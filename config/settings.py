@@ -25,11 +25,6 @@ INSTALLED_APPS = [
     "django.contrib.postgres",
     "django.contrib.sitemaps",
     "rest_framework",
-    # Public media (product photos, portfolio images, blog images) goes to Cloudinary.
-    # This does NOT affect PRIVATE_MEDIA_ROOT below - CVs stay on local disk on purpose,
-    # served only through apps.core.uploads.PrivateStorage and permission-checked views.
-    "cloudinary_storage",
-    "cloudinary",
     "apps.accounts",
     "apps.core",
     "apps.services",
@@ -99,17 +94,31 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
-# Cloudinary credentials for public media only (products, portfolio, blog images).
-CLOUDINARY_STORAGE = {
-    "CLOUD_NAME": env("CLOUDINARY_CLOUD_NAME"),
-    "API_KEY": env("CLOUDINARY_API_KEY"),
-    "API_SECRET": env("CLOUDINARY_API_SECRET"),
-}
+# Public media (product photos, portfolio images, blog images) goes to Cloudinary when it is
+# configured, which is required on Render: its disk is ephemeral, so anything under MEDIA_ROOT would
+# be lost on every redeploy. Local development, tests and CI have no Cloudinary account, so they fall
+# back to local file storage instead of failing to start.
+# This does NOT affect PRIVATE_MEDIA_ROOT below - CVs stay on local disk on purpose,
+# served only through apps.core.uploads.PrivateStorage and permission-checked views.
+CLOUDINARY_CLOUD_NAME = env("CLOUDINARY_CLOUD_NAME", default="")
+USE_CLOUDINARY = bool(CLOUDINARY_CLOUD_NAME)
+
+if USE_CLOUDINARY:
+    CLOUDINARY_STORAGE = {
+        "CLOUD_NAME": CLOUDINARY_CLOUD_NAME,
+        # Required once a cloud name is set, so a half-configured deploy fails loudly at startup.
+        "API_KEY": env("CLOUDINARY_API_KEY"),
+        "API_SECRET": env("CLOUDINARY_API_SECRET"),
+    }
+    _rf = INSTALLED_APPS.index("rest_framework") + 1
+    INSTALLED_APPS[_rf:_rf] = ["cloudinary_storage", "cloudinary"]
 
 STORAGES = {
-    # Public media only. Render's disk is ephemeral, so anything under MEDIA_ROOT would be lost
-    # on every redeploy without this.
-    "default": {"BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage"},
+    "default": {
+        "BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage"
+        if USE_CLOUDINARY
+        else "django.core.files.storage.FileSystemStorage"
+    },
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"
         if not DEBUG
