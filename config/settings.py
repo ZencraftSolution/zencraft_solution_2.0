@@ -25,6 +25,11 @@ INSTALLED_APPS = [
     "django.contrib.postgres",
     "django.contrib.sitemaps",
     "rest_framework",
+    # Public media (product photos, portfolio images, blog images) goes to Cloudinary.
+    # This does NOT affect PRIVATE_MEDIA_ROOT below - CVs stay on local disk on purpose,
+    # served only through apps.core.uploads.PrivateStorage and permission-checked views.
+    "cloudinary_storage",
+    "cloudinary",
     "apps.accounts",
     "apps.core",
     "apps.services",
@@ -38,6 +43,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -93,8 +99,29 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
-# CVs and requirement documents never live under MEDIA_ROOT. They are served
-# only through permission-checked dashboard views.
+# Cloudinary credentials for public media only (products, portfolio, blog images).
+CLOUDINARY_STORAGE = {
+    "CLOUD_NAME": env("CLOUDINARY_CLOUD_NAME"),
+    "API_KEY": env("CLOUDINARY_API_KEY"),
+    "API_SECRET": env("CLOUDINARY_API_SECRET"),
+}
+
+STORAGES = {
+    # Public media only. Render's disk is ephemeral, so anything under MEDIA_ROOT would be lost
+    # on every redeploy without this.
+    "default": {"BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage"},
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"
+        if not DEBUG
+        else "django.contrib.staticfiles.storage.StaticFilesStorage"
+    },
+}
+
+# CVs and requirement documents never live under MEDIA_ROOT, and are NOT covered by the
+# Cloudinary STORAGES entry above - PrivateStorage (apps/core/uploads.py) hardcodes this
+# local path directly. On Render this means CVs do not survive a redeploy or restart unless
+# a persistent disk is mounted at this path. They are served only through permission-checked
+# dashboard views.
 PRIVATE_MEDIA_ROOT = BASE_DIR / "private_media"
 UPLOAD_MAX_BYTES = 5 * 1024 * 1024
 # Virus scanning for CVs and requirement documents. ClamAV is the default; the no-op scanner is
