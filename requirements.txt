@@ -7,6 +7,10 @@ psycopg[binary]==3.2.3
 psycopg-binary==3.2.3
 Pillow==12.3.0
 clamd==1.0.2
+gunicorn==22.0.0
+whitenoise==6.7.0
+django-cloudinary-storage==0.3.0
+cloudinary
 
 # Transitive dependencies, pinned so installs are reproducible and auditable
 asgiref==3.11.0
