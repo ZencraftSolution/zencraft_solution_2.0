@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import environ
+from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -96,12 +97,27 @@ MEDIA_ROOT = BASE_DIR / "media"
 # only through permission-checked dashboard views.
 PRIVATE_MEDIA_ROOT = BASE_DIR / "private_media"
 UPLOAD_MAX_BYTES = 5 * 1024 * 1024
-UPLOAD_SCAN_HOOK = env("UPLOAD_SCAN_HOOK", default="apps.core.uploads.noop_scan")
+# Virus scanning for CVs and requirement documents. ClamAV is the default; the no-op scanner is
+# only allowed for local development with DEBUG=True.
+UPLOAD_SCAN_HOOK = env(
+    "UPLOAD_SCAN_HOOK",
+    default="apps.core.uploads.noop_scan" if DEBUG else "apps.core.uploads.clamav_scan",
+)
+if not DEBUG and UPLOAD_SCAN_HOOK.endswith(".noop_scan"):
+    raise ImproperlyConfigured("UPLOAD_SCAN_HOOK=noop_scan is only allowed when DEBUG=True. Configure ClamAV instead.")
+CLAMAV_UNIX_SOCKET = env("CLAMAV_UNIX_SOCKET", default="")
+CLAMAV_HOST = env("CLAMAV_HOST", default="127.0.0.1")
+CLAMAV_PORT = env.int("CLAMAV_PORT", default=3310)
+CLAMAV_TIMEOUT = env.int("CLAMAV_TIMEOUT", default=30)
 CV_RETENTION_DAYS = env.int("CV_RETENTION_DAYS", default=180)
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 DASHBOARD_PATH = env("DASHBOARD_PATH", default="hq/")
+LOGIN_MAX_FAILURES = env.int("LOGIN_MAX_FAILURES", default=5)
+LOGIN_LOCKOUT_SECONDS = env.int("LOGIN_LOCKOUT_SECONDS", default=15 * 60)
+# Number of reverse proxies in front of Django that append to X-Forwarded-For. 0 = ignore the header.
+TRUSTED_PROXY_COUNT = env.int("TRUSTED_PROXY_COUNT", default=0)
 LOGIN_URL = "dashboard:login"
 LOGIN_REDIRECT_URL = "dashboard:overview"
 
@@ -131,7 +147,9 @@ PAYMENTS = {
 SESSION_COOKIE_HTTPONLY = True
 CSRF_COOKIE_HTTPONLY = False
 SECURE_CONTENT_TYPE_NOSNIFF = True
-X_FRAME_OPTIONS = "SAMEORIGIN"
+# DENY everywhere. The only same-origin frame is the staff CV preview, whose view opts in with
+# @xframe_options_sameorigin (apps.dashboard.views.application_cv).
+X_FRAME_OPTIONS = "DENY"
 SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 
 if not DEBUG:

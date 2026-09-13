@@ -18,6 +18,14 @@ private_media/
 *.sqlite3
 *.log
 
+# Test and coverage artifacts
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.pytest_cache/
+.ruff_cache/
+
 # Tooling and editors
 .claude/
 .vscode/

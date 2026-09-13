@@ -18,7 +18,7 @@
       {% csrf_token %}
       {% include "partials/honeypot.html" %}
 
-      {% if form.errors or manual_error %}
+      {% if form.errors or manual_error or edu.total_error_count or exp.total_error_count or prj.total_error_count %}
       <div class="notice notice--error" role="alert" style="margin-bottom:28px"><i class="ph ph-warning-circle"></i>
         <span>Please fix the highlighted fields below.{% if manual_error %} {{ manual_error }}{% endif %}{% for e in form.non_field_errors %} {{ e }}{% endfor %}</span>
       </div>

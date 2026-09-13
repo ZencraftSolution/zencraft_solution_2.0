@@ -15,7 +15,7 @@ from apps.core.uploads import validate_document
 from apps.core.utils import format_npr, format_usd, make_reference, npr_to_usd, rate_limit
 
 from . import engine
-from .models import EstimatorConfig, EstimatorEvent, FeatureOption, ProjectInquiry, ProjectType
+from .models import EstimatorEvent, ProjectInquiry, ProjectType
 
 
 def start(request):

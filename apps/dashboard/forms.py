@@ -41,7 +41,12 @@ class OrderUpdateForm(forms.ModelForm):
 class EstimatorConfigForm(forms.ModelForm):
     class Meta:
         model = EstimatorConfig
-        exclude = []
+        # Explicit list: a new model field must be deliberately exposed, never editable by accident.
+        fields = [
+            "blended_hourly_rate_npr", "contingency_pct", "range_low_factor", "range_high_factor", "team_hours_per_week",
+            "minimum_project_npr", "design_multipliers", "urgency_multipliers", "team_multipliers", "platform_coefficients",
+            "disclaimer",
+        ]
         widgets = {
             "design_multipliers": forms.Textarea(attrs={"rows": 4, "class": "is-code"}),
             "urgency_multipliers": forms.Textarea(attrs={"rows": 5, "class": "is-code"}),
@@ -60,7 +65,7 @@ class EstimatorConfigForm(forms.ModelForm):
         try:
             return {k: float(v) for k, v in value.items()}
         except (TypeError, ValueError):
-            raise forms.ValidationError("All values must be numbers.")
+            raise forms.ValidationError("All values must be numbers.") from None
 
     def clean_design_multipliers(self):
         return self._validate_map("design_multipliers", ["existing", "uiux", "branding"])
@@ -78,4 +83,8 @@ class EstimatorConfigForm(forms.ModelForm):
 class SiteSettingsForm(forms.ModelForm):
     class Meta:
         model = SiteSettings
-        exclude = []
+        fields = [
+            "company_name", "tagline", "email", "careers_email", "phone", "whatsapp", "address", "office_hours",
+            "linkedin_url", "github_url", "facebook_url", "x_url", "exchange_rate_npr_per_usd", "hero_title", "hero_subtitle",
+            "stat_projects", "stat_clients", "stat_engineers", "stat_uptime", "stat_years",
+        ]

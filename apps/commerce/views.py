@@ -166,21 +166,33 @@ def payment_callback(request, gateway, reference, outcome):
         raise Http404
     if order.payment_status == "paid":
         return redirect("commerce:order_done", reference=reference)
+
+    # Provider verification happens outside the transaction so a slow gateway never holds row locks.
     result = gw.verify(order, payment, request, outcome)
-    payment.raw_response = result.raw
-    if result.success:
-        payment.status = "success"
-        payment.transaction_id = result.transaction_id or payment.transaction_id
-        order.payment_status = "paid"
-        order.save(update_fields=["payment_status", "updated_at"])
+
+    newly_paid = False
+    with transaction.atomic():
+        # Lock the order so concurrent or replayed callbacks cannot fulfil it twice.
+        locked = Order.objects.select_for_update().get(pk=order.pk)
+        payment = Payment.objects.select_for_update().get(pk=payment.pk)
+        if locked.payment_status == "paid":
+            return redirect("commerce:order_done", reference=reference)
+        payment.raw_response = result.raw
+        if result.success:
+            payment.status = "success"
+            payment.transaction_id = result.transaction_id or payment.transaction_id
+            locked.payment_status = "paid"
+            newly_paid = True
+        else:
+            payment.status = "failed"
+            locked.payment_status = "failed"
         payment.save()
+        locked.save(update_fields=["payment_status", "updated_at"])
+
+    if newly_paid:
         request.session.pop("simulated_payment", None)
-        _send_order_emails(order)
+        _send_order_emails(locked)
         return redirect("commerce:order_done", reference=reference)
-    payment.status = "failed"
-    payment.save()
-    order.payment_status = "failed"
-    order.save(update_fields=["payment_status", "updated_at"])
     messages.error(request, "The payment was not completed. You have not been charged. Please try again or choose another method.")
     return redirect("commerce:payment", reference=reference)
 

@@ -159,6 +159,9 @@ class EducationEntry(models.Model):
     class Meta:
         ordering = ["-end_year"]
 
+    def __str__(self):
+        return f"{self.degree}, {self.institution}"
+
 
 class ExperienceEntry(models.Model):
     application = models.ForeignKey(JobApplication, on_delete=models.CASCADE, related_name="experience")
@@ -172,6 +175,9 @@ class ExperienceEntry(models.Model):
     class Meta:
         ordering = ["-is_current", "-start_date"]
 
+    def __str__(self):
+        return f"{self.title} at {self.company}"
+
 
 class ProjectEntry(models.Model):
     application = models.ForeignKey(JobApplication, on_delete=models.CASCADE, related_name="projects")
@@ -179,6 +185,9 @@ class ProjectEntry(models.Model):
     url = models.URLField(blank=True)
     tech_used = models.CharField(max_length=200, blank=True)
     description = models.TextField(blank=True)
+
+    def __str__(self):
+        return self.name
 
 
 class ApplicationNote(models.Model):
@@ -189,3 +198,6 @@ class ApplicationNote(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Note on {self.application_id} by {self.author or 'system'}"

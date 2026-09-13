@@ -1,0 +1,106 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-audit:
+    name: Lint and dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install pinned dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Ruff
+        run: ruff check .
+
+      - name: pip-audit (runtime and dev dependencies)
+        run: |
+          pip-audit -r requirements.txt
+          pip-audit -r requirements-dev.txt
+
+  test:
+    name: Tests (Python ${{ matrix.python-version }}, PostgreSQL 16)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.12"]
+
+    services:
+      # Real PostgreSQL: the app relies on django.contrib.postgres full-text search and row locking.
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: zencraft_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # Tests import settings with DEBUG=True (like local development) so SSL redirects and secure cookies
+      # don't break the test client. Django's test runner still runs every test with settings.DEBUG=False,
+      # and the deploy-check step below plus DeployCheckSmokeTests verify the real DEBUG=False configuration.
+      DEBUG: "True"
+      ALLOWED_HOSTS: testserver,localhost,127.0.0.1
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/zencraft_db
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install pinned dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Generate a throwaway SECRET_KEY
+        run: echo "SECRET_KEY=$(python -c 'import secrets; print(secrets.token_urlsafe(64))')" >> "$GITHUB_ENV"
+
+      - name: Migrations are up to date
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: Deployment checklist (DEBUG=False)
+        env:
+          DEBUG: "False"
+          ALLOWED_HOSTS: zencraftsolution.com
+        run: python manage.py check --deploy --fail-level WARNING
+
+      - name: Test suite with coverage
+        run: python -m pytest --cov --cov-report=term-missing:skip-covered --cov-report=xml
+
+      - name: Enforce per-app coverage floor (commerce, careers, dashboard, core)
+        run: python scripts/check_coverage.py --floor 85
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.python-version }}
+          path: coverage.xml
+          if-no-files-found: ignore

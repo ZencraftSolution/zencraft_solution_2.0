@@ -5,13 +5,18 @@ import json
 import logging
 import urllib.parse
 import urllib.request
+from decimal import Decimal, InvalidOperation
 
 from django.conf import settings
 
 from .base import GatewayResult, PaymentGateway, VerifyResult, to_decimal_str
 
 logger = logging.getLogger(__name__)
-CFG = settings.PAYMENTS
+
+
+def _cfg():
+    """Gateway credentials, read at call time so they can be rotated or overridden in tests."""
+    return settings.PAYMENTS
 
 
 def _http_json(url, data=None, headers=None, form=False, method="POST"):
@@ -34,12 +39,13 @@ class EsewaGateway(PaymentGateway):
     label = "eSewa"
     icon = "wallet"
     description = "Pay from your eSewa wallet in NPR."
+    REQUIRED_SIGNED_FIELDS = {"status", "total_amount", "transaction_uuid", "product_code"}
 
     def is_configured(self):
-        return bool(CFG["ESEWA_SECRET_KEY"] and CFG["ESEWA_PRODUCT_CODE"])
+        return bool(_cfg()["ESEWA_SECRET_KEY"] and _cfg()["ESEWA_PRODUCT_CODE"])
 
     def _sign(self, message):
-        digest = hmac.new(CFG["ESEWA_SECRET_KEY"].encode(), message.encode(), hashlib.sha256).digest()
+        digest = hmac.new(_cfg()["ESEWA_SECRET_KEY"].encode(), message.encode(), hashlib.sha256).digest()
         return base64.b64encode(digest).decode()
 
     def initiate(self, order, payment, request):
@@ -52,15 +58,15 @@ class EsewaGateway(PaymentGateway):
             "tax_amount": "0",
             "total_amount": total,
             "transaction_uuid": uuid,
-            "product_code": CFG["ESEWA_PRODUCT_CODE"],
+            "product_code": _cfg()["ESEWA_PRODUCT_CODE"],
             "product_service_charge": "0",
             "product_delivery_charge": "0",
             "success_url": self.callback_url(request, order, "success"),
             "failure_url": self.callback_url(request, order, "failure"),
             "signed_field_names": "total_amount,transaction_uuid,product_code",
         }
-        fields["signature"] = self._sign(f"total_amount={total},transaction_uuid={uuid},product_code={CFG['ESEWA_PRODUCT_CODE']}")
-        return GatewayResult(kind="form", url=CFG["ESEWA_FORM_URL"], fields=fields)
+        fields["signature"] = self._sign(f"total_amount={total},transaction_uuid={uuid},product_code={_cfg()['ESEWA_PRODUCT_CODE']}")
+        return GatewayResult(kind="form", url=_cfg()["ESEWA_FORM_URL"], fields=fields)
 
     def verify(self, order, payment, request, outcome="success"):
         if outcome != "success" or not self.is_configured():
@@ -72,11 +78,21 @@ class EsewaGateway(PaymentGateway):
             data = json.loads(base64.b64decode(encoded).decode())
         except (ValueError, json.JSONDecodeError):
             return VerifyResult(success=False, raw={"error": "undecodable"})
-        names = data.get("signed_field_names", "").split(",")
+        if not isinstance(data, dict):
+            return VerifyResult(success=False, raw={"error": "undecodable"})
+        names = [n for n in str(data.get("signed_field_names", "")).split(",") if n]
+        # Every field we rely on must be covered by the signature, otherwise it could be edited freely.
+        if not self.REQUIRED_SIGNED_FIELDS.issubset(names):
+            return VerifyResult(success=False, raw={"error": "required fields not signed", **data})
         message = ",".join(f"{n}={data.get(n, '')}" for n in names)
-        signature_ok = hmac.compare_digest(self._sign(message), data.get("signature", ""))
+        signature_ok = hmac.compare_digest(self._sign(message), str(data.get("signature", "")))
         uuid_ok = data.get("transaction_uuid") == f"{order.reference}-{payment.pk}"
-        success = signature_ok and uuid_ok and data.get("status") == "COMPLETE"
+        product_ok = data.get("product_code") == _cfg()["ESEWA_PRODUCT_CODE"]
+        try:
+            amount_ok = Decimal(str(data.get("total_amount", "")).replace(",", "")) == Decimal(order.total_npr)
+        except InvalidOperation:
+            amount_ok = False
+        success = signature_ok and uuid_ok and product_ok and amount_ok and data.get("status") == "COMPLETE"
         return VerifyResult(success=success, transaction_id=data.get("transaction_code", ""), raw=data)
 
 
@@ -87,10 +103,10 @@ class KhaltiGateway(PaymentGateway):
     description = "Pay with Khalti wallet, mobile banking or cards."
 
     def is_configured(self):
-        return bool(CFG["KHALTI_SECRET_KEY"])
+        return bool(_cfg()["KHALTI_SECRET_KEY"])
 
     def _headers(self):
-        return {"Authorization": f"Key {CFG['KHALTI_SECRET_KEY']}"}
+        return {"Authorization": f"Key {_cfg()['KHALTI_SECRET_KEY']}"}
 
     def initiate(self, order, payment, request):
         if not self.is_configured():
@@ -104,7 +120,7 @@ class KhaltiGateway(PaymentGateway):
             "customer_info": {"name": order.customer_name, "email": order.email, "phone": order.phone},
         }
         try:
-            data = _http_json(CFG["KHALTI_API_URL"] + "epayment/initiate/", payload, self._headers())
+            data = _http_json(_cfg()["KHALTI_API_URL"] + "epayment/initiate/", payload, self._headers())
         except Exception as exc:  # network or provider error
             logger.exception("Khalti initiate failed")
             return GatewayResult(kind="instructions", message=f"Khalti is unavailable right now ({exc.__class__.__name__}). Please try another method.")
@@ -119,9 +135,17 @@ class KhaltiGateway(PaymentGateway):
         pidx = request.GET.get("pidx", "")
         if not pidx or pidx != payment.transaction_id:
             return VerifyResult(success=False, raw={"error": "pidx mismatch"})
-        data = _http_json(CFG["KHALTI_API_URL"] + "epayment/lookup/", {"pidx": pidx}, self._headers())
-        ok = data.get("status") == "Completed" and int(data.get("total_amount", 0)) == int(order.total_npr * 100)
-        return VerifyResult(success=ok, transaction_id=data.get("transaction_id", pidx), raw=data)
+        try:
+            data = _http_json(_cfg()["KHALTI_API_URL"] + "epayment/lookup/", {"pidx": pidx}, self._headers())
+        except Exception as exc:  # never mark paid on a provider error
+            logger.exception("Khalti lookup failed")
+            return VerifyResult(success=False, raw={"error": exc.__class__.__name__})
+        try:
+            amount_ok = int(data.get("total_amount", -1)) == int(order.total_npr * 100)
+        except (TypeError, ValueError):
+            amount_ok = False
+        ok = data.get("pidx") == pidx and data.get("status") == "Completed" and amount_ok
+        return VerifyResult(success=ok, transaction_id=data.get("transaction_id") or pidx, raw=data)
 
 
 class FonepayGateway(PaymentGateway):
@@ -141,10 +165,10 @@ class StripeGateway(PaymentGateway):
     description = "International Visa, Mastercard or Amex, charged in USD."
 
     def is_configured(self):
-        return bool(CFG["STRIPE_SECRET_KEY"])
+        return bool(_cfg()["STRIPE_SECRET_KEY"])
 
     def _headers(self):
-        return {"Authorization": f"Bearer {CFG['STRIPE_SECRET_KEY']}"}
+        return {"Authorization": f"Bearer {_cfg()['STRIPE_SECRET_KEY']}"}
 
     def initiate(self, order, payment, request):
         if not self.is_configured():
@@ -176,8 +200,21 @@ class StripeGateway(PaymentGateway):
         session_id = request.GET.get("session_id", "")
         if session_id != payment.transaction_id:
             return VerifyResult(success=False, raw={"error": "session mismatch"})
-        data = _http_json(f"https://api.stripe.com/v1/checkout/sessions/{session_id}", headers=self._headers(), method="GET")
-        return VerifyResult(success=data.get("payment_status") == "paid", transaction_id=data.get("payment_intent") or session_id, raw={"id": data.get("id"), "payment_status": data.get("payment_status")})
+        try:
+            data = _http_json(f"https://api.stripe.com/v1/checkout/sessions/{session_id}", headers=self._headers(), method="GET")
+        except Exception as exc:  # never mark paid on a provider error
+            logger.exception("Stripe session lookup failed")
+            return VerifyResult(success=False, raw={"error": exc.__class__.__name__})
+        expected_cents = int(Decimal(order.total_usd) * 100)
+        ok = (
+            data.get("id") == session_id
+            and data.get("payment_status") == "paid"
+            and data.get("amount_total") == expected_cents
+            and str(data.get("currency", "")).lower() == "usd"
+            and data.get("client_reference_id") == f"{order.reference}-{payment.pk}"
+        )
+        raw = {k: data.get(k) for k in ("id", "payment_status", "amount_total", "currency", "client_reference_id")}
+        return VerifyResult(success=ok, transaction_id=data.get("payment_intent") or session_id, raw=raw)
 
 
 class BankTransferGateway(PaymentGateway):

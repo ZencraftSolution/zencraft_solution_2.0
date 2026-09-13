@@ -49,9 +49,11 @@ class PaymentGateway:
         """Confirm a payment on callback. Never trust query parameters without checking with the provider."""
         if outcome != "success":
             return VerifyResult(success=False, raw={"outcome": outcome})
-        if not self.is_configured() and settings.DEBUG:
-            ok = request.session.get("simulated_payment") == payment.pk
-            return VerifyResult(success=ok, transaction_id=f"SIM-{payment.pk}", raw={"simulated": True})
+        if not self.is_configured():
+            if settings.DEBUG:
+                ok = request.session.get("simulated_payment") == payment.pk
+                return VerifyResult(success=ok, transaction_id=f"SIM-{payment.pk}", raw={"simulated": True})
+            return VerifyResult(success=False, raw={"error": "gateway not configured"})
         raise NotImplementedError
 
 

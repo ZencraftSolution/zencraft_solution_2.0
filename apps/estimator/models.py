@@ -46,6 +46,9 @@ class EstimatorConfig(models.Model):
     class Meta:
         verbose_name = "Estimator configuration"
 
+    def __str__(self):
+        return "Estimator configuration"
+
     def save(self, *args, **kwargs):
         self.pk = 1
         super().save(*args, **kwargs)
@@ -54,9 +57,6 @@ class EstimatorConfig(models.Model):
     def load(cls):
         obj, _ = cls.objects.get_or_create(pk=1)
         return obj
-
-    def __str__(self):
-        return "Estimator configuration"
 
 
 class ProjectType(models.Model):
@@ -179,6 +179,9 @@ class LeadNote(models.Model):
     class Meta:
         ordering = ["-created_at"]
 
+    def __str__(self):
+        return f"Note on {self.inquiry_id} by {self.author or 'system'}"
+
 
 class EstimatorEvent(models.Model):
     """Step views for drop-off analytics. Step 7 means the result was shown."""
@@ -189,3 +192,6 @@ class EstimatorEvent(models.Model):
 
     class Meta:
         unique_together = [("session_id", "step")]
+
+    def __str__(self):
+        return f"{self.session_id} step {self.step}"

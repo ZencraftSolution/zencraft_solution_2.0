@@ -40,7 +40,7 @@ def calculate(project_type_key, feature_keys, platforms, timeline, team_preferen
     try:
         project_type = ProjectType.objects.get(key=project_type_key, is_active=True)
     except ProjectType.DoesNotExist:
-        raise ValueError("Unknown project type")
+        raise ValueError("Unknown project type") from None
 
     platforms = [p for p in platforms if p in VALID_PLATFORMS] or ["web"]
     features = list(FeatureOption.objects.filter(key__in=feature_keys, project_types=project_type, is_active=True))

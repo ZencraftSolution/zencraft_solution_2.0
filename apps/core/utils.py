@@ -2,15 +2,26 @@ import functools
 import secrets
 from decimal import ROUND_HALF_UP, Decimal
 
+from django.conf import settings
 from django.core.cache import cache
 from django.http import HttpResponse, JsonResponse
 
 
 def client_ip(request):
+    """Client IP for rate limiting and audit logs.
+
+    X-Forwarded-For is only honoured when TRUSTED_PROXY_COUNT says how many reverse proxies
+    append to it; otherwise any visitor could spoof the header and dodge IP-keyed lockouts.
+    With N trusted proxies the real client is the Nth entry from the right.
+    """
+    remote = request.META.get("REMOTE_ADDR")
+    proxies = getattr(settings, "TRUSTED_PROXY_COUNT", 0)
     forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.META.get("REMOTE_ADDR")
+    if proxies and forwarded:
+        parts = [p.strip() for p in forwarded.split(",") if p.strip()]
+        if len(parts) >= proxies:
+            return parts[-proxies]
+    return remote
 
 
 def rate_limit(key, limit=5, window=600, methods=("POST",)):

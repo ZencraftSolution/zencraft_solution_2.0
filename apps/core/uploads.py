@@ -1,5 +1,6 @@
 """Private file storage and upload validation shared by careers and the estimator."""
 import io
+import logging
 import uuid
 import zipfile
 from pathlib import Path
@@ -10,6 +11,7 @@ from django.core.files.storage import FileSystemStorage
 from django.utils.deconstruct import deconstructible
 from django.utils.module_loading import import_string
 
+logger = logging.getLogger(__name__)
 
 class PrivateStorage(FileSystemStorage):
     """Filesystem storage with no public URL. Files are streamed by permission-checked views."""
@@ -84,5 +86,50 @@ def validate_document(uploaded, allowed=("pdf", "docx"), max_bytes=None):
 
 
 def noop_scan(uploaded):
-    """Default virus-scan hook. Replace UPLOAD_SCAN_HOOK with a ClamAV or cloud scanner in production."""
+    """Accepts every file. Only permitted when DEBUG=True (enforced in settings.py)."""
     return True
+
+
+class ScannerUnavailable(ValidationError):
+    pass
+
+
+def _clamd_client():
+    import clamd
+
+    timeout = getattr(settings, "CLAMAV_TIMEOUT", 30)
+    socket_path = getattr(settings, "CLAMAV_UNIX_SOCKET", "")
+    if socket_path:
+        return clamd.ClamdUnixSocket(path=socket_path, timeout=timeout)
+    return clamd.ClamdNetworkSocket(
+        host=getattr(settings, "CLAMAV_HOST", "127.0.0.1"),
+        port=getattr(settings, "CLAMAV_PORT", 3310),
+        timeout=timeout,
+    )
+
+
+def clamav_scan(uploaded):
+    """Streams the upload to a ClamAV daemon (INSTREAM). Returns False on a positive match.
+
+    Fails closed: if the daemon cannot be reached or returns an error, the upload is rejected
+    rather than accepted unscanned.
+    """
+    import clamd
+
+    uploaded.seek(0)
+    try:
+        result = _clamd_client().instream(uploaded)
+    except (clamd.ClamdError, OSError) as exc:
+        logger.error("ClamAV scan failed for %s: %s", getattr(uploaded, "name", "upload"), exc)
+        raise ScannerUnavailable("We could not scan this file for viruses right now. Please try again in a few minutes.") from exc
+    finally:
+        uploaded.seek(0)
+
+    status, signature = (result or {}).get("stream", ("ERROR", "no response"))
+    if status == "OK":
+        return True
+    if status == "FOUND":
+        logger.warning("ClamAV rejected upload %s: %s", getattr(uploaded, "name", "upload"), signature)
+        return False
+    logger.error("ClamAV returned %s for %s: %s", status, getattr(uploaded, "name", "upload"), signature)
+    raise ScannerUnavailable("We could not scan this file for viruses right now. Please try again in a few minutes.")

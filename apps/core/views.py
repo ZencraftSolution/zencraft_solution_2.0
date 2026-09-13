@@ -4,8 +4,8 @@ from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector
 from django.core.mail import send_mail
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
-from django.urls import reverse
 from django.template.loader import render_to_string
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from apps.blog.models import BlogPost

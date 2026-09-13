@@ -69,9 +69,42 @@ Money is stored as `DecimalField` in NPR. USD is derived from the exchange rate 
 ## Careers and CV privacy
 
 - Candidates can **upload a CV** (PDF or DOCX, max 5 MB) or **fill in their CV manually** (profile, experience, education, projects).
-- Uploads are validated by file contents (PDF header, DOCX zip structure), not only by extension, and pass through `UPLOAD_SCAN_HOOK` so a virus scanner can be plugged in.
+- Uploads are validated by file contents (PDF header, DOCX zip structure), not only by extension, and then virus-scanned through `UPLOAD_SCAN_HOOK` (ClamAV by default, see below).
 - CVs and requirement documents are saved under `private_media/` with random names. They have no public URL and are streamed only through staff-only views that write to the audit log.
 - Schedule `python manage.py purge_applications` daily. It removes CV files and personal data from rejected applications older than `CV_RETENTION_DAYS` (default 180).
+
+## Virus scanning with ClamAV (required in production)
+
+Every CV and requirements document is streamed to a ClamAV daemon before it is saved (`apps.core.uploads.clamav_scan`).
+
+- With `DEBUG=False`, `UPLOAD_SCAN_HOOK` defaults to `clamav_scan`. Setting it to `noop_scan` makes Django refuse to start.
+- The scan **fails closed**: if the daemon is unreachable or returns an error, the upload is rejected with a "try again later" message and the error is logged.
+- Local development with `DEBUG=True` defaults to `noop_scan`, so you do not need ClamAV installed to work on the site.
+
+Set up on Ubuntu or Debian:
+
+```bash
+sudo apt-get install -y clamav-daemon clamav-freshclam
+sudo systemctl stop clamav-freshclam && sudo freshclam && sudo systemctl start clamav-freshclam   # first signature download
+sudo systemctl enable --now clamav-daemon
+# Allow the Django user to read the socket
+sudo usermod -aG clamav www-data
+```
+
+Then in `.env`:
+
+```
+UPLOAD_SCAN_HOOK=apps.core.uploads.clamav_scan
+CLAMAV_UNIX_SOCKET=/var/run/clamav/clamd.ctl
+```
+
+Or, with Docker, run `docker run -d --name clamav -p 3310:3310 clamav/clamav:stable` and set `CLAMAV_HOST=127.0.0.1` and `CLAMAV_PORT=3310` (leave `CLAMAV_UNIX_SOCKET` empty). The daemon needs about 1 GB of RAM for signatures and a minute or two to load after starting.
+
+Check it end to end with the harmless EICAR test string. Uploading a `.pdf` whose content starts with `%PDF-` followed by the EICAR string should be rejected with "The file could not be accepted by our security scan."
+
+## Login lockout and proxies
+
+The HQ dashboard login and the Django admin login share one IP-keyed lockout (`LOGIN_MAX_FAILURES`, default 5, over `LOGIN_LOCKOUT_SECONDS`, default 900). Behind nginx or another reverse proxy, set `TRUSTED_PROXY_COUNT=1` so the real client IP is read from `X-Forwarded-For`. Leave it at `0` when Django is exposed directly, otherwise attackers could spoof the header to dodge the lockout.
 
 ## Front end and motion
 

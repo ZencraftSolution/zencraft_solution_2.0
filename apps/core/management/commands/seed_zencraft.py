@@ -8,8 +8,6 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
 
-from config.settings import env
-
 from apps.blog.models import BlogCategory, BlogPost
 from apps.careers.models import Department, JobOpening
 from apps.commerce.models import EngagementModel, FixedPriceRange, ProductizedService, RoleRate
@@ -19,6 +17,7 @@ from apps.core.models import SiteSettings
 from apps.estimator.models import EstimatorConfig, FeatureOption, ProjectType
 from apps.portfolio.models import CaseStudy, GalleryImage, TeamMember, Testimonial
 from apps.services.models import FAQ, Industry, ProcessStep, Service, ServiceCategory, Technology
+from config.settings import env
 
 
 class Command(BaseCommand):

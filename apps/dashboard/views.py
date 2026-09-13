@@ -4,57 +4,46 @@ from datetime import timedelta
 
 from django.contrib import messages
 from django.contrib.auth import logout
+from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.views import LoginView
-from django.core.cache import cache
 from django.db.models import Count, Q, Sum
 from django.db.models.functions import TruncDate
 from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.utils.decorators import method_decorator
+from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.views.decorators.http import require_POST
 
 from apps.careers.models import ApplicationNote, JobApplication, JobOpening
 from apps.commerce.models import Order
 from apps.core.models import AuditLog, ConsultationBooking, ContactSubmission, PageView, SiteSettings
-from apps.core.utils import client_ip, log_action
+from apps.core.throttle import throttle_login
+from apps.core.utils import log_action
 from apps.estimator.models import EstimatorConfig, EstimatorEvent, LeadNote, ProjectInquiry
 
 from .forms import ApplicationUpdateForm, EstimatorConfigForm, LeadUpdateForm, NoteForm, OrderUpdateForm, SiteSettingsForm
 from .mixins import staff_required
 
-MAX_LOGIN_FAILURES = 5
-LOCKOUT_SECONDS = 15 * 60
-
 ESTIMATOR_STEPS = ["Project type", "Scope", "Platforms", "Timeline and team", "Design", "Contact details", "Estimate shown", "Lead submitted"]
 
 
+def _dashboard_locked(request):
+    return render(request, "dashboard/login.html", {"form": AuthenticationForm(request), "locked": True}, status=429)
+
+
+@method_decorator(throttle_login(locked_response=_dashboard_locked), name="dispatch")
 class DashboardLoginView(LoginView):
+    """Staff sign-in. Lockout is shared with the Django admin login via apps.core.throttle."""
+
     template_name = "dashboard/login.html"
     redirect_authenticated_user = True
-
-    def _key(self):
-        return f"dash-login-fail:{client_ip(self.request)}"
-
-    def post(self, request, *args, **kwargs):
-        if cache.get(self._key(), 0) >= MAX_LOGIN_FAILURES:
-            return render(request, self.template_name, {"form": self.get_form_class()(request), "locked": True}, status=429)
-        return super().post(request, *args, **kwargs)
-
-    def form_invalid(self, form):
-        key = self._key()
-        if not cache.add(key, 1, LOCKOUT_SECONDS):
-            try:
-                cache.incr(key)
-            except ValueError:
-                cache.set(key, 1, LOCKOUT_SECONDS)
-        return super().form_invalid(form)
 
     def form_valid(self, form):
         user = form.get_user()
         if not user.is_staff:
             form.add_error(None, "Please enter a correct username and password.")
             return self.form_invalid(form)
-        cache.delete(self._key())
         response = super().form_valid(form)
         log_action(self.request, "signed in", user)
         return response
@@ -247,6 +236,7 @@ def application_detail(request, pk):
     })
 
 
+@xframe_options_sameorigin  # framed by dashboard/application_detail.html for in-browser PDF preview
 @staff_required
 def application_cv(request, pk):
     app = get_object_or_404(JobApplication, pk=pk)
@@ -261,7 +251,7 @@ def _private_file_response(field_file, filename, inline):
     try:
         handle = field_file.open("rb")
     except FileNotFoundError:
-        raise Http404
+        raise Http404("File missing from private storage") from None
     content_type = mimetypes.guess_type(field_file.name)[0] or "application/octet-stream"
     response = FileResponse(handle, content_type=content_type, as_attachment=not inline, filename=filename)
     response["X-Content-Type-Options"] = "nosniff"

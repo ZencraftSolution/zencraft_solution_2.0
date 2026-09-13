@@ -48,6 +48,9 @@ class CaseStudyImage(models.Model):
     class Meta:
         ordering = ["order"]
 
+    def __str__(self):
+        return self.caption or f"Image {self.order} for {self.case_study_id}"
+
 
 class Testimonial(models.Model):
     VERIFICATION = [("pending", "Pending"), ("verified", "Verified"), ("rejected", "Rejected")]

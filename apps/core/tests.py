@@ -1,286 +1,421 @@
+"""Cross-cutting tests: helpers, template tags, rate limiting, uploads and scanning, middleware, error pages,
+sitemap/robots, the public core pages and the seed command. App-specific behaviour lives in each app's tests.py."""
 import io
 import json
-import zipfile
+import re
+from datetime import timedelta
+from decimal import Decimal
+from unittest import mock
 
-from django.contrib.auth import get_user_model
+from django.core import mail
 from django.core.cache import cache
+from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
-from django.test import TestCase, override_settings
+from django.http import HttpResponse
+from django.template import Context, Template
+from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from apps.blog.models import BlogPost
-from apps.careers.models import JobApplication, JobOpening
-from apps.commerce.models import Order, ProductizedService
-from apps.core.utils import format_npr
-from apps.dashboard.crud import REGISTRY
-from apps.estimator.models import EstimatorEvent, ProjectInquiry
-from apps.portfolio.models import CaseStudy
-from apps.services.models import Industry, Service
-
-PDF_BYTES = b"%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF"
-
-
-def docx_bytes():
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w") as zf:
-        zf.writestr("[Content_Types].xml", "<Types/>")
-        zf.writestr("word/document.xml", "<w:document/>")
-    return buf.getvalue()
-
-
-class SeededTestCase(TestCase):
-    @classmethod
-    def setUpTestData(cls):
-        call_command("seed_zencraft", stdout=io.StringIO())
-
-    def setUp(self):
-        cache.clear()
+from apps.careers.models import JobOpening
+from apps.core import uploads
+from apps.core.models import ConsultationBooking, ContactSubmission, NewsletterSubscriber, PageView, SiteSettings
+from apps.core.testing import CLAMAV_SCAN, NOOP_SCAN, docx_bytes, make_job, make_product, pdf_upload
+from apps.core.utils import client_ip, format_npr, format_usd, log_action, make_reference, npr_to_usd, rate_limit
+from apps.services.models import Service
 
 
 class FormattingTests(TestCase):
     def test_south_asian_grouping(self):
         self.assertEqual(format_npr(800000), "Rs. 8,00,000")
         self.assertEqual(format_npr(12345678), "Rs. 1,23,45,678")
+        self.assertEqual(format_npr(Decimal("999.5")), "Rs. 1,000")
         self.assertEqual(format_npr(950), "Rs. 950")
+        self.assertEqual(format_npr(-150000), "Rs. -1,50,000")
+        self.assertEqual(format_npr(100000, with_symbol=False), "1,00,000")
+        self.assertEqual((format_npr(None), format_npr("")), ("", ""))
+
+    def test_usd_helpers_and_reference(self):
+        self.assertEqual(npr_to_usd(134250, Decimal("134.25")), Decimal("1000"))
+        self.assertIsNone(npr_to_usd(None, 134))
+        self.assertIsNone(npr_to_usd(100, 0))
+        self.assertEqual((format_usd(Decimal("1234")), format_usd(None)), ("$1,234", ""))
+        self.assertRegex(make_reference("ZC"), r"^ZC-[0-9A-F]{6}$")
 
 
-class PublicPageTests(SeededTestCase):
-    def test_public_pages_render(self):
-        urls = [
-            reverse("core:home"), reverse("core:about"), reverse("core:contact"), reverse("core:consultation"),
-            reverse("core:search") + "?q=cloud", reverse("core:privacy"), reverse("core:terms"), reverse("core:cookies"),
-            reverse("services:list"), reverse("services:industries"), reverse("services:technologies"),
-            reverse("portfolio:list"), reverse("commerce:pricing"), reverse("commerce:store"), reverse("commerce:cart"),
-            reverse("estimator:start"), reverse("careers:landing"), reverse("careers:jobs") + "?level=senior",
-            reverse("blog:list"), reverse("blog:list") + "?q=cloud", "/robots.txt", "/sitemap.xml",
-        ]
-        urls += [s.get_absolute_url() for s in Service.objects.all()]
-        urls += [i.get_absolute_url() for i in Industry.objects.all()]
-        urls += [c.get_absolute_url() for c in CaseStudy.objects.all()]
-        urls += [j.get_absolute_url() for j in JobOpening.objects.all()]
-        urls += [reverse("careers:apply", args=[j.slug]) for j in JobOpening.objects.all()[:2]]
-        urls += [p.get_absolute_url() for p in BlogPost.objects.all()]
-        urls += [p.get_absolute_url() for p in ProductizedService.objects.all()]
-        for url in urls:
-            with self.subTest(url=url):
-                self.assertEqual(self.client.get(url).status_code, 200)
+class TemplateTagTests(TestCase):
+    def render(self, source, **ctx):
+        return Template("{% load zc %}" + source).render(Context(ctx))
 
-    def test_nine_services_with_depth(self):
-        self.assertEqual(Service.objects.count(), 9)
-        for s in Service.objects.all():
-            self.assertEqual(s.steps.count(), 6)
-            self.assertGreaterEqual(len(s.deliverables), 6)
-            self.assertGreaterEqual(s.faqs.count(), 4)
+    def test_price_tags_render_both_currencies(self):
+        html = self.render("{% price amount 'per month' %}", amount=Decimal("134250"), site=SiteSettings(exchange_rate_npr_per_usd=Decimal("134.25")))
+        self.assertIn("Rs. 1,34,250", html)
+        self.assertIn("$1,000", html)
+        self.assertIn("per month", html)
+        self.assertEqual(self.render("{% price amount %}", amount=None), "")
+        ranged = self.render("{% price_range low high %}", low=100000, high=250000)
+        self.assertIn("Rs. 1,00,000 to 2,50,000", ranged)
+        self.assertIn("$", self.render("{% usd 134250 %}"))
 
-    def test_404_uses_terminal_page(self):
-        response = self.client.get("/does-not-exist/")
-        self.assertEqual(response.status_code, 404)
+    def test_filters(self):
+        self.assertEqual(self.render("{{ v|npr }}", v=250000), "Rs. 2,50,000")
+        self.assertEqual(self.render("{% for l in v|lines %}[{{ l }}]{% endfor %}", v="a\n\n b \n"), "[a][b]")
+        self.assertEqual(self.render("{% for p in v|paragraphs %}[{{ p }}]{% endfor %}", v="one\n\ntwo"), "[one][two]")
+        self.assertEqual(self.render("{{ d|get_item:'k' }}|{{ n|get_item:'k' }}", d={"k": "v"}, n=5), "v|None")
+        self.assertEqual(self.render("{{ 3|pad2 }}|{{ 'x'|pad2 }}", ), "03|x")
+        self.assertEqual(self.render("{% for _ in 3|star_range %}*{% endfor %}{% for _ in 'x'|star_range %}!{% endfor %}"), "***")
 
-    def test_job_posting_json_ld(self):
-        job = JobOpening.objects.first()
-        self.assertContains(self.client.get(job.get_absolute_url()), '"@type": "JobPosting"')
+    def test_json_ld_escapes_script_breakout(self):
+        html = self.render("{% json_ld data %}", data={"name": "</script><script>alert(1)</script>"})
+        self.assertEqual(html.count("</script>"), 1)
+        self.assertIn("<\\/script>", html)
 
-    def test_contact_form(self):
-        response = self.client.post(reverse("core:contact"), {
-            "name": "Sita Sharma", "email": "sita@example.com", "subject": "Hello", "message": "We need an app.", "consent": "on",
-        })
-        self.assertEqual(response.status_code, 302)
-
-    def test_honeypot_blocks_bots(self):
-        response = self.client.post(reverse("core:contact"), {
-            "name": "Bot", "email": "bot@example.com", "subject": "x", "message": "x", "consent": "on", "website": "http://spam",
-        })
-        self.assertEqual(response.status_code, 200)
+    def test_network_svg_and_active(self):
+        svg = self.render("{% network_svg seed=3 nodes=10 %}")
+        self.assertEqual(svg.count("<circle"), 10)
+        request = RequestFactory().get("/services/web/")
+        self.assertEqual(self.render("{% active '/services/' %}|{% active '/work/' %}", request=request), "is-active|")
 
 
-class EstimatorTests(SeededTestCase):
-    def answers(self):
-        return {
-            "project_type": "mobile-app", "features": ["auth", "payments", "notifications"], "platforms": ["ios", "android"],
-            "timeline": "fast", "team_preference": "fixed", "design_needs": "uiux", "session_id": "test-session",
-        }
-
-    def test_config_api(self):
-        data = self.client.get(reverse("estimator:config_api")).json()
-        self.assertEqual(len(data["project_types"]), 7)
-
-    def test_preview_range_is_ordered(self):
-        response = self.client.post(reverse("estimator:preview_api"), json.dumps(self.answers()), content_type="application/json")
-        est = response.json()["estimate"]
-        self.assertLess(est["low_npr"], est["high_npr"])
-        self.assertTrue(est["low_npr_display"].startswith("Rs. "))
-
-    def test_submit_creates_lead_with_private_document(self):
-        doc = SimpleUploadedFile("brief.pdf", PDF_BYTES, content_type="application/pdf")
-        response = self.client.post(reverse("estimator:submit_api"), {
-            "answers": json.dumps(self.answers()), "name": "Ramesh Koirala", "email": "ramesh@example.com",
-            "company": "Koirala Traders", "consent": "on", "document": doc,
-        })
-        self.assertEqual(response.status_code, 200, response.content)
-        lead = ProjectInquiry.objects.get(reference=response.json()["reference"])
-        self.assertEqual(lead.platforms, ["ios", "android"])
-        self.assertTrue(lead.document.name.startswith("inquiries/"))
-        self.assertTrue(EstimatorEvent.objects.filter(session_id="test-session", step=8).exists())
-        lead.document.delete()
-
-    def test_submit_requires_consent(self):
-        response = self.client.post(reverse("estimator:submit_api"), {"answers": json.dumps(self.answers()), "name": "A", "email": "a@example.com"})
-        self.assertEqual(response.status_code, 400)
-        self.assertIn("consent", response.json()["errors"])
-
-
-class CareersTests(SeededTestCase):
-    def base_data(self, mode):
-        return {
-            "application_mode": mode, "full_name": "Asmita Gurung", "email": f"asmita-{mode}@example.com", "phone": "9800000000",
-            "current_location": "Pokhara", "years_experience": "1.5", "notice_period": "1-month", "source": "website", "consent": "on",
-            "edu-TOTAL_FORMS": "1", "edu-INITIAL_FORMS": "0", "edu-MIN_NUM_FORMS": "0", "edu-MAX_NUM_FORMS": "6",
-            "exp-TOTAL_FORMS": "1", "exp-INITIAL_FORMS": "0", "exp-MIN_NUM_FORMS": "0", "exp-MAX_NUM_FORMS": "8",
-            "prj-TOTAL_FORMS": "1", "prj-INITIAL_FORMS": "0", "prj-MIN_NUM_FORMS": "0", "prj-MAX_NUM_FORMS": "6",
-        }
-
-    def test_apply_with_cv_upload(self):
-        job = JobOpening.objects.get(slug="junior-qa-engineer")
-        data = self.base_data("cv")
-        data["cv"] = SimpleUploadedFile("asmita-cv.docx", docx_bytes(), content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
-        response = self.client.post(reverse("careers:apply", args=[job.slug]), data)
-        self.assertRedirects(response, reverse("careers:applied"))
-        app = JobApplication.objects.get(email="asmita-cv@example.com")
-        self.assertTrue(app.cv.name.startswith("cvs/"))
-        self.assertEqual(app.cv_original_name, "asmita-cv.docx")
-        app.cv.delete()
-
-    def test_apply_manually_without_cv(self):
-        job = JobOpening.objects.get(slug="software-engineering-intern")
-        data = self.base_data("manual")
-        data.update({
-            "headline": "Final-year BSc CSIT student", "professional_summary": "I build Django apps.", "skills": "Python, Django, React",
-            "edu-0-institution": "Tribhuvan University", "edu-0-degree": "BSc CSIT", "edu-0-end_year": "2026",
-            "exp-0-company": "Local startup", "exp-0-title": "Intern", "exp-0-start_date": "2025-06",
-            "prj-0-name": "Bus ticket app", "prj-0-tech_used": "Flutter",
-        })
-        response = self.client.post(reverse("careers:apply", args=[job.slug]), data)
-        self.assertRedirects(response, reverse("careers:applied"))
-        app = JobApplication.objects.get(email="asmita-manual@example.com")
-        self.assertFalse(app.cv)
-        self.assertEqual(app.education.count(), 1)
-        self.assertEqual(app.experience.count(), 1)
-        self.assertEqual(app.projects.count(), 1)
-
-    def test_manual_requires_history(self):
-        job = JobOpening.objects.get(slug="software-engineering-intern")
-        data = self.base_data("manual")
-        data.update({"headline": "x", "professional_summary": "y", "skills": "z"})
-        response = self.client.post(reverse("careers:apply", args=[job.slug]), data)
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Add at least one education or work experience entry")
-
-    def test_rejects_fake_pdf(self):
-        job = JobOpening.objects.get(slug="junior-qa-engineer")
-        data = self.base_data("cv")
-        data["cv"] = SimpleUploadedFile("cv.pdf", b"MZ this is really an exe", content_type="application/pdf")
-        response = self.client.post(reverse("careers:apply", args=[job.slug]), data)
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "does not look like a valid PDF")
-
-
-@override_settings(DEBUG=True)
-class CommerceTests(SeededTestCase):
-    def test_cart_checkout_and_sandbox_payment(self):
-        product = ProductizedService.objects.get(slug="discovery-workshop")
-        self.client.post(reverse("commerce:cart_add", args=[product.pk]), {"quantity": 1})
-        response = self.client.post(reverse("commerce:checkout"), {
-            "customer_name": "Bishal Shrestha", "email": "bishal@example.com", "phone": "9811111111", "country": "Nepal", "consent": "on",
-        })
-        order = Order.objects.get(email="bishal@example.com")
-        self.assertRedirects(response, reverse("commerce:payment", args=[order.reference]))
-        self.assertEqual(order.total_npr, product.price_npr * 113 / 100)
-
-        response = self.client.post(reverse("commerce:payment_start", args=[order.reference, "fonepay"]))
-        self.assertRedirects(response, reverse("commerce:simulate", args=["fonepay", order.reference]))
-        response = self.client.get(reverse("commerce:payment_callback", args=["fonepay", order.reference, "success"]))
-        self.assertRedirects(response, reverse("commerce:order_done", args=[order.reference]))
-        order.refresh_from_db()
-        self.assertEqual(order.payment_status, "paid")
-
-    def test_other_sessions_cannot_view_order(self):
-        product = ProductizedService.objects.first()
-        self.client.post(reverse("commerce:cart_add", args=[product.pk]))
-        self.client.post(reverse("commerce:checkout"), {"customer_name": "A B", "email": "ab@example.com", "phone": "1", "country": "Nepal", "consent": "on"})
-        order = Order.objects.get(email="ab@example.com")
-        self.client.logout()
-        self.client.cookies.clear()
-        self.assertEqual(self.client.get(reverse("commerce:order_done", args=[order.reference])).status_code, 404)
-
-
-class DashboardTests(SeededTestCase):
+class RateLimitTests(TestCase):
     def setUp(self):
-        super().setUp()
-        User = get_user_model()
-        self.staff = User.objects.create_user("hq-staff", "staff@example.com", "a-strong-passphrase-2026", is_staff=True)
-        self.visitor = User.objects.create_user("visitor", "visitor@example.com", "a-strong-passphrase-2026")
+        cache.clear()
+        self.factory = RequestFactory()
 
-    def test_anonymous_redirects_and_non_staff_gets_404(self):
-        url = reverse("dashboard:overview")
-        self.assertEqual(self.client.get(url).status_code, 302)
-        self.client.force_login(self.visitor)
-        self.assertEqual(self.client.get(url).status_code, 404)
+        @rate_limit("unit-test", limit=2, window=60)
+        def view(request):
+            return HttpResponse("ok")
 
-    def test_staff_pages_render(self):
-        self.client.force_login(self.staff)
-        urls = [reverse(n) for n in ["dashboard:overview", "dashboard:leads", "dashboard:applications", "dashboard:applications_list",
-                                     "dashboard:applications_export", "dashboard:orders", "dashboard:estimator_config", "dashboard:settings",
-                                     "dashboard:analytics", "dashboard:audit", "dashboard:newsletter_export"]]
-        for slug in REGISTRY:
-            urls.append(reverse("dashboard:crud_list", args=[slug]))
-            urls.append(reverse("dashboard:crud_create", args=[slug]))
-            obj = REGISTRY[slug]["model"].objects.first()
-            if obj:
-                urls.append(reverse("dashboard:crud_edit", args=[slug, obj.pk]))
-        for url in urls:
+        self.view = view
+
+    def test_blocks_after_limit_with_plain_and_json_responses(self):
+        for _ in range(2):
+            self.assertEqual(self.view(self.factory.post("/")).status_code, 200)
+        blocked = self.view(self.factory.post("/"))
+        self.assertEqual((blocked.status_code, blocked["Content-Type"].split(";")[0]), (429, "text/html"))
+        as_json = self.view(self.factory.post("/", HTTP_X_REQUESTED_WITH="fetch"))
+        self.assertEqual(as_json.status_code, 429)
+        self.assertFalse(json.loads(as_json.content)["ok"])
+
+    def test_get_and_other_ips_not_limited(self):
+        for _ in range(3):
+            self.view(self.factory.post("/"))
+        self.assertEqual(self.view(self.factory.get("/")).status_code, 200)
+        self.assertEqual(self.view(self.factory.post("/", REMOTE_ADDR="10.9.9.9")).status_code, 200)
+
+    def test_expired_counter_recovers(self):
+        self.view(self.factory.post("/"))
+        with mock.patch.object(cache, "incr", side_effect=ValueError):
+            self.assertEqual(self.view(self.factory.post("/")).status_code, 200)
+
+
+class ClientIpTests(TestCase):
+    def test_forwarded_header_ignored_unless_proxies_trusted(self):
+        request = RequestFactory().get("/", REMOTE_ADDR="10.0.0.1", HTTP_X_FORWARDED_FOR="1.1.1.1, 2.2.2.2, 3.3.3.3")
+        self.assertEqual(client_ip(request), "10.0.0.1")
+        with override_settings(TRUSTED_PROXY_COUNT=1):
+            self.assertEqual(client_ip(request), "3.3.3.3")
+        with override_settings(TRUSTED_PROXY_COUNT=2):
+            self.assertEqual(client_ip(request), "2.2.2.2")
+        with override_settings(TRUSTED_PROXY_COUNT=5):
+            self.assertEqual(client_ip(request), "10.0.0.1")
+
+    def test_log_action_for_anonymous_request(self):
+        request = RequestFactory().post("/somewhere/")
+        from django.contrib.auth.models import AnonymousUser
+
+        request.user = AnonymousUser()
+        log_action(request, "test action", None, detail="x")
+        from apps.core.models import AuditLog
+
+        entry = AuditLog.objects.get()
+        self.assertEqual((entry.user, entry.path, entry.object_repr), (None, "/somewhere/", ""))
+
+
+class UploadValidationTests(TestCase):
+    def test_sniffing(self):
+        self.assertEqual(uploads.sniff_document_type(pdf_upload()), "pdf")
+        self.assertEqual(uploads.sniff_document_type(SimpleUploadedFile("a.docx", docx_bytes())), "docx")
+        self.assertIsNone(uploads.sniff_document_type(SimpleUploadedFile("a.docx", docx_bytes(valid=False))))
+        self.assertIsNone(uploads.sniff_document_type(SimpleUploadedFile("a.docx", b"PK\x03\x04 broken zip")))
+        self.assertIsNone(uploads.sniff_document_type(SimpleUploadedFile("a.pdf", b"GIF89a")))
+
+    @override_settings(UPLOAD_SCAN_HOOK=NOOP_SCAN)
+    def test_validate_document_rules(self):
+        self.assertEqual(uploads.validate_document(pdf_upload()), "pdf")
+        with self.assertRaisesMessage(ValidationError, "PDF or DOCX"):
+            uploads.validate_document(pdf_upload(name="cv.exe"))
+        with self.assertRaisesMessage(ValidationError, "too large"):
+            uploads.validate_document(pdf_upload(), max_bytes=10)
+        with self.assertRaisesMessage(ValidationError, "does not look like"):
+            uploads.validate_document(SimpleUploadedFile("cv.pdf", docx_bytes()))
+
+    def test_private_storage_has_no_public_url_and_random_names(self):
+        with self.assertRaises(ValueError):
+            uploads.private_storage.url("cvs/x.pdf")
+        name = uploads.RandomisedPath("cvs")(None, "My CV (final).PDF")
+        self.assertRegex(name, r"^cvs/[0-9a-f]{32}\.pdf$")
+        self.assertTrue(uploads.noop_scan(pdf_upload()))
+
+
+@override_settings(UPLOAD_SCAN_HOOK=CLAMAV_SCAN, CLAMAV_UNIX_SOCKET="", CLAMAV_HOST="clamav.test", CLAMAV_PORT=3310)
+class ClamAVScanTests(TestCase):
+    def fake_client(self, response=None, error=None):
+        client = mock.Mock()
+        if error is not None:
+            client.instream.side_effect = error
+        else:
+            client.instream.return_value = response
+        return mock.patch("apps.core.uploads._clamd_client", return_value=client), client
+
+    def test_clean_file_is_accepted_and_stream_rewound(self):
+        patcher, client = self.fake_client({"stream": ("OK", None)})
+        f = pdf_upload()
+        with patcher:
+            self.assertEqual(uploads.validate_document(f), "pdf")
+        client.instream.assert_called_once()
+        self.assertEqual(f.tell(), 0)
+
+    def test_infected_file_is_rejected(self):
+        patcher, _ = self.fake_client({"stream": ("FOUND", "Eicar-Test-Signature")})
+        with patcher, self.assertRaisesMessage(ValidationError, "security scan"):
+            uploads.validate_document(pdf_upload())
+
+    def test_unreachable_daemon_fails_closed(self):
+        import clamd
+
+        patcher, _ = self.fake_client(error=clamd.ConnectionError("Connection refused"))
+        with patcher, self.assertLogs("apps.core.uploads", "ERROR"), self.assertRaisesMessage(ValidationError, "could not scan"):
+            uploads.validate_document(pdf_upload())
+
+    def test_daemon_error_or_empty_response_fails_closed(self):
+        for response in ({"stream": ("ERROR", "INSTREAM size limit exceeded")}, None):
+            patcher, _ = self.fake_client(response)
+            with self.subTest(response=response), patcher, self.assertLogs("apps.core.uploads", "ERROR"), self.assertRaises(ValidationError):
+                uploads.clamav_scan(pdf_upload())
+
+    def test_client_uses_network_or_unix_socket_from_settings(self):
+        import clamd
+
+        client = uploads._clamd_client()
+        self.assertIsInstance(client, clamd.ClamdNetworkSocket)
+        self.assertEqual((client.host, client.port), ("clamav.test", 3310))
+        with override_settings(CLAMAV_UNIX_SOCKET="/run/clamav/clamd.ctl"):
+            self.assertIsInstance(uploads._clamd_client(), clamd.ClamdUnixSocket)
+
+    def test_noop_scanner_refused_when_debug_is_false(self):
+        import os
+        import subprocess
+        import sys
+
+        from django.conf import settings
+
+        env = {**os.environ, "DEBUG": "False", "UPLOAD_SCAN_HOOK": NOOP_SCAN, "SECRET_KEY": "x" * 60}
+        result = subprocess.run([sys.executable, "-c", "import config.settings"], cwd=settings.BASE_DIR, env=env,
+                                capture_output=True, text=True, timeout=180)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("only allowed when DEBUG=True", result.stderr)
+
+
+class MiddlewareAndContextTests(TestCase):
+    def setUp(self):
+        cache.clear()
+
+    def test_page_views_recorded_for_public_html_only(self):
+        self.client.get("/legal/privacy/")
+        self.client.get("/robots.txt")
+        self.client.get("/does-not-exist/")
+        self.client.get(reverse("dashboard:login"))
+        self.client.get(reverse("estimator:config_api"))
+        self.assertEqual(list(PageView.objects.values_list("path", flat=True)), ["/legal/privacy/"])
+
+    def test_security_headers(self):
+        public = self.client.get("/legal/terms/")
+        self.assertIn("camera=()", public["Permissions-Policy"])
+        self.assertEqual(public["X-Content-Type-Options"], "nosniff")
+        self.assertNotIn("X-Robots-Tag", public)
+        dash = self.client.get(reverse("dashboard:login"))
+        self.assertEqual((dash["X-Robots-Tag"], dash["Cache-Control"]), ("noindex, nofollow", "no-store"))
+
+    def test_cart_count_and_site_settings_cache(self):
+        product = make_product()
+        self.client.post(reverse("commerce:cart_add", args=[product.pk]), {"quantity": 3})
+        self.assertEqual(self.client.get("/legal/cookies/").context["cart_count"], 3)
+        site = SiteSettings.load()
+        self.assertIsNotNone(cache.get(SiteSettings.CACHE_KEY))  # load() populates the cache
+        site.phone = "+977 9811111111"
+        site.save()
+        self.assertEqual(SiteSettings.load().phone, "+977 9811111111")
+        self.assertEqual(site.pk, 1)
+
+
+class ErrorPageTests(TestCase):
+    def test_404_terminal_page(self):
+        response = self.client.get("/definitely/missing/")
+        self.assertEqual(response.status_code, 404)
+        self.assertContains(response, "HTTP/1.1 404 Not Found", status_code=404)
+
+    def test_500_handler_is_standalone(self):
+        from apps.core.views import page_not_found, server_error
+
+        request = RequestFactory().get("/boom/")
+        response = server_error(request)
+        self.assertEqual(response.status_code, 500)
+        self.assertIn(b"Something went wrong on our side", response.content)
+        self.assertEqual(page_not_found(RequestFactory().get("/x/"), Exception()).status_code, 404)
+
+
+class SitemapRobotsTests(TestCase):
+    def test_robots(self):
+        body = self.client.get("/robots.txt").content.decode()
+        self.assertIn("Disallow: /hq/", body)
+        self.assertRegex(body, r"Sitemap: http://testserver/sitemap\.xml")
+
+    def test_sitemap_lists_public_content_only(self):
+        from apps.services.models import ServiceCategory
+
+        category = ServiceCategory.objects.create(name="S", slug="s")
+        Service.objects.create(category=category, name="Live", slug="live-service", nav_blurb="x", outcome_headline="x", summary="x",
+                               intro="x", hero_image_url="https://example.com/x.jpg")
+        Service.objects.create(category=category, name="Hidden", slug="hidden-service", nav_blurb="x", outcome_headline="x", summary="x",
+                               intro="x", hero_image_url="https://example.com/x.jpg", is_published=False)
+        make_job(slug="open-job")
+        make_job(slug="closed-job", closing_date=timezone.localdate() - timedelta(days=2))
+        xml = self.client.get("/sitemap.xml").content.decode()
+        self.assertIn("/services/live-service/", xml)
+        self.assertIn("/careers/jobs/open-job/", xml)
+        self.assertNotIn("hidden-service", xml)
+        self.assertNotIn("closed-job", xml)
+        self.assertNotIn("/hq/", xml)
+
+
+class PublicCoreFormTests(TestCase):
+    def setUp(self):
+        cache.clear()
+
+    def test_contact_form_success_and_honeypot(self):
+        data = {"name": "Sita Sharma", "email": "sita@example.com", "subject": "Hello", "message": "We need an app.", "consent": "on"}
+        self.assertRedirects(self.client.post(reverse("core:contact"), data), reverse("core:contact"))
+        self.assertEqual(ContactSubmission.objects.count(), 1)
+        self.assertEqual(len(mail.outbox), 2)
+        response = self.client.post(reverse("core:contact"), {**data, "website": "http://spam"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(ContactSubmission.objects.count(), 1)
+
+    def test_contact_is_rate_limited(self):
+        for _ in range(5):
+            self.client.post(reverse("core:contact"), {"name": ""})
+        self.assertEqual(self.client.post(reverse("core:contact"), {"name": ""}).status_code, 429)
+
+    def test_consultation_booking_rules(self):
+        url = reverse("core:consultation") + "?topic=data"
+        self.assertEqual(self.client.get(url).context["form"].initial["topic"], "data")
+        base = {"name": "Hari", "email": "hari@example.com", "topic": "new-project", "preferred_slot": "morning", "consent": "on"}
+        past = self.client.post(url, {**base, "preferred_date": (timezone.localdate() - timedelta(days=1)).isoformat()})
+        self.assertContains(past, "today or a future date")
+        today = timezone.localdate()
+        saturday = today + timedelta(days=(5 - today.weekday()) % 7 or 7)
+        self.assertContains(self.client.post(url, {**base, "preferred_date": saturday.isoformat()}), "closed on Saturdays")
+        weekday = saturday + timedelta(days=2)
+        ok = self.client.post(url, {**base, "preferred_date": weekday.isoformat()})
+        self.assertContains(ok, "Talk soon")
+        self.assertEqual(ConsultationBooking.objects.get().preferred_date, weekday)
+
+    def test_newsletter_json_and_form_posts(self):
+        url = reverse("core:newsletter")
+        ok = self.client.post(url, {"email": "Reader@Example.com"}, HTTP_X_REQUESTED_WITH="fetch")
+        self.assertTrue(ok.json()["ok"])
+        again = self.client.post(url, {"email": "reader@example.com"}, HTTP_REFERER="/about/")
+        self.assertRedirects(again, "/about/", fetch_redirect_response=False)
+        self.assertEqual(NewsletterSubscriber.objects.count(), 1)
+        bad = self.client.post(url, {"email": "nope"}, HTTP_X_REQUESTED_WITH="fetch")
+        self.assertEqual(bad.status_code, 400)
+        self.assertRedirects(self.client.post(url, {"email": "nope"}), reverse("core:home"), fetch_redirect_response=False)
+        self.assertEqual(self.client.get(url).status_code, 405)
+
+
+class DeployCheckSmokeTests(TestCase):
+    """Boots a fresh process with DEBUG=False and runs `check --deploy`, so security-setting regressions fail CI."""
+
+    PRODUCTION_ENV = {
+        "DEBUG": "False",
+        "SECRET_KEY": "k7Rq2vX9mZp4Lw8Ns3Tb6Yc1Hd5Fg0Jj-e_uQaWoPiUyTrEsDxCvBnM",  # 56 chars, test-only
+        "ALLOWED_HOSTS": "zencraftsolution.com",
+    }
+
+    def run_in_production_mode(self, code):
+        import os
+        import subprocess
+        import sys
+
+        from django.conf import settings
+
+        env = {**os.environ, **self.PRODUCTION_ENV}
+        env.pop("UPLOAD_SCAN_HOOK", None)  # must default to ClamAV in production
+        return subprocess.run([sys.executable, "-c", code], cwd=settings.BASE_DIR, env=env, capture_output=True, text=True, timeout=300)
+
+    def test_check_deploy_reports_zero_issues(self):
+        result = self.run_in_production_mode(
+            "import sys; from django.core.management import execute_from_command_line; "
+            "import os; os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings'); "
+            "execute_from_command_line(['manage.py', 'check', '--deploy', '--fail-level', 'WARNING'])"
+        )
+        output = result.stdout + result.stderr
+        self.assertEqual(result.returncode, 0, output)
+        self.assertIn("System check identified no issues", output)
+
+    def test_gate_catches_a_security_regression(self):
+        # Reintroduce the pre-fix X_FRAME_OPTIONS value and confirm the same gate fails.
+        result = self.run_in_production_mode(
+            "import os, django; os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings'); django.setup(); "
+            "from django.conf import settings; settings.X_FRAME_OPTIONS = 'SAMEORIGIN'; "
+            "from django.core.management import call_command; call_command('check', deploy=True, fail_level='WARNING')"
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("security.W019", result.stdout + result.stderr)
+
+    def test_production_settings_default_to_clamav(self):
+        result = self.run_in_production_mode(
+            "import os, django; os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings'); django.setup(); "
+            "from django.conf import settings; print(settings.UPLOAD_SCAN_HOOK, settings.X_FRAME_OPTIONS, settings.SESSION_COOKIE_SECURE)"
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.split(), ["apps.core.uploads.clamav_scan", "DENY", "True"])
+
+
+class SeededSiteSmokeTests(TestCase):
+    """Loads the real seed content once and renders the pages that depend on all of it together."""
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("seed_zencraft", stdout=io.StringIO())
+
+    def test_seed_is_idempotent(self):
+        counts = (Service.objects.count(), JobOpening.objects.count(), BlogPost.objects.count())
+        call_command("seed_zencraft", stdout=io.StringIO())
+        self.assertEqual(counts, (Service.objects.count(), JobOpening.objects.count(), BlogPost.objects.count()))
+        self.assertEqual(counts, (9, 7, 6))
+        for service in Service.objects.all():
+            self.assertEqual(service.steps.count(), 6)
+            self.assertGreaterEqual(len(service.deliverables), 6)
+            self.assertGreaterEqual(service.faqs.count(), 4)
+
+    def test_core_pages_render(self):
+        for url in ["/", "/about/", "/contact/", "/book-consultation/", "/legal/privacy/", "/legal/terms/", "/legal/cookies/", "/sitemap.xml"]:
             with self.subTest(url=url):
                 self.assertEqual(self.client.get(url).status_code, 200)
+        home = self.client.get("/")
+        self.assertEqual(len(home.context["hero_slides"]), 5)
+        self.assertContains(home, "data-hero-slider")
+        self.assertContains(home, '"@type":"Organization"')
 
-    def test_kanban_status_api_and_cv_access_logged(self):
-        job = JobOpening.objects.first()
-        app = JobApplication.objects.create(
-            reference="ZA-TEST01", job=job, full_name="Test Person", email="t@example.com", phone="1", current_location="Kathmandu",
-            years_experience=2, notice_period="1-month", cv=SimpleUploadedFile("cv.pdf", PDF_BYTES), cv_original_name="cv.pdf",
-        )
-        self.client.force_login(self.staff)
-        response = self.client.patch(reverse("dashboard:api_application_status", args=[app.pk]), json.dumps({"status": "shortlisted"}), content_type="application/json")
-        self.assertEqual(response.status_code, 200)
-        app.refresh_from_db()
-        self.assertEqual(app.status, "shortlisted")
-
-        response = self.client.get(reverse("dashboard:application_cv", args=[app.pk]))
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response["Content-Type"], "application/pdf")
-        # Release the Windows file handle without firing request_finished (which would close the test DB connection)
-        for closer in list(response._resource_closers):
-            closer()
-        from apps.core.models import AuditLog
-        self.assertTrue(AuditLog.objects.filter(action="opened CV", object_id=str(app.pk)).exists())
-        app.cv.delete()
-
-    def test_estimator_config_is_editable(self):
-        self.client.force_login(self.staff)
-        from apps.dashboard.forms import EstimatorConfigForm
-        from apps.estimator.models import EstimatorConfig
-        form = EstimatorConfigForm(instance=EstimatorConfig.load())
-        data = {}
-        for name, field in form.fields.items():
-            value = form.initial.get(name)
-            data[name] = json.dumps(value) if isinstance(value, dict) else value
-        data["blended_hourly_rate_npr"] = "2500"
-        response = self.client.post(reverse("dashboard:estimator_config"), data)
-        self.assertEqual(response.status_code, 302)
-        self.assertEqual(int(EstimatorConfig.load().blended_hourly_rate_npr), 2500)
-
-    def test_login_rate_limited(self):
-        url = reverse("dashboard:login")
-        for _ in range(5):
-            self.client.post(url, {"username": "hq-staff", "password": "wrong"})
-        response = self.client.post(url, {"username": "hq-staff", "password": "a-strong-passphrase-2026"})
-        self.assertEqual(response.status_code, 429)
+    def test_site_search_spans_services_case_studies_and_posts(self):
+        response = self.client.get(reverse("core:search") + "?q=banking")
+        self.assertGreater(response.context["total"], 0)
+        self.assertTrue(response.context["cases"])
+        self.assertEqual(self.client.get(reverse("core:search")).context["total"], 0)
+        empty = self.client.get(reverse("core:search") + "?q=zzzxqvnonexistent")
+        self.assertContains(empty, "Nothing found")
+        self.assertTrue(re.search(r"\d+ results?", empty.content.decode()))
