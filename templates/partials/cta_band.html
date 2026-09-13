@@ -1,0 +1,12 @@
+<section class="cta-band" aria-labelledby="cta-title">
+  <div class="container cta-band__inner">
+    <div data-reveal>
+      <h2 class="h2" id="cta-title">{{ cta_title|default:"Have a project in mind? Get a realistic range in five minutes." }}</h2>
+      <p>{{ cta_text|default:"Answer a few questions about scope, platforms and timeline. You get an indicative budget, timeline and team shape straight away." }}</p>
+    </div>
+    <div class="cta-band__actions" data-reveal>
+      <a class="btn btn--light" href="{% url 'estimator:start' %}">Get an estimate <i class="ph ph-arrow-right"></i></a>
+      <a class="btn btn--outline-light" href="{% url 'core:consultation' %}">Book a consultation</a>
+    </div>
+  </div>
+</section>

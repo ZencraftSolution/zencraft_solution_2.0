@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Open roles | Careers | {{ site.company_name }}{% endblock %}
+{% block meta_description %}Browse open software engineering, QA, design, DevOps and support jobs at Zencraft Solution.{% endblock %}
+{% block cta_band %}{% endblock %}
+
+{% block content %}
+<section class="page-hero blueprint">
+  <div class="container" style="padding-block:clamp(40px,6vw,72px)">
+    <ol class="crumbs" aria-label="Breadcrumb"><li><a href="{% url 'core:home' %}">Home</a></li><li><a href="{% url 'careers:landing' %}">Careers</a></li><li>Open roles</li></ol>
+    <h1 class="h1 mt-2" data-split>Open roles</h1>
+    <p class="lead mt-2" data-hero-item>Filter by team, level, contract type and where you want to work.</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <form class="filters" method="get" data-job-filters data-reveal>
+      <div class="field"><label for="f-dept">Team</label>
+        <select id="f-dept" name="department"><option value="">All teams</option>{% for d in departments %}<option value="{{ d.slug }}" {% if filters.department == d.slug %}selected{% endif %}>{{ d.name }}</option>{% endfor %}</select></div>
+      <div class="field"><label for="f-level">Experience</label>
+        <select id="f-level" name="level"><option value="">All levels</option>{% for v, l in levels %}<option value="{{ v }}" {% if filters.level == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+      <div class="field"><label for="f-type">Contract</label>
+        <select id="f-type" name="type"><option value="">All types</option>{% for v, l in types %}<option value="{{ v }}" {% if filters.type == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+      <div class="field"><label for="f-mode">Location</label>
+        <select id="f-mode" name="mode"><option value="">Anywhere</option>{% for v, l in modes %}<option value="{{ v }}" {% if filters.mode == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+      <button class="btn btn--dark" type="submit" data-job-submit>Filter</button>
+    </form>
+
+    <div data-job-list style="position:relative">
+      {% for job in jobs %}{% include "careers/_job_row.html" with job=job %}{% endfor %}
+    </div>
+    <div class="empty-state" data-job-empty {% if jobs %}hidden{% endif %}>
+      <i class="ph ph-magnifying-glass"></i>
+      <h3>No roles match these filters</h3>
+      <p>Try widening your search, or send a speculative application to {{ site.careers_email }}.</p>
+    </div>
+  </div>
+</section>
+{% endblock %}

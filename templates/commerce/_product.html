@@ -1,0 +1,19 @@
+{% load zc %}
+<article class="product{% if p.featured %} product--featured{% endif %}">
+  <div class="product__top">
+    <i class="ph ph-{{ p.icon }}" aria-hidden="true"></i>
+    {% if p.featured %}<span class="tag tag--blue">Most chosen</span>{% endif %}
+  </div>
+  <div>
+    <h3><a href="{{ p.get_absolute_url }}">{{ p.name }}{% if p.tier_label %} <span class="muted" style="font-weight:500">{{ p.tier_label }}</span>{% endif %}</a></h3>
+    <p class="mt-1">{{ p.summary }}</p>
+  </div>
+  <ul>{% for d in p.deliverables|slice:":4" %}<li><i class="ph ph-check"></i>{{ d }}</li>{% endfor %}</ul>
+  <div class="product__foot">
+    <div>{% if p.billing == "monthly" %}{% price p.price_npr "per month" %}{% else %}{% price p.price_npr "one-time" %}{% endif %}</div>
+    <form method="post" action="{% url 'commerce:cart_add' p.pk %}">
+      {% csrf_token %}
+      <button class="btn btn--primary btn--sm" type="submit"><i class="ph ph-plus"></i> Add to cart</button>
+    </form>
+  </div>
+</article>

@@ -1,0 +1,32 @@
+{% extends "dashboard/base.html" %}
+{% load zc %}
+{% block title %}Leads{% endblock %}
+{% block top_title %}Lead pipeline{% endblock %}
+{% block content %}
+<div class="dash-head">
+  <div><h1>Lead pipeline</h1><p>{{ total }} inquiries, {{ conversion }}% won. Drag cards between columns to update status.</p></div>
+  <div class="flex gap-1">
+    <a class="btn btn--sm {% if mine %}btn--dark{% else %}btn--ghost{% endif %}" href="?mine={% if mine %}0{% else %}1{% endif %}">{% if mine %}Showing my leads{% else %}Only my leads{% endif %}</a>
+  </div>
+</div>
+<div class="board" data-board data-endpoint="{% url 'dashboard:api_lead_status' 0 %}">
+  {% for code, label, leads in columns %}
+  <section class="board__col" data-status="{{ code }}" aria-label="{{ label }}">
+    <div class="board__head"><span>{{ label }}</span><span class="board__count" data-count>{{ leads|length }}</span></div>
+    <div class="board__list">
+      {% for l in leads %}
+      <article class="bcard" draggable="true" data-id="{{ l.pk }}">
+        <a class="bcard__title" href="{% url 'dashboard:lead_detail' l.pk %}">{{ l.company|default:l.name }}</a>
+        <div class="bcard__meta">{{ l.project_type_label }} / {{ l.platform_labels|join:", " }}</div>
+        <div class="bcard__meta mono">{{ l.estimate_low_npr|npr }} to {{ l.estimate_high_npr|npr }}</div>
+        <div class="bcard__foot">
+          <span class="tag">{{ l.get_budget_band_display }}</span>
+          <span class="mono muted" style="font-size:.72rem">{{ l.created_at|date:"j M" }}{% if l.assigned_to %} / {{ l.assigned_to.first_name|default:l.assigned_to.username }}{% endif %}</span>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+  {% endfor %}
+</div>
+{% endblock %}

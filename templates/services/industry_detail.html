@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}{{ industry.name }} software development | {{ site.company_name }}{% endblock %}
+{% block meta_description %}{{ industry.tagline }}{% endblock %}
+{% block og_image %}{{ industry.image_url }}{% endblock %}
+
+{% block content %}
+<section class="page-hero blueprint">
+  <div class="container page-hero__inner page-hero__inner--media">
+    <div class="page-hero__copy">
+      <ol class="crumbs" aria-label="Breadcrumb"><li><a href="{% url 'core:home' %}">Home</a></li><li><a href="{% url 'services:industries' %}">Industries</a></li><li>{{ industry.name }}</li></ol>
+      <h1 class="h1" data-split>{{ industry.name }}</h1>
+      <p class="lead" data-hero-item>{{ industry.tagline }}</p>
+      <div class="page-hero__actions" data-hero-item><a class="btn btn--primary" href="{% url 'core:consultation' %}">Book a consultation</a></div>
+    </div>
+    <div class="page-hero__media" data-hero-visual><img src="{{ industry.image_url }}" alt="{{ industry.name }}" width="1000" height="750" data-seed="{{ industry.slug }}"></div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container container--narrow">
+    <p class="lead" style="font-size:1.3rem;color:var(--ink)" data-reveal>{{ industry.description }}</p>
+  </div>
+</section>
+
+<section class="section section--alt section--line">
+  <div class="container grid-2">
+    <div data-reveal>
+      <h2 class="h3">Challenges we hear most often</h2>
+      <ul class="fact-list mt-2">{% for c in industry.challenge_list %}<li><span style="color:var(--ink-2)"><i class="ph ph-warning-circle" style="color:var(--amber);margin-right:8px"></i>{{ c }}</span></li>{% endfor %}</ul>
+    </div>
+    <div data-reveal>
+      <h2 class="h3">What we build</h2>
+      <ul class="fact-list mt-2">{% for s in industry.solution_list %}<li><span style="color:var(--ink-2)"><i class="ph ph-check-circle" style="color:var(--green);margin-right:8px"></i>{{ s }}</span></li>{% endfor %}</ul>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="section-head" data-reveal><h2 class="h2">Services for {{ industry.name|lower }}</h2></div>
+    <div class="card-grid" data-reveal-group>
+      {% for s in industry.services.all %}
+      <a class="card card--hover stack" style="--stack:12px" href="{% url 'services:detail' s.slug %}">
+        <span class="bento-card__icon"><i class="ph ph-{{ s.icon }}"></i></span><h3 class="h3">{{ s.name }}</h3><p class="muted">{{ s.nav_blurb }}</p>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+{% if case_studies %}
+<section class="section section--alt section--line">
+  <div class="container">
+    <div class="section-head" data-reveal><h2 class="h2">Case studies</h2></div>
+    <div class="card-grid" data-reveal-group>{% for c in case_studies %}{% include "portfolio/_card.html" with c=c %}{% endfor %}</div>
+  </div>
+</section>
+{% endif %}
+
+{% if industry.faqs.all %}
+<section class="section">
+  <div class="container grid-2" style="align-items:start">
+    <h2 class="h2" data-reveal>Questions from {{ industry.name|lower }} teams</h2>
+    <div class="faq" data-reveal>{% for f in industry.faqs.all %}<details><summary>{{ f.question }}<i class="ph ph-plus"></i></summary><div class="faq__answer">{{ f.answer }}</div></details>{% endfor %}</div>
+  </div>
+</section>
+{% endif %}
+
+<section class="section section--line">
+  <div class="container">
+    <h2 class="h3" data-reveal>Other industries</h2>
+    <ul class="chips mt-2" data-reveal-group>{% for o in others %}<li><a class="chip" href="{{ o.get_absolute_url }}"><i class="ph ph-{{ o.icon }}"></i>{{ o.name }}</a></li>{% endfor %}</ul>
+  </div>
+</section>
+{% endblock %}

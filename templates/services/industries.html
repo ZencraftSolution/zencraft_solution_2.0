@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Industries we serve | {{ site.company_name }}{% endblock %}
+{% block meta_description %}Software for healthcare, banking, education, retail, logistics, hospitality and NGOs, built by Zencraft Solution.{% endblock %}
+
+{% block content %}
+<section class="page-hero blueprint">
+  <div class="container page-hero__inner">
+    <div class="page-hero__copy" style="max-width:780px">
+      <ol class="crumbs" aria-label="Breadcrumb"><li><a href="{% url 'core:home' %}">Home</a></li><li>Industries</li></ol>
+      <h1 class="h1" data-split>Software that understands the rules of your sector</h1>
+      <p class="lead" data-hero-item>Seven industry teams with the integrations, compliance knowledge and reference projects to move quickly.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="card-grid" style="grid-template-columns:repeat(auto-fill,minmax(min(100%,360px),1fr));gap:24px" data-reveal-group data-grid-wave>
+      {% for i in industries %}
+      <article class="case-card" style="flex:initial">
+        <a class="case-card__media" href="{{ i.get_absolute_url }}" tabindex="-1" aria-hidden="true"><img src="{{ i.image_url }}" alt="" width="1000" height="625" loading="lazy" data-seed="{{ i.slug }}"></a>
+        <div class="case-card__body">
+          <div class="flex items-center gap-1"><i class="ph ph-{{ i.icon }}" style="font-size:1.4rem;color:var(--blue)"></i><h2 class="h3"><a href="{{ i.get_absolute_url }}">{{ i.name }}</a></h2></div>
+          <p>{{ i.tagline }}</p>
+          <ul class="chips">{% for s in i.services.all|slice:":3" %}<li><a class="chip" href="{% url 'services:detail' s.slug %}">{{ s.name }}</a></li>{% endfor %}</ul>
+          <a class="text-link" style="margin-top:auto" href="{{ i.get_absolute_url }}">Explore {{ i.name|lower }} <i class="ph ph-arrow-right"></i></a>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Consultation requested | {{ site.company_name }}{% endblock %}
+{% block cta_band %}{% endblock %}
+{% block content %}
+<section class="section">
+  <div class="container container--narrow">
+    <div class="form-card">
+      <div class="notice notice--success"><i class="ph ph-check-circle"></i><span>Request received. A confirmation is on its way to {{ booking.email }}.</span></div>
+      <h1 class="h1 mt-3" data-split>Thanks, {{ booking.name }}. Talk soon.</h1>
+      <ul class="fact-list mt-3">
+        <li><span>Topic</span><strong>{{ booking.get_topic_display }}</strong></li>
+        <li><span>Preferred date</span><strong>{{ booking.preferred_date|date:"l, j F Y" }}</strong></li>
+        <li><span>Preferred time</span><strong>{{ booking.get_preferred_slot_display }}</strong></li>
+      </ul>
+      <p class="lead mt-3">We will confirm the exact time and send a calendar invite within one working day.</p>
+      <div class="flex gap-1 mt-4 flex-wrap">
+        <a class="btn btn--dark" href="{% url 'portfolio:list' %}">Browse case studies</a>
+        <a class="btn btn--ghost" href="{% url 'estimator:start' %}">Try the estimator</a>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

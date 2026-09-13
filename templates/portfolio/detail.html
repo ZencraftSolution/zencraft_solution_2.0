@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% load zc %}
+{% block title %}{{ case.title }} | Case study | {{ site.company_name }}{% endblock %}
+{% block meta_description %}{{ case.summary }}{% endblock %}
+{% block og_type %}article{% endblock %}
+{% block og_image %}{{ case.cover_image_url }}{% endblock %}
+
+{% block content %}
+<article>
+  <header class="page-hero blueprint">
+    <div class="container" style="padding-block:clamp(40px,6vw,80px)">
+      <ol class="crumbs" aria-label="Breadcrumb"><li><a href="{% url 'core:home' %}">Home</a></li><li><a href="{% url 'portfolio:list' %}">Work</a></li><li>{{ case.industry.name }}</li></ol>
+      <div class="grid-2 mt-3" style="align-items:end">
+        <div class="stack" style="--stack:18px">
+          <p class="label" data-hero-item>{{ case.client_name }}</p>
+          <h1 class="h1" data-split>{{ case.title }}</h1>
+        </div>
+        <ul class="fact-list" data-hero-item>
+          <li><span>Industry</span><strong>{{ case.industry.name }}</strong></li>
+          <li><span>Duration</span><strong>{{ case.duration }}</strong></li>
+          <li><span>Team size</span><strong class="mono">{{ case.team_size }} people</strong></li>
+          <li><span>Year</span><strong class="mono">{{ case.year }}</strong></li>
+        </ul>
+      </div>
+      <div class="case-hero__media" data-hero-visual>
+        <img src="{{ case.cover_image_url }}" alt="{{ case.title }}" width="1600" height="686" fetchpriority="high" data-seed="{{ case.slug }}">
+      </div>
+    </div>
+  </header>
+
+  <section class="section section--tight">
+    <div class="container">
+      <div class="results-row" data-reveal-group>
+        {% for r in case.results %}<div><strong>{{ r.value }}</strong><span>{{ r.label }}</span></div>{% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <section class="section" style="padding-top:0">
+    <div class="container with-aside">
+      <div class="prose">
+        <p class="lead" style="font-size:1.25rem;color:var(--ink)" data-reveal>{{ case.summary }}</p>
+        <h2 data-reveal>The challenge</h2>
+        {% for p in case.challenge|paragraphs %}<p data-reveal>{{ p }}</p>{% endfor %}
+        <h2 data-reveal>What we built</h2>
+        {% for p in case.solution|paragraphs %}<p data-reveal>{{ p }}</p>{% endfor %}
+      </div>
+      <aside class="aside-sticky stack" style="--stack:16px">
+        <div class="card" data-reveal>
+          <h2 class="h3">Services</h2>
+          <ul class="chips mt-2">{% for s in case.services.all %}<li><a class="chip" href="{% url 'services:detail' s.slug %}">{{ s.name }}</a></li>{% endfor %}</ul>
+          <h2 class="h3 mt-3">Stack</h2>
+          <ul class="chips mt-2">{% for t in case.technologies.all %}<li class="chip"><img src="{{ t.logo_url }}" alt="" width="16" height="16" loading="lazy" data-logo>{{ t.name }}</li>{% endfor %}</ul>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  {% if case.code_snippet or case.architecture_note %}
+  <section class="section section--alt section--line">
+    <div class="container grid-2" style="align-items:start">
+      <div data-reveal>
+        <h2 class="h2">Architecture decisions</h2>
+        <p class="lead mt-2">{{ case.architecture_note }}</p>
+      </div>
+      {% if case.code_snippet %}
+      <figure class="code-block" style="margin:0" data-reveal>
+        <div class="code-block__bar"><span>{{ case.code_language }}</span><span>excerpt, simplified</span></div>
+        <pre><code class="language-{{ case.code_language }}">{{ case.code_snippet }}</code></pre>
+      </figure>
+      {% endif %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if testimonial %}
+  <section class="section">
+    <div class="container container--narrow">
+      <figure class="quote is-active" style="position:static" data-reveal>
+        <div class="stars">{% for _ in testimonial.rating|star_range %}<i class="ph-fill ph-star"></i>{% endfor %}</div>
+        <blockquote class="quote__text" style="margin:0">&ldquo;{{ testimonial.content }}&rdquo;</blockquote>
+        <figcaption class="quote__by"><img src="{{ testimonial.photo_url }}" alt="" width="104" height="104" loading="lazy" data-seed="{{ testimonial.client_name }}"><div><strong>{{ testimonial.client_name }}</strong><span>{{ testimonial.role }}, {{ testimonial.company }}</span></div></figcaption>
+      </figure>
+    </div>
+  </section>
+  {% endif %}
+</article>
+
+{% if more %}
+<section class="section section--alt section--line">
+  <div class="container">
+    <div class="section-head flex justify-between items-center flex-wrap gap-2" style="max-width:none" data-reveal>
+      <h2 class="h2">More work</h2><a class="text-link" href="{% url 'portfolio:list' %}">All case studies <i class="ph ph-arrow-right"></i></a>
+    </div>
+    <div class="card-grid" style="grid-template-columns:repeat(auto-fill,minmax(min(100%,420px),1fr))" data-reveal-group>{% for c in more %}{% include "portfolio/_card.html" with c=c %}{% endfor %}</div>
+  </div>
+</section>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" defer></script>
+<script>
+  window.addEventListener("DOMContentLoaded", function () {
+    if (window.hljs) document.querySelectorAll(".code-block code").forEach(function (el) { window.hljs.highlightElement(el); });
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,8 @@
+Hi {{ submission.name }},
+
+Thanks for contacting Zencraft Solution. We received your message about "{{ submission.subject }}" and an engineer will reply within one working day.
+
+If it is urgent, call us on {{ site.phone|default:"+977 1-4547821" }}.
+
+Zencraft Solution
+Jhamsikhel Road, Lalitpur, Nepal

@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% load zc %}
+{% block title %}Order {{ order.reference }} | {{ site.company_name }}{% endblock %}
+{% block cta_band %}{% endblock %}
+{% block content %}
+<section class="section">
+  <div class="container container--narrow">
+    <div class="form-card">
+      {% if order.payment_status == "paid" %}
+      <div class="notice notice--success"><i class="ph ph-check-circle"></i><span>Payment received. A confirmation has been sent to {{ order.email }}.</span></div>
+      <h1 class="h2 mt-3" data-split>Thank you. Your order is confirmed.</h1>
+      <p class="lead mt-2">Our team will contact you within one working day to schedule kickoff.</p>
+      {% else %}
+      <div class="notice"><i class="ph ph-clock"></i><span>Order placed. We will confirm once your payment arrives.</span></div>
+      <h1 class="h2 mt-3" data-split>Almost done. Please complete your {% if order.payment_method == "invoice" %}invoice payment{% else %}bank transfer{% endif %}.</h1>
+      <ul class="fact-list mt-3">
+        <li><span>Bank</span><strong>Nabil Bank Ltd, Jhamsikhel branch</strong></li>
+        <li><span>Account name</span><strong>Zencraft Solution Pvt. Ltd.</strong></li>
+        <li><span>NPR account</span><strong class="mono">0441 0170 5021 88</strong></li>
+        <li><span>SWIFT (USD)</span><strong class="mono">NARBNPKA</strong></li>
+        <li><span>Payment reference</span><strong class="mono">{{ order.reference }}</strong></li>
+      </ul>
+      {% if order.payment_method == "invoice" %}<p class="muted mt-2">A PAN/VAT invoice with 15-day terms will be emailed to {{ order.email }} within one working day.</p>{% endif %}
+      {% endif %}
+      <ul class="fact-list mt-4">
+        <li><span>Reference</span><strong class="mono">{{ order.reference }}</strong></li>
+        {% for item in order.items.all %}<li><span>{{ item.quantity }} x {{ item.name }}</span><strong>{{ item.line_total_npr|npr }}</strong></li>{% endfor %}
+        <li><span>Total</span><strong>{{ order.total_npr|npr }} / ${{ order.total_usd|floatformat:2 }}</strong></li>
+      </ul>
+      <a class="btn btn--dark mt-4" href="{% url 'core:home' %}">Back to home</a>
+    </div>
+  </div>
+</section>
+{% endblock %}

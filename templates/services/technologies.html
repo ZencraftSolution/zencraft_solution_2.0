@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Technology stack | {{ site.company_name }}{% endblock %}
+{% block meta_description %}The languages, frameworks, databases, cloud platforms and testing tools Zencraft Solution engineers use in production.{% endblock %}
+
+{% block content %}
+<section class="page-hero blueprint">
+  <div class="container page-hero__inner">
+    <div class="page-hero__copy" style="max-width:780px">
+      <ol class="crumbs" aria-label="Breadcrumb"><li><a href="{% url 'core:home' %}">Home</a></li><li>Technologies</li></ol>
+      <h1 class="h1" data-split>{{ total }} technologies we run in production today</h1>
+      <p class="lead" data-hero-item>We pick proven, well-supported tools your future team can hire for. Each one below is in use on at least one live client system.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container" style="display:grid;gap:64px">
+    {% for key, label, items in groups %}
+    <div>
+      <div class="flex justify-between items-center flex-wrap gap-2" style="margin-bottom:24px" data-reveal>
+        <h2 class="h3">{{ label }}</h2>
+        <span class="mono muted" style="font-size:.8rem">{{ items|length }} tools</span>
+      </div>
+      <ul class="logo-grid" data-reveal-group data-grid-wave>
+        {% for t in items %}
+        <li class="logo-tile" title="{{ t.years_used }} years in production">
+          <img src="{{ t.logo_url }}" alt="{{ t.name }}" width="40" height="40" loading="lazy" data-logo>
+          <span>{{ t.name }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

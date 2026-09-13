@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Page not found | Zencraft Solution{% endblock %}
+{% block cta_band %}{% endblock %}
+{% block content %}
+<section class="error-page blueprint">
+  <div class="container grid-2" style="align-items:center">
+    <div class="terminal" data-reveal>
+      <div class="terminal__bar"><span></span><span></span><span></span><em>zencraft@lalitpur: ~</em></div>
+      <div class="terminal__body"><span class="terminal__prompt">$</span> curl -I {{ request.path|truncatechars:48 }}
+<span class="terminal__key">HTTP/1.1 404 Not Found</span>
+<span class="terminal__dim">x-served-by: zencraft-web</span>
+<span class="terminal__dim">content-type: text/html</span>
+
+<span class="terminal__prompt">$</span> zencraft suggest --nearest
+<span class="terminal__ok">[ok]</span> /services/
+<span class="terminal__ok">[ok]</span> /work/
+<span class="terminal__ok">[ok]</span> /estimate/
+<span class="terminal__prompt">$</span> <span class="terminal__caret"></span></div>
+    </div>
+    <div class="stack" style="--stack:20px">
+      <p class="label">Error 404</p>
+      <h1 class="h1">This page does not exist, or it moved.</h1>
+      <p class="lead">Check the address, or pick up from one of the most visited pages.</p>
+      <div class="flex gap-1 flex-wrap">
+        <a class="btn btn--primary" href="/">Go to home</a>
+        <a class="btn btn--ghost" href="/services/">Browse services</a>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

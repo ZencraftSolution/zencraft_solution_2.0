@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Project cost estimator | {{ site.company_name }}{% endblock %}
+{% block meta_description %}Get an indicative budget range, timeline and team for your software project in about five minutes. NPR and USD.{% endblock %}
+{% block cta_band %}{% endblock %}
+
+{% block content %}
+<section class="page-hero blueprint">
+  <div class="container" style="padding-block:clamp(36px,5vw,64px)">
+    <ol class="crumbs" aria-label="Breadcrumb"><li><a href="{% url 'core:home' %}">Home</a></li><li>Project estimator</li></ol>
+    <h1 class="h1 mt-2" data-split>Estimate your project in five minutes</h1>
+    <p class="lead mt-2" data-hero-item>Six short questions. You get an honest range, a likely timeline and the team shape we would propose.</p>
+  </div>
+</section>
+
+<section class="section" style="padding-top:clamp(40px,5vw,64px)">
+  <div class="container">
+    <noscript><div class="notice notice--error"><i class="ph ph-warning-circle"></i><span>The estimator needs JavaScript. You can also <a class="text-link" href="{% url 'core:contact' %}">describe your project on the contact page</a>.</span></div></noscript>
+
+    <div class="estimator" data-estimator
+         data-config-url="{% url 'estimator:config_api' %}"
+         data-submit-url="{% url 'estimator:submit_api' %}"
+         data-event-url="{% url 'estimator:event_api' %}">
+      <form class="form-card" novalidate data-estimator-form enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="est-progress" data-progress-wrap>
+          <div class="est-progress__bar" role="progressbar" aria-valuemin="1" aria-valuemax="6" aria-valuenow="1" aria-label="Estimator progress"><div class="est-progress__fill" data-progress></div></div>
+          <span class="est-progress__text" data-progress-text>Step 1 of 6</span>
+        </div>
+
+        <fieldset class="est-step" data-step="1" style="border:0;padding:0;margin:0">
+          <legend class="sr-only">Project type</legend>
+          <h2>What are you building?</h2>
+          <p>Pick the closest match. You can describe the details later.</p>
+          <div class="tiles" data-types><div class="muted">Loading options...</div></div>
+          <p class="field__error" data-step-error hidden>Please choose a project type.</p>
+        </fieldset>
+
+        <fieldset class="est-step" data-step="2" hidden style="border:0;padding:0;margin:0">
+          <legend class="sr-only">Scope</legend>
+          <h2>Which features will it need?</h2>
+          <p>Select everything that applies to the first release. Skip anything you are unsure about.</p>
+          <div class="tiles tiles--compact" data-features></div>
+        </fieldset>
+
+        <fieldset class="est-step" data-step="3" hidden style="border:0;padding:0;margin:0">
+          <legend class="sr-only">Platforms</legend>
+          <h2>Where should it run?</h2>
+          <p>Choose every platform you need at launch.</p>
+          <div class="tiles tiles--compact">
+            {% for value, label in platform_choices %}
+            <label class="tile"><input type="checkbox" name="platform" value="{{ value }}"><span class="tile__body"><i class="ph ph-{% if value == 'web' %}globe{% elif value == 'ios' %}apple-logo{% elif value == 'android' %}android-logo{% elif value == 'windows' %}windows-logo{% elif value == 'macos' %}laptop{% else %}linux-logo{% endif %}"></i><strong>{{ label }}</strong></span></label>
+            {% endfor %}
+          </div>
+          <p class="field__error" data-step-error hidden>Please choose at least one platform.</p>
+        </fieldset>
+
+        <fieldset class="est-step" data-step="4" hidden style="border:0;padding:0;margin:0">
+          <legend class="sr-only">Timeline and team</legend>
+          <h2>How soon, and how do you want to work?</h2>
+          <p>Faster timelines need a larger team working in parallel, which raises cost.</p>
+          <p class="field__label" style="margin-bottom:12px">Timeline</p>
+          <div class="tiles tiles--compact">
+            {% for value, label in timeline_choices %}
+            <label class="tile"><input type="radio" name="timeline" value="{{ value }}" {% if value == "standard" %}checked{% endif %}><span class="tile__body"><strong>{{ label }}</strong></span></label>
+            {% endfor %}
+          </div>
+          <p class="field__label" style="margin:28px 0 12px">Team preference</p>
+          <div class="tiles tiles--compact">
+            {% for value, label in team_choices %}
+            <label class="tile"><input type="radio" name="team_preference" value="{{ value }}" {% if value == "unsure" %}checked{% endif %}><span class="tile__body"><strong>{{ label }}</strong></span></label>
+            {% endfor %}
+          </div>
+        </fieldset>
+
+        <fieldset class="est-step" data-step="5" hidden style="border:0;padding:0;margin:0">
+          <legend class="sr-only">Design</legend>
+          <h2>What about design?</h2>
+          <p>Design shapes how people feel about the product and how quickly developers can build it.</p>
+          <div class="tiles">
+            {% for value, label in design_choices %}
+            <label class="tile"><input type="radio" name="design_needs" value="{{ value }}" {% if value == "existing" %}checked{% endif %}>
+              <span class="tile__body"><i class="ph ph-{% if value == 'existing' %}check-square{% elif value == 'uiux' %}pencil-ruler{% else %}palette{% endif %}"></i><strong>{{ label }}</strong>
+                <span>{% if value == 'existing' %}Figma files or a clear brand guide are ready{% elif value == 'uiux' %}Research, wireframes and interface design{% else %}Logo, visual identity and full product design{% endif %}</span></span></label>
+            {% endfor %}
+          </div>
+        </fieldset>
+
+        <fieldset class="est-step" data-step="6" hidden style="border:0;padding:0;margin:0">
+          <legend class="sr-only">Contact details</legend>
+          <h2>Where should we send your estimate?</h2>
+          <p>We show the range immediately and email you a copy. A solution architect may follow up once, and only if you want to.</p>
+          <div class="honeypot" aria-hidden="true"><label for="est-website">Leave empty</label><input id="est-website" type="text" name="website" tabindex="-1" autocomplete="off"></div>
+          <div class="form-grid form-grid--2">
+            <div class="field"><label for="est-name">Full name<span class="field__req" aria-hidden="true">*</span></label><input id="est-name" type="text" name="name" required autocomplete="name"><p class="field__error" data-error-for="name"></p></div>
+            <div class="field"><label for="est-email">Work email<span class="field__req" aria-hidden="true">*</span></label><input id="est-email" type="email" name="email" required autocomplete="email"><p class="field__error" data-error-for="email"></p></div>
+            <div class="field"><label for="est-phone">Phone</label><input id="est-phone" type="tel" name="phone" autocomplete="tel"></div>
+            <div class="field"><label for="est-company">Company</label><input id="est-company" type="text" name="company" autocomplete="organization"></div>
+            <div class="field"><label for="est-country">Country</label><input id="est-country" type="text" name="country" autocomplete="country-name" value="Nepal"></div>
+            <div class="field"><label for="est-budget">Budget you have in mind</label>
+              <select id="est-budget" name="budget_band">{% for value, label in budget_choices %}<option value="{{ value }}" {% if value == "unknown" %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+            </div>
+            <div class="field span-2"><label for="est-desc">Anything else we should know?</label><textarea id="est-desc" name="description" rows="4" maxlength="4000" placeholder="Users, integrations, deadlines, existing systems"></textarea></div>
+            <div class="field span-2"><label for="est-doc">Requirements document (optional)</label><input id="est-doc" type="file" name="document" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"><p class="field__help">PDF or DOCX, up to 5 MB. Stored privately and only visible to our project team.</p><p class="field__error" data-error-for="document"></p></div>
+            <div class="field span-2"><label class="check" for="est-consent"><input id="est-consent" type="checkbox" name="consent" required><span>I agree that Zencraft Solution may store these answers to prepare my estimate and contact me about it, as described in the <a class="text-link" href="{% url 'core:privacy' %}" target="_blank">privacy policy</a>.<span class="field__req" aria-hidden="true">*</span></span></label><p class="field__error" data-error-for="consent"></p></div>
+          </div>
+          <div class="notice notice--error mt-2" data-form-error hidden><i class="ph ph-warning-circle"></i><span data-form-error-text></span></div>
+        </fieldset>
+
+        <div class="est-nav" data-nav>
+          <button class="btn btn--ghost" type="button" data-back hidden><i class="ph ph-arrow-left"></i> Back</button>
+          <button class="btn btn--primary" type="button" data-next style="margin-left:auto">Continue <i class="ph ph-arrow-right"></i></button>
+          <button class="btn btn--primary" type="submit" data-submit hidden style="margin-left:auto">Show my estimate <i class="ph ph-arrow-right"></i></button>
+        </div>
+
+        <div class="est-result" data-result hidden tabindex="-1">
+          <div class="est-result__range">
+            <p class="label">Indicative budget range</p>
+            <p class="est-result__numbers" data-result-primary aria-live="polite">...</p>
+            <p class="est-result__alt" data-result-secondary></p>
+          </div>
+          <div class="est-result__grid">
+            <div class="card">
+              <p class="label">Likely timeline</p>
+              <p class="h2 mono mt-1" data-result-weeks></p>
+              <p class="muted mt-1" style="font-size:.9rem">From kickoff to first production release, based on about <span class="mono" data-result-hours></span> hours of work.</p>
+            </div>
+            <div class="card">
+              <p class="label">Suggested team</p>
+              <ul class="team-list mt-2" data-result-team></ul>
+            </div>
+          </div>
+          <div class="notice"><i class="ph ph-info"></i><span data-result-disclaimer></span></div>
+          <div class="card flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <h3 class="h3">Next step: a free 30-minute discovery call</h3>
+              <p class="muted mt-1">Your reference is <strong class="mono" data-result-ref></strong>. A copy has been emailed to you.</p>
+            </div>
+            <a class="btn btn--primary" href="{% url 'core:consultation' %}?topic=new-project" data-result-cta>Book a consultation</a>
+          </div>
+        </div>
+      </form>
+
+      <aside class="aside-sticky">
+        <div class="est-summary">
+          <h3>Your answers</h3>
+          <dl data-summary>
+            <div><dt>Project</dt><dd data-sum="type">Not chosen yet</dd></div>
+            <div><dt>Features</dt><dd data-sum="features">None selected</dd></div>
+            <div><dt>Platforms</dt><dd data-sum="platforms">None selected</dd></div>
+            <div><dt>Timeline and team</dt><dd data-sum="timeline">Standard pace, not sure yet</dd></div>
+            <div><dt>Design</dt><dd data-sum="design">I have designs</dd></div>
+          </dl>
+          <div class="est-live">
+            <p class="muted" style="font-size:.86rem">Estimates are calculated from our delivery history and published rates. Nothing is shared outside Zencraft.</p>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}<script src="{% static 'js/estimator.js' %}" defer></script>{% endblock %}

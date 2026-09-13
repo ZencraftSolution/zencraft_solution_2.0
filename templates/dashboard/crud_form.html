@@ -1,0 +1,22 @@
+{% extends "dashboard/base.html" %}
+{% block title %}{% if instance %}Edit {{ instance }}{% else %}New{% endif %} / {{ cfg.title }}{% endblock %}
+{% block top_title %}{{ cfg.title }}{% endblock %}
+{% block content %}
+<div class="dash-head">
+  <div><a class="text-link" href="{% url 'dashboard:crud_list' slug %}"><i class="ph ph-arrow-left"></i> {{ cfg.title }}</a><h1 class="mt-1">{% if instance %}{{ instance|truncatechars:80 }}{% else %}New record{% endif %}</h1></div>
+  {% if public_url %}<a class="btn btn--ghost btn--sm" href="{{ public_url }}" target="_blank" rel="noopener"><i class="ph ph-arrow-square-out"></i> View on site</a>{% endif %}
+</div>
+<form method="post" class="panel" novalidate>
+  {% csrf_token %}
+  {% if form.errors %}<div class="notice notice--error" style="margin-bottom:16px"><i class="ph ph-warning-circle"></i><span>Please fix the highlighted fields.{% for e in form.non_field_errors %} {{ e }}{% endfor %}</span></div>{% endif %}
+  <div class="form-grid form-grid--2">
+    {% for field in form.visible_fields %}{% include "partials/field.html" with field=field span=field.field.widget.attrs.rows %}{% endfor %}
+    {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+  </div>
+  <div class="flex gap-1 mt-4 flex-wrap">
+    <button class="btn btn--primary" type="submit">Save</button>
+    <button class="btn btn--ghost" type="submit" name="save_continue" value="1">Save and keep editing</button>
+    {% if instance %}<a class="btn btn--ghost" style="margin-left:auto;color:var(--red)" href="{% url 'dashboard:crud_delete' slug instance.pk %}"><i class="ph ph-trash"></i> Delete</a>{% endif %}
+  </div>
+</form>
+{% endblock %}

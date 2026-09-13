@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% load zc %}
+{% block title %}Checkout | {{ site.company_name }}{% endblock %}
+{% block cta_band %}{% endblock %}
+
+{% block content %}
+<section class="section">
+  <div class="container">
+    <ol class="crumbs"><li><a href="{% url 'commerce:cart' %}">Cart</a></li><li>Details</li><li>Payment</li></ol>
+    <h1 class="h1 mt-2" data-split>Your details</h1>
+    <div class="with-aside mt-4">
+      <form method="post" class="form-card" novalidate data-reveal>
+        {% csrf_token %}
+        {% include "partials/honeypot.html" %}
+        {% if form.non_field_errors %}<div class="notice notice--error"><i class="ph ph-warning-circle"></i>{{ form.non_field_errors }}</div>{% endif %}
+        <div class="form-grid form-grid--2">
+          {% include "partials/field.html" with field=form.customer_name %}
+          {% include "partials/field.html" with field=form.email %}
+          {% include "partials/field.html" with field=form.phone %}
+          {% include "partials/field.html" with field=form.company %}
+          {% include "partials/field.html" with field=form.country %}
+          {% include "partials/field.html" with field=form.pan_vat %}
+          {% include "partials/field.html" with field=form.billing_address span=True %}
+          {% include "partials/field.html" with field=form.notes span=True %}
+          {% include "partials/field.html" with field=form.consent span=True %}
+        </div>
+        <button class="btn btn--primary mt-3" type="submit">Continue to payment <i class="ph ph-arrow-right"></i></button>
+      </form>
+      <aside class="aside-sticky">
+        <div class="form-card">
+          <h2 class="h3">Order summary</h2>
+          <ul class="fact-list mt-2">
+            {% for line in lines %}<li><span>{{ line.quantity }} x {{ line.product }}</span><strong>{% price line.line_total %}</strong></li>{% endfor %}
+            <li><span>VAT (13%)</span><strong>{% price totals.vat %}</strong></li>
+            <li><span>Total</span><strong>{% price totals.total %}</strong></li>
+          </ul>
+          <p class="muted mt-2" style="font-size:.84rem">The NPR to USD rate is fixed on your order when you continue.</p>
+        </div>
+      </aside>
+    </div>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,17 @@
+{% extends "core/legal_base.html" %}
+{% block title %}Cookie policy | {{ site.company_name }}{% endblock %}
+{% block legal_title %}Cookie policy{% endblock %}
+{% block legal_body %}
+<p>This website uses as few cookies as possible and no advertising or cross-site tracking cookies.</p>
+<h2>Cookies we set</h2>
+<ul>
+  <li><code>csrftoken</code>: protects forms against cross-site request forgery. Required.</li>
+  <li><code>sessionid</code>: remembers your cart and the confirmation page after you submit a form. Required, expires when the session ends or after 2 weeks.</li>
+</ul>
+<h2>Local storage</h2>
+<p>Your currency preference (NPR or USD) is saved in your browser's local storage so prices display the way you chose on your next visit. It never leaves your device.</p>
+<h2>Third-party content</h2>
+<p>Fonts, icons, images and animation libraries are loaded from public content delivery networks. These providers may log your IP address for security and performance, under their own policies.</p>
+<h2>Managing cookies</h2>
+<p>You can delete or block cookies in your browser settings. Blocking required cookies will prevent forms and the cart from working.</p>
+{% endblock %}

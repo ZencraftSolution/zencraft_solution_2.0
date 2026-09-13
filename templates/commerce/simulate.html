@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% load zc %}
+{% block title %}Sandbox payment{% endblock %}
+{% block cta_band %}{% endblock %}
+{% block content %}
+<section class="section">
+  <div class="container container--narrow">
+    <div class="form-card text-center">
+      <span class="tag tag--amber">Development sandbox</span>
+      <h1 class="h2 mt-2">{{ gateway.label }} simulator</h1>
+      <p class="lead mt-2" style="margin-inline:auto">No credentials are configured for {{ gateway.label }}, so this page stands in for the provider while DEBUG is on. It is never available in production.</p>
+      <p class="mono mt-3" style="font-size:1.4rem;color:var(--ink)">{% if gateway.currency == "USD" %}${{ order.total_usd|floatformat:2 }}{% else %}{{ order.total_npr|npr }}{% endif %}</p>
+      <div class="flex gap-1 mt-4" style="justify-content:center;flex-wrap:wrap">
+        <a class="btn btn--primary" href="{% url 'commerce:payment_callback' gateway.code order.reference 'success' %}">Approve payment</a>
+        <a class="btn btn--ghost" href="{% url 'commerce:payment_callback' gateway.code order.reference 'failure' %}">Decline payment</a>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

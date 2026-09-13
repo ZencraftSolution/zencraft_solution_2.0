@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% load zc %}
+{% block title %}Payment for {{ order.reference }} | {{ site.company_name }}{% endblock %}
+{% block cta_band %}{% endblock %}
+
+{% block content %}
+<section class="section">
+  <div class="container">
+    <ol class="crumbs"><li>Cart</li><li>Details</li><li>Payment</li></ol>
+    <h1 class="h1 mt-2" data-split>Choose how to pay</h1>
+    <p class="lead mt-2" data-hero-item>Order <span class="mono">{{ order.reference }}</span> for {{ order.customer_name }}.</p>
+    {% if order.payment_status == "failed" %}<div class="notice notice--error mt-3"><i class="ph ph-warning-circle"></i><span>Your last payment attempt did not complete. You have not been charged.</span></div>{% endif %}
+    <div class="with-aside mt-4">
+      <div class="stack" style="--stack:12px" data-reveal-group>
+        {% for g in gateways %}
+        <form method="post" action="{% url 'commerce:payment_start' order.reference g.code %}">
+          {% csrf_token %}
+          <button type="submit" class="card card--hover w-full" style="display:grid;grid-template-columns:48px 1fr auto;gap:16px;align-items:center;text-align:left;cursor:pointer">
+            <span class="bento-card__icon"><i class="ph ph-{{ g.icon }}"></i></span>
+            <span>
+              <strong style="color:var(--ink);display:block">{{ g.label }}</strong>
+              <span class="muted" style="font-size:.9rem">{{ g.description }}</span>
+              {% if not g.is_configured and debug %}<span class="tag tag--amber" style="margin-top:6px">Sandbox simulator</span>{% endif %}
+            </span>
+            <span class="mono" style="font-size:.9rem;color:var(--ink)">{% if g.currency == "USD" %}${{ order.total_usd|floatformat:2 }}{% else %}{{ order.total_npr|npr }}{% endif %}</span>
+          </button>
+        </form>
+        {% endfor %}
+      </div>
+      <aside class="aside-sticky">
+        <div class="form-card">
+          <h2 class="h3">Order {{ order.reference }}</h2>
+          <ul class="fact-list mt-2">
+            {% for item in order.items.all %}<li><span>{{ item.quantity }} x {{ item.name }}</span><strong>{{ item.line_total_npr|npr }}</strong></li>{% endfor %}
+            <li><span>VAT</span><strong>{{ order.vat_npr|npr }}</strong></li>
+            <li><span>Total NPR</span><strong>{{ order.total_npr|npr }}</strong></li>
+            <li><span>Total USD</span><strong class="mono">${{ order.total_usd|floatformat:2 }}</strong></li>
+            <li><span>Rate used</span><strong class="mono">{{ order.exchange_rate|floatformat:2 }}</strong></li>
+          </ul>
+        </div>
+      </aside>
+    </div>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,69 @@
+{% load zc static %}
+<header class="site-header">
+  <div class="container site-header__inner">
+    <a href="{% url 'core:home' %}" class="brand" aria-label="{{ site.company_name }} home">
+      <img class="brand__logo" src="{% static 'img/logo-mark.png' %}" alt="" width="52" height="40">
+      Zencraft Solution
+    </a>
+
+    <nav class="nav" aria-label="Primary">
+      <div class="nav__item" data-menu>
+        <button class="nav__trigger {% active '/services/' %}" type="button" aria-expanded="false" aria-controls="mega-services">
+          Services <i class="ph ph-caret-down" aria-hidden="true"></i>
+        </button>
+        <div class="mega" id="mega-services">
+          {% for s in nav_services %}
+          <a class="mega__link" href="{% url 'services:detail' s.slug %}">
+            <i class="ph ph-{{ s.icon }}" aria-hidden="true"></i>
+            <span><strong>{{ s.name }}</strong><span>{{ s.nav_blurb }}</span></span>
+          </a>
+          {% endfor %}
+          <div class="mega__foot">
+            <span class="muted">Not sure which service fits?</span>
+            <a class="text-link" href="{% url 'core:consultation' %}">Book a consultation <i class="ph ph-arrow-right"></i></a>
+          </div>
+        </div>
+      </div>
+      <a class="nav__link {% active '/services/industries/' %}" href="{% url 'services:industries' %}">Industries</a>
+      <a class="nav__link {% active '/work/' %}" href="{% url 'portfolio:list' %}">Work</a>
+      <a class="nav__link {% active '/pricing/' %}" href="{% url 'commerce:pricing' %}">Pricing</a>
+      <a class="nav__link {% active '/careers/' %}" href="{% url 'careers:landing' %}">Careers</a>
+      <a class="nav__link {% active '/insights/' %}" href="{% url 'blog:list' %}">Insights</a>
+    </nav>
+
+    <div class="header-actions">
+      <div class="currency-toggle" role="group" aria-label="Display prices in">
+        <button type="button" data-currency="npr" aria-pressed="true">NPR</button>
+        <button type="button" data-currency="usd" aria-pressed="false">USD</button>
+      </div>
+      <a class="icon-btn" href="{% url 'commerce:cart' %}" aria-label="Cart, {{ cart_count }} items">
+        <i class="ph ph-shopping-cart-simple" aria-hidden="true"></i>
+        {% if cart_count %}<span class="icon-btn__badge">{{ cart_count }}</span>{% endif %}
+      </a>
+      <a class="btn btn--primary btn--sm header-cta" href="{% url 'estimator:start' %}">Get an estimate</a>
+      <button class="icon-btn menu-toggle" type="button" aria-expanded="false" aria-controls="mobile-menu" aria-label="Open menu" data-menu-toggle>
+        <i class="ph ph-list" aria-hidden="true"></i>
+      </button>
+    </div>
+  </div>
+
+  <div class="mobile-menu" id="mobile-menu">
+    <div class="mobile-menu__group">
+      <p class="mobile-menu__title">Services</p>
+      {% for s in nav_services %}<a href="{% url 'services:detail' s.slug %}">{{ s.name }}</a>{% endfor %}
+    </div>
+    <div class="mobile-menu__group">
+      <p class="mobile-menu__title">Company</p>
+      <a href="{% url 'services:industries' %}">Industries</a>
+      <a href="{% url 'portfolio:list' %}">Work</a>
+      <a href="{% url 'commerce:pricing' %}">Pricing</a>
+      <a href="{% url 'commerce:store' %}">Store</a>
+      <a href="{% url 'careers:landing' %}">Careers</a>
+      <a href="{% url 'blog:list' %}">Insights</a>
+      <a href="{% url 'core:about' %}">About</a>
+      <a href="{% url 'core:contact' %}">Contact</a>
+    </div>
+    <div class="currency-toggle mobile-currency" role="group" aria-label="Display prices in"><button type="button" data-currency="npr" aria-pressed="true">NPR</button><button type="button" data-currency="usd" aria-pressed="false">USD</button></div>
+    <a class="btn btn--primary btn--block" href="{% url 'estimator:start' %}">Get an estimate</a>
+  </div>
+</header>

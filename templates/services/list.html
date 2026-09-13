@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% load zc %}
+{% block title %}Software development services | {{ site.company_name }}{% endblock %}
+{% block meta_description %}Custom software, web and mobile development, IT consulting, QA, data analytics, help desk and infrastructure services from Zencraft Solution in Nepal.{% endblock %}
+
+{% block content %}
+<section class="page-hero blueprint">
+  <div class="container page-hero__inner">
+    <div class="page-hero__copy" style="max-width:780px">
+      <ol class="crumbs" aria-label="Breadcrumb"><li><a href="{% url 'core:home' %}">Home</a></li><li>Services</li></ol>
+      <h1 class="h1" data-split>Engineering services for the whole life of your software</h1>
+      <p class="lead" data-hero-item>Plan it, build it, test it, run it and support it. Use one service or combine several under a single team and contract.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="card-grid" data-reveal-group data-grid-wave>
+      {% for s in services %}
+      <a class="card card--hover stack" style="--stack:14px;display:flex;flex-direction:column" href="{% url 'services:detail' s.slug %}">
+        <span class="bento-card__icon"><i class="ph ph-{{ s.icon }}"></i></span>
+        <h2 class="h3">{{ s.name }}</h2>
+        <p class="muted" style="font-size:.95rem">{{ s.summary }}</p>
+        <ul class="chips" style="margin-top:auto;padding-top:8px">
+          {% for t in s.technologies.all|slice:":4" %}<li class="tag">{{ t.name }}</li>{% endfor %}
+        </ul>
+        <span class="text-link">View service <i class="ph ph-arrow-right"></i></span>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="section section--alt section--line">
+  <div class="container">
+    <div class="section-head" data-reveal>
+      <h2 class="h2">Every service is available under four engagement models</h2>
+    </div>
+    <div class="models" data-reveal-group>
+      {% for m in engagement_models %}
+      <div class="model"><i class="ph ph-{{ m.icon }}"></i><h3>{{ m.name }}</h3><p>{{ m.best_for }}</p><small>{{ m.billing_note }}</small></div>
+      {% endfor %}
+    </div>
+    <p class="mt-3"><a class="text-link" href="{% url 'commerce:pricing' %}">See rates and indicative ranges <i class="ph ph-arrow-right"></i></a></p>
+  </div>
+</section>
+{% endblock %}

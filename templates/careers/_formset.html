@@ -1,0 +1,23 @@
+{{ formset.management_form }}
+{% if formset.non_form_errors %}<div class="notice notice--error"><i class="ph ph-warning-circle"></i>{{ formset.non_form_errors }}</div>{% endif %}
+<div data-formset-list="{{ formset.prefix }}">
+  {% for f in formset.forms %}
+  <div class="repeat-block" data-formset-item>
+    <div class="repeat-block__head"><span>{{ title }} <span data-formset-number>{{ forloop.counter }}</span></span></div>
+    <div class="form-grid form-grid--2">
+      {% for field in f.visible_fields %}{% include "partials/field.html" with field=field span=field.field.widget.attrs.rows %}{% endfor %}
+      {% for hidden in f.hidden_fields %}{{ hidden }}{% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+<template data-formset-template="{{ formset.prefix }}">
+  <div class="repeat-block" data-formset-item>
+    <div class="repeat-block__head"><span>{{ title }} <span data-formset-number></span></span><button class="btn btn--ghost btn--sm" type="button" data-formset-remove><i class="ph ph-x"></i> Remove</button></div>
+    <div class="form-grid form-grid--2">
+      {% for field in formset.empty_form.visible_fields %}{% include "partials/field.html" with field=field span=field.field.widget.attrs.rows %}{% endfor %}
+      {% for hidden in formset.empty_form.hidden_fields %}{{ hidden }}{% endfor %}
+    </div>
+  </div>
+</template>
+<button class="btn btn--ghost btn--sm mt-2" type="button" data-formset-add="{{ formset.prefix }}" data-max="{{ formset.max_num }}"><i class="ph ph-plus"></i> Add {{ title|lower }}</button>

@@ -1,0 +1,33 @@
+{% extends "dashboard/base.html" %}
+{% block title %}Applications{% endblock %}
+{% block top_title %}Applications{% endblock %}
+{% block content %}
+<div class="dash-head">
+  <div><a class="text-link" href="{% url 'dashboard:applications' %}"><i class="ph ph-arrow-left"></i> Board</a><h1 class="mt-1">All applications</h1></div>
+  <a class="btn btn--ghost btn--sm" href="{% url 'dashboard:applications_export' %}?{{ request.GET.urlencode }}"><i class="ph ph-download-simple"></i> Export CSV</a>
+</div>
+{% include "dashboard/_app_filters.html" %}
+<form method="post" class="panel" data-bulk>
+  {% csrf_token %}
+  <div class="flex gap-1 items-center flex-wrap" style="margin-bottom:12px">
+    <label class="sr-only" for="bulk-status">Move selected to</label>
+    <select class="input" id="bulk-status" name="bulk_status" style="width:auto;min-height:38px">{% for v, l in statuses %}<option value="{{ v }}">Move selected to: {{ l }}</option>{% endfor %}</select>
+    <button class="btn btn--dark btn--sm" type="submit">Update selected</button>
+    <span class="muted mono" style="font-size:.8rem" data-bulk-count>0 selected</span>
+  </div>
+  <div class="dtable-wrap"><table class="dtable">
+    <thead><tr><th><input type="checkbox" aria-label="Select all" data-bulk-all></th><th>Candidate</th><th>Role</th><th>Years</th><th>Mode</th><th>Notice</th><th>Rating</th><th>Status</th><th>Applied</th></tr></thead>
+    <tbody>
+      {% for a in applications %}
+      <tr>
+        <td><input type="checkbox" name="ids" value="{{ a.pk }}" aria-label="Select {{ a.full_name }}" data-bulk-item></td>
+        <td><a href="{% url 'dashboard:application_detail' a.pk %}">{{ a.full_name }}</a><br><span class="muted" style="font-size:.78rem">{{ a.email }}</span></td>
+        <td>{{ a.job.title }}</td><td class="mono">{{ a.years_experience }}</td><td>{{ a.get_application_mode_display }}</td>
+        <td>{{ a.get_notice_period_display }}</td><td class="mono">{{ a.rating|default:"-" }}</td>
+        <td><span class="tag">{{ a.get_status_display }}</span></td><td class="mono" style="font-size:.78rem">{{ a.created_at|date:"j M Y" }}</td>
+      </tr>
+      {% empty %}<tr><td colspan="9" class="muted">No applications match these filters.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</form>
+{% endblock %}

@@ -1,0 +1,28 @@
+{% extends "dashboard/base.html" %}
+{% load zc %}
+{% block title %}Orders{% endblock %}
+{% block top_title %}Orders{% endblock %}
+{% block content %}
+<div class="dash-head"><div><h1>Store orders</h1><p>Productized service purchases and their payment status.</p></div></div>
+<ul class="chips" style="margin-bottom:16px">
+  <li><a class="chip {% if not status %}is-active{% endif %}" href="?">All</a></li>
+  {% for v, l in statuses %}<li><a class="chip {% if status == v %}is-active{% endif %}" href="?status={{ v }}">{{ l }}</a></li>{% endfor %}
+</ul>
+<div class="panel"><div class="dtable-wrap"><table class="dtable">
+  <thead><tr><th>Reference</th><th>Customer</th><th>Items</th><th>Total NPR</th><th>Total USD</th><th>Method</th><th>Payment</th><th>Fulfilment</th><th>Created</th></tr></thead>
+  <tbody>
+    {% for o in orders %}
+    <tr>
+      <td><a class="mono" href="{% url 'dashboard:order_detail' o.pk %}">{{ o.reference }}</a></td>
+      <td>{{ o.customer_name }}<br><span class="muted" style="font-size:.78rem">{{ o.company|default:o.email }}</span></td>
+      <td>{% for i in o.items.all %}{{ i.quantity }} x {{ i.name }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</td>
+      <td class="mono">{{ o.total_npr|npr }}</td><td class="mono">${{ o.total_usd|floatformat:2 }}</td>
+      <td>{{ o.get_payment_method_display|default:"-" }}</td>
+      <td><span class="tag {% if o.payment_status == 'paid' %}tag--green{% elif o.payment_status == 'failed' %}tag--red{% elif o.payment_status == 'awaiting' %}tag--amber{% endif %}">{{ o.get_payment_status_display }}</span></td>
+      <td><span class="tag">{{ o.get_fulfilment_status_display }}</span></td>
+      <td class="mono" style="font-size:.78rem">{{ o.created_at|date:"j M Y" }}</td>
+    </tr>
+    {% empty %}<tr><td colspan="9" class="muted">No orders yet.</td></tr>{% endfor %}
+  </tbody>
+</table></div></div>
+{% endblock %}

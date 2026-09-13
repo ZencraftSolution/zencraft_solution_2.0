@@ -1,0 +1,287 @@
+{% extends "base.html" %}
+{% load zc static %}
+
+{% block title %}{{ site.company_name }}: software development company in Nepal{% endblock %}
+
+{% block content %}
+<section class="hs" data-hero-slider aria-roledescription="carousel" aria-label="Industries we build software for">
+  <div class="hs__bgs" aria-hidden="true">
+    {% for s in hero_slides %}
+    <div class="hs__bg{% if forloop.first %} is-active{% endif %}" style="--tint: {{ s.tint }}" data-hs-bg>
+      <img src="{{ s.background_url }}" alt="" width="1920" height="1080" {% if not forloop.first %}loading="lazy"{% else %}fetchpriority="high"{% endif %} data-seed="hero-bg-{{ forloop.counter }}">
+    </div>
+    {% endfor %}
+    <svg class="hs__wave" viewBox="0 0 1440 220" preserveAspectRatio="none"><path d="M0 120 C 240 40, 520 40, 760 110 S 1200 200, 1440 60 L1440 220 L0 220 Z"/></svg>
+  </div>
+
+  <div class="container hs__grid">
+    <div class="hs__copy">
+      <h1 class="hs__title" data-split>Custom Software and IT&nbsp;Services</h1>
+      <p class="hs__tagline" data-hero-item>Engineering outcomes you can measure</p>
+      <div class="hs__tabs" role="tablist" aria-label="Choose an industry" data-hero-item>
+        {% for s in hero_slides %}
+        <button class="hs__tab{% if forloop.first %} is-active{% endif %}" type="button" role="tab" id="hs-tab-{{ forloop.counter0 }}"
+                aria-selected="{% if forloop.first %}true{% else %}false{% endif %}" aria-controls="hs-slide-{{ forloop.counter0 }}"
+                tabindex="{% if forloop.first %}0{% else %}-1{% endif %}" data-hs-tab="{{ forloop.counter0 }}">
+          {{ s.label }}<span class="hs__tab-bar" aria-hidden="true"></span>
+        </button>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="hs__visual" data-hero-visual>
+      <button class="hs__arrow hs__arrow--prev" type="button" aria-label="Previous slide" data-hs-prev><i class="ph ph-caret-left"></i></button>
+      <div class="hs__frame">
+        <div class="hs__stack" aria-live="polite">
+          {% for s in hero_slides %}
+          <figure class="hs__slide{% if forloop.first %} is-active{% endif %}" id="hs-slide-{{ forloop.counter0 }}" role="tabpanel"
+                  aria-labelledby="hs-tab-{{ forloop.counter0 }}" aria-roledescription="slide" aria-label="{{ forloop.counter }} of {{ hero_slides|length }}"
+                  {% if not forloop.first %}aria-hidden="true"{% endif %} data-hs-slide>
+            <div class="hs__media"><img src="{{ s.image_url }}" alt="{{ s.caption }} built by Zencraft Solution" width="1200" height="760" {% if not forloop.first %}loading="lazy"{% endif %} data-seed="hero-{{ forloop.counter }}"></div>
+            <figcaption class="hs__caption">
+              <span>{{ s.caption }}</span>
+              <strong class="mono">{{ s.metric }}</strong>
+            </figcaption>
+          </figure>
+          {% endfor %}
+        </div>
+      </div>
+      <button class="hs__arrow hs__arrow--next" type="button" aria-label="Next slide" data-hs-next><i class="ph ph-caret-right"></i></button>
+    </div>
+  </div>
+
+  <div class="container hs__foot">
+    {% with first=hero_slides.0 %}
+    <a class="hs__link" href="{{ first.url }}" data-hs-link>
+      <span data-hs-link-text>{{ first.link }}</span> <i class="ph ph-arrow-right"></i>
+    </a>
+    {% endwith %}
+    {{ hero_slides|json_script:"hero-slides" }}
+  </div>
+</section>
+
+<section class="container" aria-label="Company in numbers">
+  <div class="metrics">
+    <div class="metric"><div class="metric__value" data-count="{{ site.stat_projects }}">{{ site.stat_projects }}</div><p class="metric__label">Projects delivered since 2017</p></div>
+    <div class="metric"><div class="metric__value" data-count="{{ site.stat_clients }}">{{ site.stat_clients }}</div><p class="metric__label">Clients in 11 countries</p></div>
+    <div class="metric"><div class="metric__value" data-count="{{ site.stat_engineers }}">{{ site.stat_engineers }}</div><p class="metric__label">Engineers, designers and QA</p></div>
+    <div class="metric"><div class="metric__value"><span data-count="{{ site.stat_uptime }}" data-decimals="2">{{ site.stat_uptime }}</span>%</div><p class="metric__label">Uptime across supported systems</p></div>
+  </div>
+</section>
+
+<div class="marquee" aria-label="Technologies we work with">
+  <div class="marquee__track">
+    {% for t in technologies %}<img src="{{ t.logo_url }}" alt="{{ t.name }}" width="30" height="30" loading="lazy" data-logo>{% endfor %}
+    {% for t in technologies %}<img src="{{ t.logo_url }}" alt="" width="30" height="30" loading="lazy" data-logo aria-hidden="true">{% endfor %}
+  </div>
+</div>
+
+<section class="section" aria-labelledby="services-title">
+  <div class="container">
+    <div class="section-head" data-reveal>
+      <h2 class="h2" id="services-title">Nine services, one accountable team</h2>
+      <p class="lead">From the first discovery workshop to 24/7 support, every engagement is run by the same engineers who wrote the code.</p>
+    </div>
+    <div class="bento" data-reveal-group data-grid-wave>
+      {% for s in services %}
+      {% if forloop.first %}
+      <a class="bento-card bento-card--feature" href="{% url 'services:detail' s.slug %}">
+        <img src="{{ s.hero_image_url }}" alt="" width="1200" height="900" loading="lazy" data-seed="{{ s.slug }}">
+        <span class="bento-card__icon"><i class="ph ph-{{ s.icon }}"></i></span>
+        <h3>{{ s.name }}</h3>
+        <p>{{ s.summary }}</p>
+        <span class="bento-card__more">Explore the service <i class="ph ph-arrow-right"></i></span>
+      </a>
+      {% else %}
+      <a class="bento-card{% if forloop.counter == 3 %} bento-card--tint{% elif forloop.counter == 5 %} bento-card--dark{% elif forloop.counter == 8 %} bento-card--grid{% endif %}" href="{% url 'services:detail' s.slug %}">
+        <span class="bento-card__icon"><i class="ph ph-{{ s.icon }}"></i></span>
+        <h3>{{ s.name }}</h3>
+        <p>{{ s.nav_blurb }}</p>
+        <span class="bento-card__more">Learn more <i class="ph ph-arrow-right"></i></span>
+      </a>
+      {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="section section--alt section--line" aria-labelledby="capability-title">
+  <div class="container grid-2" style="align-items:center">
+    <div class="terminal" data-reveal>
+      <div class="terminal__bar"><span></span><span></span><span></span><em>zencraft@lalitpur: ~</em></div>
+      {{ terminal_lines|json_script:"terminal-lines" }}
+      <div class="terminal__body" data-terminal="terminal-lines"><span class="terminal__prompt">$</span> zencraft --services{% for s in services %}
+<span class="terminal__ok">+</span> {{ s.name }}{% endfor %}</div>
+    </div>
+    <div data-reveal>
+      <h2 class="h2" id="capability-title">Engineers first, account managers second</h2>
+      <p class="lead mt-2">You talk to the tech lead from the first call. Every project has written architecture decisions, code review on every change and a staging environment you can open any day.</p>
+      <ul class="fact-list mt-4">
+        <li><span>Average engineer tenure</span><strong class="mono">3.8 years</strong></li>
+        <li><span>Automated test coverage on active projects</span><strong class="mono">81%</strong></li>
+        <li><span>Median response on P1 incidents</span><strong class="mono">14 min</strong></li>
+        <li><span>Working-hour overlap with EU and Australia</span><strong class="mono">4 to 6 h</strong></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="section" aria-labelledby="process-title">
+  <div class="container">
+    <div class="section-head" data-reveal>
+      <h2 class="h2" id="process-title">How a project moves from idea to production</h2>
+      <p class="lead">The same six stages on every engagement, so you always know what happens next and what you will see at the end of it.</p>
+    </div>
+    <div class="process process--horizontal" data-process>
+      <div class="process__rail" aria-hidden="true"><div class="process__fill"></div></div>
+      <ol class="process__list">
+        {% for title, text in process %}
+        <li class="process__step">
+          <span class="process__node">{{ forloop.counter|pad2 }}</span>
+          <div>
+            <h3>{{ title }}</h3>
+            <p>{{ text }}</p>
+          </div>
+        </li>
+        {% endfor %}
+      </ol>
+    </div>
+  </div>
+</section>
+
+<section class="cases" data-cases aria-labelledby="cases-title">
+  <div class="cases__inner">
+    <div class="container cases__head">
+      <div>
+        <h2 class="h2" id="cases-title">Selected work</h2>
+        <p class="lead mt-2">Platforms we built and still run for banks, hospitals, retailers and logistics firms.</p>
+      </div>
+      <a class="text-link" href="{% url 'portfolio:list' %}">All case studies <i class="ph ph-arrow-right"></i></a>
+    </div>
+    <div class="cases__track" data-cases-track>
+      {% for c in case_studies %}
+      <a class="case-card" href="{% url 'portfolio:detail' c.slug %}" data-flip-card data-flip-id="case-{{ c.slug }}">
+        <div class="case-card__media"><img src="{{ c.cover_image_url }}" alt="{{ c.title }}" width="1040" height="650" loading="lazy" data-seed="{{ c.slug }}" data-flip-img></div>
+        <div class="case-card__body">
+          <div class="case-card__meta"><span>{{ c.industry.name }}</span><span>{{ c.year }}</span><span>{{ c.duration }}</span></div>
+          <h3>{{ c.title }}</h3>
+          <p>{{ c.summary }}</p>
+          <div class="case-card__results">
+            {% for r in c.results|slice:":2" %}<div><strong>{{ r.value }}</strong><span>{{ r.label }}</span></div>{% endfor %}
+          </div>
+        </div>
+      </a>
+      {% endfor %}
+      <div class="case-card case-card--end">
+        <h3 class="h3">Your project could be next</h3>
+        <p class="muted">Tell us what you are building and we will share how we handled something similar.</p>
+        <a class="btn btn--primary" href="{% url 'core:consultation' %}">Book a consultation</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" aria-labelledby="industries-title">
+  <div class="container industries" data-industries>
+    <div>
+      <div class="section-head" data-reveal>
+        <h2 class="h2" id="industries-title">Built around how your industry works</h2>
+        <p class="lead">Compliance rules, integrations and user habits differ by sector. Our teams specialise so you do not pay for the learning curve.</p>
+      </div>
+      <ul class="industry-list" data-reveal-group>
+        {% for i in industries %}
+        <li class="industry-row{% if forloop.first %} is-active{% endif %}" data-industry-index="{{ forloop.counter0 }}">
+          <a href="{{ i.get_absolute_url }}">
+            <i class="ph ph-{{ i.icon }}" aria-hidden="true"></i>
+            <div><h3>{{ i.name }}</h3><p>{{ i.tagline }}</p></div>
+            <i class="ph ph-arrow-right arrow" aria-hidden="true"></i>
+          </a>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    <div class="industry-stage" aria-hidden="true">
+      {% for i in industries %}<img src="{{ i.image_url }}" alt="" width="800" height="1000" loading="lazy" data-seed="{{ i.slug }}" class="{% if forloop.first %}is-active{% endif %}">{% endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="section section--alt section--line" aria-labelledby="quotes-title">
+  <div class="container quotes">
+    <div data-reveal>
+      <h2 class="h2" id="quotes-title">What clients say after launch</h2>
+      <p class="lead mt-2">Every quote is from a client whose platform we still support today.</p>
+      <div class="quotes__controls">
+        <button class="icon-btn" type="button" data-quote-prev aria-label="Previous testimonial"><i class="ph ph-arrow-left"></i></button>
+        <button class="icon-btn" type="button" data-quote-next aria-label="Next testimonial"><i class="ph ph-arrow-right"></i></button>
+        <span class="quotes__count mono" data-quote-count aria-live="polite">1 / {{ testimonials|length }}</span>
+      </div>
+    </div>
+    <div class="quotes__stage" data-quotes>
+      {% for t in testimonials %}
+      <figure class="quote{% if forloop.first %} is-active{% endif %}" aria-hidden="{% if forloop.first %}false{% else %}true{% endif %}">
+        <div class="stars" aria-label="{{ t.rating }} out of 5">{% for _ in t.rating|star_range %}<i class="ph-fill ph-star"></i>{% endfor %}</div>
+        <blockquote class="quote__text" style="margin:0">&ldquo;{{ t.content }}&rdquo;</blockquote>
+        <figcaption class="quote__by">
+          <img src="{{ t.photo_url }}" alt="" width="104" height="104" loading="lazy" data-seed="{{ t.client_name }}">
+          <div><strong>{{ t.client_name }}</strong><span>{{ t.role }}, {{ t.company }}</span></div>
+        </figcaption>
+      </figure>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="section" aria-labelledby="models-title">
+  <div class="container">
+    <div class="section-head" data-reveal>
+      <h2 class="h2" id="models-title">Pick the way you want to work with us</h2>
+      <p class="lead">Published rates, clear contracts and no minimum lock-in beyond the first month.</p>
+    </div>
+    <div class="models" data-reveal-group>
+      {% for m in engagement_models %}
+      <div class="model">
+        <i class="ph ph-{{ m.icon }}" aria-hidden="true"></i>
+        <h3>{{ m.name }}</h3>
+        <p>{{ m.summary }}</p>
+        <small>{{ m.billing_note }}</small>
+      </div>
+      {% endfor %}
+    </div>
+    <p class="mt-3"><a class="text-link" href="{% url 'commerce:pricing' %}">Compare engagement models and rates <i class="ph ph-arrow-right"></i></a></p>
+  </div>
+</section>
+
+{% if posts %}
+<section class="section section--line" aria-labelledby="insights-title">
+  <div class="container">
+    <div class="section-head flex justify-between items-center flex-wrap gap-2" style="max-width:none" data-reveal>
+      <h2 class="h2" id="insights-title">Latest insights</h2>
+      <a class="text-link" href="{% url 'blog:list' %}">All articles <i class="ph ph-arrow-right"></i></a>
+    </div>
+    <div class="insights">
+      {% with lead=posts.0 %}
+      <a class="post-card" href="{{ lead.get_absolute_url }}" data-reveal>
+        <div class="post-card__media"><img src="{{ lead.hero_image_url }}" alt="" width="1200" height="750" loading="lazy" data-seed="{{ lead.slug }}"></div>
+        <div class="post-card__meta"><span>{{ lead.category.name }}</span><span>{{ lead.reading_minutes }} min read</span></div>
+        <h3 class="h3">{{ lead.title }}</h3>
+        <p>{{ lead.excerpt }}</p>
+      </a>
+      {% endwith %}
+      <div class="insights__side" data-reveal-group>
+        {% for p in posts|slice:"1:" %}
+        <a class="post-card post-card--row" href="{{ p.get_absolute_url }}">
+          <div class="post-card__media"><img src="{{ p.hero_image_url }}" alt="" width="280" height="280" loading="lazy" data-seed="{{ p.slug }}"></div>
+          <div class="stack" style="--stack:8px">
+            <div class="post-card__meta"><span>{{ p.category.name }}</span><span>{{ p.reading_minutes }} min</span></div>
+            <h3>{{ p.title }}</h3>
+            <p>{{ p.excerpt|truncatewords:18 }}</p>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

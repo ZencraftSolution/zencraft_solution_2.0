@@ -1,0 +1,16 @@
+{% load zc %}Hi {{ order.customer_name }},
+
+Thank you for your order with Zencraft Solution.
+
+Order reference: {{ order.reference }}
+Payment method: {{ order.get_payment_method_display }}
+Payment status: {{ order.get_payment_status_display }}
+
+{% for item in order.items.all %}{{ item.quantity }} x {{ item.name }}: {{ item.line_total_npr|npr }}
+{% endfor %}VAT: {{ order.vat_npr|npr }}
+Total: {{ order.total_npr|npr }} (USD {{ order.total_usd }} at {{ order.exchange_rate }})
+
+{% if order.payment_status != "paid" %}Please use {{ order.reference }} as the reference for your bank transfer. We start work once payment is confirmed.
+{% else %}Our team will contact you within one working day to schedule kickoff.
+{% endif %}
+Zencraft Solution

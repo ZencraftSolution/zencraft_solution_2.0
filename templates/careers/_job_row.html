@@ -1,0 +1,13 @@
+<a class="job-row" href="{{ job.get_absolute_url }}" data-job data-department="{{ job.department.slug }}" data-level="{{ job.experience_level }}" data-type="{{ job.employment_type }}" data-mode="{{ job.work_mode }}">
+  <div>
+    <h3>{{ job.title }}</h3>
+    <p class="muted" style="font-size:.92rem;margin-top:4px">{{ job.summary }}</p>
+  </div>
+  <div class="job-row__meta">
+    <span class="tag tag--blue">{{ job.get_experience_level_display }}</span>
+    <span class="tag">{{ job.get_employment_type_display }}</span>
+    <span class="tag">{{ job.get_work_mode_display }}</span>
+    {% if job.show_salary and job.salary_min_npr %}<span class="tag tag--green">Rs. {{ job.salary_min_npr|floatformat:0 }} to {{ job.salary_max_npr|floatformat:0 }}</span>{% endif %}
+  </div>
+  <span class="job-row__cta">View role <i class="ph ph-arrow-right"></i></span>
+</a>

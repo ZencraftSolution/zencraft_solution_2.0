@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}{% if active_category %}{{ active_category.name }} | {% endif %}Insights | {{ site.company_name }}{% endblock %}
+{% block meta_description %}Practical articles on software engineering, product strategy, cloud and careers from the Zencraft Solution team.{% endblock %}
+
+{% block content %}
+<section class="page-hero blueprint">
+  <div class="container" style="padding-block:clamp(40px,6vw,80px)">
+    <ol class="crumbs" aria-label="Breadcrumb"><li><a href="{% url 'core:home' %}">Home</a></li><li>Insights</li></ol>
+    <div class="flex justify-between items-center flex-wrap gap-2 mt-2">
+      <h1 class="h1" data-split>{% if active_category %}{{ active_category.name }}{% else %}Insights from the team{% endif %}</h1>
+      <form method="get" role="search" class="flex gap-1" style="width:min(100%,380px)" data-hero-item>
+        <label class="sr-only" for="blog-q">Search articles</label>
+        <input class="input" id="blog-q" type="search" name="q" value="{{ q }}" placeholder="Search articles">
+        <button class="btn btn--dark" type="submit" aria-label="Search"><i class="ph ph-magnifying-glass"></i></button>
+      </form>
+    </div>
+    <ul class="chips mt-3" data-hero-item>
+      <li><a class="chip {% if not active_category %}is-active{% endif %}" href="{% url 'blog:list' %}">All topics</a></li>
+      {% for c in categories %}<li><a class="chip {% if active_category == c %}is-active{% endif %}" href="{% url 'blog:category' c.slug %}">{{ c.name }}</a></li>{% endfor %}
+    </ul>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    {% if q %}<p class="muted" style="margin-bottom:28px">{{ page.paginator.count }} result{{ page.paginator.count|pluralize }} for <strong style="color:var(--ink)">&ldquo;{{ q }}&rdquo;</strong></p>{% endif %}
+
+    {% if lead %}
+    <a class="grid-2 post-card" style="align-items:center;margin-bottom:64px" href="{{ lead.get_absolute_url }}" data-reveal>
+      <div class="post-card__media"><img src="{{ lead.hero_image_url }}" alt="" width="1200" height="750" data-seed="{{ lead.slug }}"></div>
+      <div class="stack" style="--stack:14px">
+        <div class="post-card__meta"><span>{{ lead.category.name }}</span><span>{{ lead.published_at|date:"j M Y" }}</span><span>{{ lead.reading_minutes }} min read</span></div>
+        <h2 class="h2">{{ lead.title }}</h2>
+        <p class="lead">{{ lead.excerpt }}</p>
+        <span class="text-link">Read article <i class="ph ph-arrow-right"></i></span>
+      </div>
+    </a>
+    {% endif %}
+
+    {% if page.object_list %}
+    <div class="card-grid" style="gap:40px 24px" data-reveal-group data-grid-wave>
+      {% for p in page.object_list %}{% if p != lead %}
+      <a class="post-card" href="{{ p.get_absolute_url }}">
+        <div class="post-card__media"><img src="{{ p.hero_image_url }}" alt="" width="800" height="500" loading="lazy" data-seed="{{ p.slug }}"></div>
+        <div class="post-card__meta"><span>{{ p.category.name }}</span><span>{{ p.reading_minutes }} min read</span></div>
+        <h3>{{ p.title }}</h3>
+        <p>{{ p.excerpt }}</p>
+      </a>
+      {% endif %}{% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state"><i class="ph ph-article"></i><h3>No articles found</h3><p>Try a different search term or browse all topics.</p><a class="btn btn--ghost mt-3" href="{% url 'blog:list' %}">All articles</a></div>
+    {% endif %}
+
+    {% if page.has_other_pages %}
+    <nav class="pagination" aria-label="Pagination">
+      {% if page.has_previous %}<a href="?page={{ page.previous_page_number }}{% if q %}&q={{ q|urlencode }}{% endif %}" aria-label="Previous page"><i class="ph ph-arrow-left"></i></a>{% endif %}
+      {% for n in page.paginator.page_range %}{% if n == page.number %}<span class="is-current" aria-current="page">{{ n }}</span>{% else %}<a href="?page={{ n }}{% if q %}&q={{ q|urlencode }}{% endif %}">{{ n }}</a>{% endif %}{% endfor %}
+      {% if page.has_next %}<a href="?page={{ page.next_page_number }}{% if q %}&q={{ q|urlencode }}{% endif %}" aria-label="Next page"><i class="ph ph-arrow-right"></i></a>{% endif %}
+    </nav>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

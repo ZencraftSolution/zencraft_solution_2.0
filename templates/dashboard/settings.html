@@ -1,0 +1,15 @@
+{% extends "dashboard/base.html" %}
+{% block title %}Site settings{% endblock %}
+{% block top_title %}Site settings{% endblock %}
+{% block content %}
+<div class="dash-head"><div><h1>Site settings and exchange rate</h1><p>Contact details, homepage copy, statistics and the NPR to USD rate used across the site.</p></div></div>
+<form method="post" class="panel" novalidate>
+  {% csrf_token %}
+  {% if form.errors %}<div class="notice notice--error" style="margin-bottom:16px"><i class="ph ph-warning-circle"></i><span>Please fix the highlighted fields.</span></div>{% endif %}
+  <div class="notice" style="margin-bottom:20px"><i class="ph ph-currency-circle-dollar"></i><span>Changing the exchange rate updates displayed USD prices immediately. Existing orders and estimates keep the rate snapshotted when they were created.</span></div>
+  <div class="form-grid form-grid--2">
+    {% for field in form.visible_fields %}{% include "partials/field.html" with field=field %}{% endfor %}
+  </div>
+  <button class="btn btn--primary mt-3" type="submit">Save settings</button>
+</form>
+{% endblock %}

@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% load zc %}
+{% block title %}Your cart | {{ site.company_name }}{% endblock %}
+{% block cta_band %}{% endblock %}
+
+{% block content %}
+<section class="section">
+  <div class="container">
+    <h1 class="h1" data-split>Your cart</h1>
+    {% if lines %}
+    <div class="with-aside mt-4">
+      <form method="post" action="{% url 'commerce:cart_update' %}" data-reveal>
+        {% csrf_token %}
+        <div class="table-wrap">
+          <table class="table" style="min-width:560px">
+            <thead><tr><th scope="col">Service</th><th scope="col">Price</th><th scope="col">Qty</th><th scope="col">Total</th><th scope="col"><span class="sr-only">Remove</span></th></tr></thead>
+            <tbody>
+              {% for line in lines %}
+              <tr>
+                <td><a href="{{ line.product.get_absolute_url }}"><strong>{{ line.product }}</strong></a><br><span class="muted" style="font-size:.85rem">{{ line.product.get_billing_display }}</span></td>
+                <td>{% price line.product.price_npr %}</td>
+                <td>
+                  <label class="sr-only" for="qty-{{ line.product.pk }}">Quantity</label>
+                  <input class="input" style="width:76px;min-height:40px" id="qty-{{ line.product.pk }}" type="number" name="qty-{{ line.product.pk }}" value="{{ line.quantity }}" min="0" max="12">
+                </td>
+                <td>{% price line.line_total %}</td>
+                <td><button class="icon-btn" type="submit" name="remove" value="{{ line.product.pk }}" aria-label="Remove {{ line.product }}"><i class="ph ph-trash"></i></button></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="flex gap-1 mt-2 flex-wrap">
+          <button class="btn btn--ghost btn--sm" type="submit">Update quantities</button>
+          <a class="btn btn--ghost btn--sm" href="{% url 'commerce:store' %}">Continue shopping</a>
+        </div>
+      </form>
+      <aside class="aside-sticky">
+        <div class="form-card" data-reveal>
+          <h2 class="h3">Summary</h2>
+          <ul class="fact-list mt-2">
+            <li><span>Subtotal</span><strong>{% price totals.subtotal %}</strong></li>
+            <li><span>VAT (13%)</span><strong>{% price totals.vat %}</strong></li>
+            <li><span>Total</span><strong>{% price totals.total %}</strong></li>
+          </ul>
+          <a class="btn btn--primary btn--block mt-3" href="{% url 'commerce:checkout' %}">Checkout</a>
+        </div>
+      </aside>
+    </div>
+    {% else %}
+    <div class="empty-state mt-4">
+      <i class="ph ph-shopping-cart-simple"></i>
+      <h3>Your cart is empty</h3>
+      <p>Browse support plans, audits and workshops with fixed prices.</p>
+      <a class="btn btn--primary mt-3" href="{% url 'commerce:store' %}">Visit the store</a>
+    </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

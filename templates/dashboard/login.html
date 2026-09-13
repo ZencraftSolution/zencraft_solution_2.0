@@ -1,0 +1,35 @@
+{% load static %}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" type="image/png" sizes="32x32" href="{% static 'img/favicon-32.png' %}">
+  <title>Sign in | Zencraft HQ</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=JetBrains+Mono:wght@500&family=Space+Grotesk:wght@600&display=swap">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/regular/style.css">
+  <link rel="stylesheet" href="{% static 'css/main.css' %}">
+  <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+</head>
+<body>
+  <main class="login-wrap">
+    <div class="login-card">
+      <span class="brand"><img class="brand__logo" src="{% static 'img/logo-mark.png' %}" alt="" width="52" height="40">Zencraft HQ</span>
+      <h1 class="h3 mt-3">Staff sign in</h1>
+      <p class="muted mt-1" style="font-size:.9rem">Authorised personnel only. Every sign-in is logged.</p>
+      {% if locked %}
+      <div class="notice notice--error mt-3"><i class="ph ph-lock"></i><span>Too many failed attempts. Please wait 15 minutes before trying again.</span></div>
+      {% elif form.errors %}
+      <div class="notice notice--error mt-3" role="alert"><i class="ph ph-warning-circle"></i><span>Please enter a correct username and password.</span></div>
+      {% endif %}
+      <form method="post" class="stack mt-3" style="--stack:16px" novalidate>
+        {% csrf_token %}
+        <div class="field"><label for="id_username">Username</label><input type="text" name="username" id="id_username" autocomplete="username" required autofocus value="{{ form.username.value|default:'' }}"></div>
+        <div class="field"><label for="id_password">Password</label><input type="password" name="password" id="id_password" autocomplete="current-password" required></div>
+        <input type="hidden" name="next" value="{{ next }}">
+        <button class="btn btn--primary btn--block" type="submit">Sign in</button>
+      </form>
+    </div>
+  </main>
+</body>
+</html>

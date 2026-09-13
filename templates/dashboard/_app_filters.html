@@ -1,0 +1,11 @@
+<form class="dash-filters" method="get">
+  <div class="field"><label for="f-job">Role</label><select id="f-job" name="job"><option value="">All roles</option>{% for j in jobs %}<option value="{{ j.pk }}" {% if params.job == j.pk|stringformat:"d" %}selected{% endif %}>{{ j.title }}</option>{% endfor %}</select></div>
+  <div class="field"><label for="f-exp">Experience</label><select id="f-exp" name="exp"><option value="">Any</option>
+    <option value="0-1" {% if params.exp == "0-1" %}selected{% endif %}>Under 1 year</option>
+    <option value="1-3" {% if params.exp == "1-3" %}selected{% endif %}>1 to 3 years</option>
+    <option value="3-6" {% if params.exp == "3-6" %}selected{% endif %}>3 to 6 years</option>
+    <option value="6+" {% if params.exp == "6+" %}selected{% endif %}>6+ years</option></select></div>
+  <div class="field"><label for="f-q">Search</label><input class="input" id="f-q" type="search" name="q" value="{{ params.q|default:'' }}" placeholder="Name, email, skill"></div>
+  <button class="btn btn--dark btn--sm" type="submit">Apply</button>
+  <a class="btn btn--ghost btn--sm" href="?">Reset</a>
+</form>

@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Careers at {{ site.company_name }} | Software jobs in Lalitpur, Nepal{% endblock %}
+{% block meta_description %}Join Zencraft Solution. Open roles for developers, QA engineers, designers, DevOps and support in Lalitpur and remote across Nepal.{% endblock %}
+{% block cta_band %}{% endblock %}
+
+{% block content %}
+<section class="page-hero blueprint">
+  <div class="container page-hero__inner page-hero__inner--media">
+    <div class="page-hero__copy">
+      <ol class="crumbs" aria-label="Breadcrumb"><li><a href="{% url 'core:home' %}">Home</a></li><li>Careers</li></ol>
+      <h1 class="h1" data-split>Do the best engineering work of your career, from Nepal</h1>
+      <p class="lead" data-hero-item>Real products, thoughtful code review and a clear path to grow. {{ job_count }} open role{{ job_count|pluralize }} right now.</p>
+      <div class="page-hero__actions" data-hero-item>
+        <a class="btn btn--primary" href="{% url 'careers:jobs' %}">See open roles <i class="ph ph-arrow-right"></i></a>
+      </div>
+    </div>
+    <div class="page-hero__media" data-hero-visual>
+      <img src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=1200&h=900&q=80" alt="Zencraft engineers planning a sprint together" width="1200" height="900" data-seed="careers-team">
+    </div>
+  </div>
+</section>
+
+<section class="section" aria-labelledby="values-title">
+  <div class="container grid-2" style="align-items:start">
+    <div class="aside-sticky" data-reveal>
+      <h2 class="h2" id="values-title">How we work together</h2>
+      <p class="lead mt-2">Four habits we hire for, review against and try to live every day.</p>
+    </div>
+    <div class="deliverables" style="grid-template-columns:1fr" data-reveal-group>
+      {% for title, text in values %}
+      <div class="deliverable"><span class="deliverable__index">0{{ forloop.counter }}</span><div><h3>{{ title }}</h3><p>{{ text }}</p></div></div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+{% if gallery %}
+<section class="section section--tight section--line">
+  <div class="container photo-mosaic" data-reveal-group>
+    {% for g in gallery %}<img src="{{ g.image_url }}" alt="{{ g.caption }}" width="800" height="800" loading="lazy" data-seed="gallery-{{ forloop.counter }}">{% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<section class="section section--alt section--line" aria-labelledby="benefits-title">
+  <div class="container">
+    <div class="section-head" data-reveal><h2 class="h2" id="benefits-title">Benefits that matter day to day</h2></div>
+    <div class="benefits" data-reveal-group data-grid-wave>
+      {% for icon, title, text in benefits %}
+      <div class="benefit"><i class="ph ph-{{ icon }}"></i><h3>{{ title }}</h3><p>{{ text }}</p></div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="section" aria-labelledby="roles-title" id="roles">
+  <div class="container">
+    <div class="section-head flex justify-between items-center flex-wrap gap-2" style="max-width:none" data-reveal>
+      <h2 class="h2" id="roles-title">Open roles</h2>
+      <a class="text-link" href="{% url 'careers:jobs' %}">Filter all roles <i class="ph ph-arrow-right"></i></a>
+    </div>
+    {% for dept, jobs in departments %}
+    <div class="mt-4">
+      <h3 class="label" style="margin-bottom:12px">{{ dept.name }}</h3>
+      <div data-reveal-group>
+        {% for job in jobs %}{% include "careers/_job_row.html" with job=job %}{% endfor %}
+      </div>
+    </div>
+    {% empty %}
+    <div class="empty-state"><i class="ph ph-briefcase"></i><h3>No open roles right now</h3><p>We still read every speculative application sent to {{ site.careers_email }}.</p></div>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="section section--alt section--line">
+  <div class="container grid-2" style="align-items:center">
+    <div data-reveal>
+      <h2 class="h2">Do not see the right role?</h2>
+      <p class="lead mt-2">Send your CV or GitHub profile to <a class="text-link" href="mailto:{{ site.careers_email }}">{{ site.careers_email }}</a>. We keep strong profiles on file for six months and contact you when something fits.</p>
+    </div>
+    <ul class="fact-list" data-reveal>
+      <li><span>Application to first reply</span><strong class="mono">5 working days</strong></li>
+      <li><span>Interview stages</span><strong class="mono">3</strong></li>
+      <li><span>Feedback for completed tasks</span><strong>Always written</strong></li>
+    </ul>
+  </div>
+</section>
+{% endblock %}

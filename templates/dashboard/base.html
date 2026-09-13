@@ -1,0 +1,60 @@
+{% load static %}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" type="image/png" sizes="32x32" href="{% static 'img/favicon-32.png' %}">
+  <title>{% block title %}HQ{% endblock %} | Zencraft HQ</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/regular/style.css">
+  <link rel="stylesheet" href="{% static 'css/main.css' %}">
+  <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+</head>
+<body class="dash">
+{% with p=request.path %}
+<div class="dash-shell">
+  <nav class="dash-side" aria-label="Dashboard" data-dash-side>
+    <a class="brand" href="{% url 'dashboard:overview' %}"><img class="brand__logo" src="{% static 'img/logo-mark.png' %}" alt="" width="52" height="40">Zencraft HQ</a>
+    <a class="dash-link {% if request.resolver_match.url_name == 'overview' %}is-active{% endif %}" href="{% url 'dashboard:overview' %}"><i class="ph ph-squares-four"></i>Overview</a>
+    <p class="dash-nav-title">Pipelines</p>
+    <a class="dash-link {% if 'lead' in request.resolver_match.url_name %}is-active{% endif %}" href="{% url 'dashboard:leads' %}"><i class="ph ph-kanban"></i>Leads</a>
+    <a class="dash-link {% if 'application' in request.resolver_match.url_name %}is-active{% endif %}" href="{% url 'dashboard:applications' %}"><i class="ph ph-identification-card"></i>Recruitment</a>
+    <a class="dash-link {% if 'order' in request.resolver_match.url_name %}is-active{% endif %}" href="{% url 'dashboard:orders' %}"><i class="ph ph-receipt"></i>Orders</a>
+    <a class="dash-link {% if request.resolver_match.url_name == 'analytics' %}is-active{% endif %}" href="{% url 'dashboard:analytics' %}"><i class="ph ph-chart-bar"></i>Analytics</a>
+    <p class="dash-nav-title">Configuration</p>
+    <a class="dash-link {% if request.resolver_match.url_name == 'estimator_config' %}is-active{% endif %}" href="{% url 'dashboard:estimator_config' %}"><i class="ph ph-calculator"></i>Estimator engine</a>
+    <a class="dash-link {% if request.resolver_match.url_name == 'settings' %}is-active{% endif %}" href="{% url 'dashboard:settings' %}"><i class="ph ph-gear"></i>Site settings and FX</a>
+    <a class="dash-link {% if request.resolver_match.url_name == 'audit' %}is-active{% endif %}" href="{% url 'dashboard:audit' %}"><i class="ph ph-list-magnifying-glass"></i>Audit log</a>
+    {% for group, items in crud_groups.items %}
+    <p class="dash-nav-title">{{ group }}</p>
+    {% for slug, title in items %}
+    <a class="dash-link {% if request.resolver_match.kwargs.slug == slug %}is-active{% endif %}" href="{% url 'dashboard:crud_list' slug %}"><i class="ph ph-caret-right"></i>{{ title }}</a>
+    {% endfor %}
+    {% endfor %}
+    <p class="dash-nav-title">System</p>
+    {% if request.user.is_superuser %}<a class="dash-link" href="{% url 'admin:index' %}"><i class="ph ph-database"></i>Django admin</a>{% endif %}
+    <a class="dash-link" href="{% url 'core:home' %}" target="_blank" rel="noopener"><i class="ph ph-arrow-square-out"></i>View website</a>
+  </nav>
+
+  <div class="dash-main">
+    <header class="dash-top">
+      <button class="icon-btn dash-menu-btn" type="button" aria-label="Open navigation" data-dash-toggle><i class="ph ph-list"></i></button>
+      <span class="dash-top__title">{% block top_title %}Dashboard{% endblock %}</span>
+      <div class="dash-top__right">
+        <span class="muted">{{ request.user.get_full_name|default:request.user.username }}</span>
+        <form method="post" action="{% url 'dashboard:logout' %}">{% csrf_token %}<button class="btn btn--ghost btn--sm" type="submit"><i class="ph ph-sign-out"></i> Sign out</button></form>
+      </div>
+    </header>
+    <main class="dash-content">
+      {% if messages %}<div class="stack" style="--stack:8px;margin-bottom:16px">{% for m in messages %}<div class="notice {% if m.tags == 'error' %}notice--error{% else %}notice--success{% endif %}"><i class="ph {% if m.tags == 'error' %}ph-warning-circle{% else %}ph-check-circle{% endif %}"></i><span>{{ m }}</span></div>{% endfor %}</div>{% endif %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+{% endwith %}
+<script src="{% static 'js/dashboard.js' %}" defer></script>
+</body>
+</html>

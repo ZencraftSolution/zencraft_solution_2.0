@@ -1,0 +1,98 @@
+{% load static zc %}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ site.company_name }}: custom software, web and mobile development in Nepal{% endblock %}</title>
+  <meta name="description" content="{% block meta_description %}{{ site.company_name }} designs, builds and supports custom software, web platforms and mobile apps for businesses in Nepal and abroad.{% endblock %}">
+  <link rel="canonical" href="{{ SITE_URL }}{{ request.path }}">
+  <meta name="theme-color" content="#ffffff">
+  <meta property="og:type" content="{% block og_type %}website{% endblock %}">
+  <meta property="og:site_name" content="{{ site.company_name }}">
+  <meta property="og:title" content="{% block og_title %}{{ site.company_name }}{% endblock %}">
+  <meta property="og:description" content="{% block og_description %}{{ site.tagline }}{% endblock %}">
+  <meta property="og:url" content="{{ SITE_URL }}{{ request.path }}">
+  <meta property="og:image" content="{% block og_image %}https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=1200&h=630&q=80{% endblock %}">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="{% static 'img/favicon.ico' %}" sizes="48x48">
+  <link rel="icon" type="image/png" sizes="32x32" href="{% static 'img/favicon-32.png' %}">
+  <link rel="icon" type="image/png" sizes="192x192" href="{% static 'img/favicon-192.png' %}">
+  <link rel="apple-touch-icon" href="{% static 'img/apple-touch-icon.png' %}">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://images.unsplash.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@500;600&display=swap">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/regular/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/fill/style.css">
+  <link rel="stylesheet" href="{% static 'css/main.css' %}">
+
+  <script>
+    (function () {
+      var d = document.documentElement;
+      try { if (localStorage.getItem("zc-currency") === "usd") d.setAttribute("data-currency", "usd"); } catch (e) {}
+      if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        d.classList.add("js-motion");
+        try {
+          if (sessionStorage.getItem("zc-veil")) {
+            sessionStorage.removeItem("zc-veil");
+            d.classList.add("veil-in");
+            setTimeout(function () { d.classList.remove("veil-in"); }, 1500);
+          }
+        } catch (e) {}
+        setTimeout(function () { if (!window.__zcMotionReady) d.classList.remove("js-motion"); }, 6000);
+      }
+      document.addEventListener("error", function (e) {
+        var t = e.target;
+        if (!t || t.tagName !== "IMG" || t.dataset.fallbackDone) return;
+        t.dataset.fallbackDone = "1";
+        if (t.hasAttribute("data-logo")) {
+          var s = document.createElement("span");
+          s.className = "logo-tile__fallback";
+          s.textContent = (t.alt || "?").slice(0, 2);
+          t.replaceWith(s);
+          return;
+        }
+        var seed = (t.dataset.seed || t.alt || "zencraft").toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40);
+        t.src = "https://picsum.photos/seed/zc-" + seed + "/" + (t.getAttribute("width") || 1200) + "/" + (t.getAttribute("height") || 800);
+      }, true);
+    })();
+  </script>
+
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"{{ site.company_name|escapejs }}","url":"{{ SITE_URL }}","logo":"{{ SITE_URL }}{% static 'img/favicon-192.png' %}","email":"{{ site.email }}","telephone":"{{ site.phone|escapejs }}","address":{"@type":"PostalAddress","streetAddress":"{{ site.address|escapejs }}","addressCountry":"NP"}}</script>
+  {% block json_ld %}{% endblock %}
+  {% block extra_head %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="page-veil" aria-hidden="true"></div>
+
+  {% include "partials/header.html" %}
+
+  <main id="main">
+    {% block content %}{% endblock %}
+  </main>
+
+  {% block cta_band %}{% include "partials/cta_band.html" %}{% endblock %}
+  {% include "partials/footer.html" %}
+
+  {% if messages %}
+  <div class="toast-stack" role="status" aria-live="polite">
+    {% for message in messages %}
+    <div class="toast {% if message.tags == 'error' %}toast--error{% endif %}">
+      <i class="ph {% if message.tags == 'error' %}ph-warning-circle{% else %}ph-check-circle{% endif %}" aria-hidden="true"></i>
+      <span>{{ message }}</span>
+      <button type="button" aria-label="Dismiss" data-dismiss-toast><i class="ph ph-x"></i></button>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/ScrollTrigger.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/SplitText.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/Flip.min.js" defer></script>
+  <script src="{% static 'js/main.js' %}" defer></script>
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

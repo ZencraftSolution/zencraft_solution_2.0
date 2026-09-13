@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Contact {{ site.company_name }}{% endblock %}
+{% block meta_description %}Contact Zencraft Solution in Lalitpur, Nepal. Email, phone, office address and a contact form. We reply within one working day.{% endblock %}
+{% block cta_band %}{% endblock %}
+
+{% block content %}
+<section class="page-hero blueprint">
+  <div class="container" style="padding-block:clamp(40px,6vw,80px)">
+    <ol class="crumbs" aria-label="Breadcrumb"><li><a href="{% url 'core:home' %}">Home</a></li><li>Contact</li></ol>
+    <h1 class="h1 mt-2" data-split>Tell us what you are working on</h1>
+    <p class="lead mt-2" data-hero-item>A real engineer reads every message and replies within one working day.</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container with-aside">
+    <form method="post" class="form-card" novalidate data-reveal>
+      {% csrf_token %}
+      {% include "partials/honeypot.html" %}
+      {% if form.errors %}<div class="notice notice--error" style="margin-bottom:24px" role="alert"><i class="ph ph-warning-circle"></i><span>Please fix the highlighted fields.</span></div>{% endif %}
+      <div class="form-grid form-grid--2">
+        {% include "partials/field.html" with field=form.name %}
+        {% include "partials/field.html" with field=form.email %}
+        {% include "partials/field.html" with field=form.phone %}
+        {% include "partials/field.html" with field=form.company %}
+        {% include "partials/field.html" with field=form.subject span=True %}
+        {% include "partials/field.html" with field=form.message span=True %}
+        {% include "partials/field.html" with field=form.consent span=True %}
+      </div>
+      <button class="btn btn--primary mt-3" type="submit">Send message <i class="ph ph-paper-plane-tilt"></i></button>
+    </form>
+    <aside class="aside-sticky stack" style="--stack:16px">
+      <div class="card" data-reveal>
+        <h2 class="h3">Office</h2>
+        <ul class="fact-list mt-2">
+          <li><span>Email</span><strong><a href="mailto:{{ site.email }}">{{ site.email }}</a></strong></li>
+          <li><span>Phone</span><strong><a href="tel:{{ site.phone|cut:' ' }}">{{ site.phone }}</a></strong></li>
+          {% if site.whatsapp %}<li><span>WhatsApp</span><strong>{{ site.whatsapp }}</strong></li>{% endif %}
+          <li><span>Hours</span><strong>{{ site.office_hours }}</strong></li>
+        </ul>
+        <p class="muted mt-2" style="font-size:.92rem">{{ site.address }}</p>
+      </div>
+      <div class="card" style="background:var(--blue-50);border-color:var(--blue-100)" data-reveal>
+        <h2 class="h3">Prefer a call?</h2>
+        <p class="muted mt-1">Pick a time for a free 30-minute consultation with a solution architect.</p>
+        <a class="btn btn--dark mt-2" href="{% url 'core:consultation' %}">Book a consultation</a>
+      </div>
+    </aside>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Applications closed | {{ site.company_name }}{% endblock %}
+{% block content %}
+<section class="section">
+  <div class="container container--narrow">
+    <div class="empty-state">
+      <i class="ph ph-clock"></i>
+      <h1 class="h2 mt-2">Applications for {{ job.title }} have closed</h1>
+      <p>Thank you for your interest. New roles open regularly.</p>
+      <a class="btn btn--primary mt-3" href="{% url 'careers:jobs' %}">See open roles</a>
+    </div>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,16 @@
+Hi {{ application.full_name }},
+
+Thank you for applying for {{ job.title }} at Zencraft Solution. Your application has arrived safely.
+
+Application reference: {{ application.reference }}
+Submitted as: {{ application.get_application_mode_display }}
+
+What happens next:
+1. The hiring team reviews your application within 5 working days.
+2. If there is a fit, we invite you to a 30-minute intro call.
+3. You complete a short practical task and receive written feedback.
+4. You meet the team you would join.
+
+Your personal data is stored privately and deleted 6 months after a decision if you are not hired. Reply to this email to withdraw your application at any time.
+
+Zencraft Solution People and Talent

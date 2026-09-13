@@ -1,0 +1,26 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Django
+staticfiles/
+media/
+private_media/
+*.sqlite3
+*.log
+
+# Tooling and editors
+.claude/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,13 @@
+{% extends "dashboard/base.html" %}
+{% block title %}Delete{% endblock %}
+{% block top_title %}{{ cfg.title }}{% endblock %}
+{% block content %}
+<div class="panel" style="max-width:560px">
+  <h1 class="h3">Delete {{ obj|truncatechars:80 }}?</h1>
+  <p class="muted mt-2">This permanently removes the record from {{ cfg.title|lower }}. It cannot be undone and will be recorded in the audit log.</p>
+  <form method="post" class="flex gap-1 mt-3">{% csrf_token %}
+    <button class="btn btn--primary" style="background:var(--red)" type="submit">Yes, delete</button>
+    <a class="btn btn--ghost" href="{% url 'dashboard:crud_list' slug %}">Cancel</a>
+  </form>
+</div>
+{% endblock %}

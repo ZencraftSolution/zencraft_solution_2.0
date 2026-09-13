@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Case studies | {{ site.company_name }}{% endblock %}
+{% block meta_description %}Software projects Zencraft Solution has delivered for banks, hospitals, retailers, logistics companies, hotels and NGOs.{% endblock %}
+
+{% block content %}
+<section class="page-hero blueprint">
+  <div class="container page-hero__inner">
+    <div class="page-hero__copy" style="max-width:780px">
+      <ol class="crumbs" aria-label="Breadcrumb"><li><a href="{% url 'core:home' %}">Home</a></li><li>Work</li></ol>
+      <h1 class="h1" data-split>Systems we built and still stand behind</h1>
+      <p class="lead" data-hero-item>Real projects with the problem, the architecture and the measured results. Some clients are anonymised at their request.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <nav aria-label="Filter by industry" data-reveal>
+      <ul class="chips" style="margin-bottom:40px">
+        <li><a class="chip {% if not active_industry %}is-active{% endif %}" href="{% url 'portfolio:list' %}" data-no-transition>All industries</a></li>
+        {% for i in industries %}
+        <li><a class="chip {% if active_industry == i.slug %}is-active{% endif %}" href="?industry={{ i.slug }}" data-no-transition>{{ i.name }}</a></li>
+        {% endfor %}
+      </ul>
+    </nav>
+    {% if cases %}
+    <div class="card-grid" style="grid-template-columns:repeat(auto-fill,minmax(min(100%,380px),1fr));gap:24px" data-reveal-group data-grid-wave>
+      {% for c in cases %}{% include "portfolio/_card.html" with c=c %}{% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state"><i class="ph ph-folder-open"></i><h3>No case studies in this industry yet</h3><p>We have delivered work here under NDA. Ask us for a private walkthrough.</p><a class="btn btn--primary mt-3" href="{% url 'core:consultation' %}">Book a consultation</a></div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,44 @@
+{% extends "dashboard/base.html" %}
+{% load zc %}
+{% block title %}{{ order.reference }}{% endblock %}
+{% block top_title %}Order {{ order.reference }}{% endblock %}
+{% block content %}
+<div class="dash-head"><div><a class="text-link" href="{% url 'dashboard:orders' %}"><i class="ph ph-arrow-left"></i> Orders</a><h1 class="mt-1">{{ order.reference }}</h1><p>{{ order.customer_name }} / {{ order.created_at|date:"j M Y, H:i" }}</p></div></div>
+<div class="dash-grid dash-grid--main">
+  <div>
+    <div class="panel">
+      <h2 class="panel__title">Items</h2>
+      <table class="dtable"><thead><tr><th>Service</th><th>Billing</th><th>Unit</th><th>Qty</th><th>Total</th></tr></thead><tbody>
+        {% for i in order.items.all %}<tr><td>{{ i.name }}</td><td>{{ i.billing }}</td><td class="mono">{{ i.unit_price_npr|npr }}</td><td class="mono">{{ i.quantity }}</td><td class="mono">{{ i.line_total_npr|npr }}</td></tr>{% endfor %}
+        <tr><td colspan="4">Subtotal</td><td class="mono">{{ order.subtotal_npr|npr }}</td></tr>
+        <tr><td colspan="4">VAT</td><td class="mono">{{ order.vat_npr|npr }}</td></tr>
+        <tr><td colspan="4"><strong>Total</strong></td><td class="mono"><strong>{{ order.total_npr|npr }}</strong><br><span class="muted">${{ order.total_usd|floatformat:2 }} at {{ order.exchange_rate|floatformat:4 }}</span></td></tr>
+      </tbody></table>
+    </div>
+    <div class="panel">
+      <h2 class="panel__title">Payment attempts</h2>
+      <table class="dtable"><thead><tr><th>Gateway</th><th>Amount</th><th>Status</th><th>Transaction</th><th>When</th></tr></thead><tbody>
+        {% for p in order.payments.all %}<tr><td>{{ p.gateway }}</td><td class="mono">{{ p.amount }} {{ p.currency }}</td><td><span class="tag {% if p.status == 'success' %}tag--green{% elif p.status == 'failed' %}tag--red{% endif %}">{{ p.get_status_display }}</span></td><td class="mono" style="font-size:.78rem">{{ p.transaction_id|default:"-" }}</td><td class="mono" style="font-size:.78rem">{{ p.created_at|date:"j M, H:i" }}</td></tr>
+        {% empty %}<tr><td colspan="5" class="muted">No payment attempts.</td></tr>{% endfor %}
+      </tbody></table>
+    </div>
+  </div>
+  <div>
+    <div class="panel">
+      <h2 class="panel__title">Customer</h2>
+      <dl class="dl" style="grid-template-columns:100px 1fr">
+        <dt>Email</dt><dd><a class="text-link" href="mailto:{{ order.email }}">{{ order.email }}</a></dd>
+        <dt>Phone</dt><dd>{{ order.phone }}</dd><dt>Company</dt><dd>{{ order.company|default:"-" }}</dd>
+        <dt>Country</dt><dd>{{ order.country }}</dd><dt>PAN/VAT</dt><dd>{{ order.pan_vat|default:"-" }}</dd>
+        <dt>Address</dt><dd>{{ order.billing_address|default:"-" }}</dd><dt>Notes</dt><dd>{{ order.notes|default:"-" }}</dd>
+      </dl>
+    </div>
+    <form method="post" class="panel stack" style="--stack:14px">{% csrf_token %}
+      <h2 class="panel__title">Status</h2>
+      {% include "partials/field.html" with field=form.payment_status %}
+      {% include "partials/field.html" with field=form.fulfilment_status %}
+      <button class="btn btn--primary btn--block" type="submit">Update order</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

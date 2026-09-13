@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Book a free consultation | {{ site.company_name }}{% endblock %}
+{% block meta_description %}Book a free 30-minute consultation with a Zencraft Solution architect about your software project, team or system.{% endblock %}
+{% block cta_band %}{% endblock %}
+
+{% block content %}
+<section class="page-hero blueprint">
+  <div class="container" style="padding-block:clamp(40px,6vw,80px)">
+    <ol class="crumbs" aria-label="Breadcrumb"><li><a href="{% url 'core:home' %}">Home</a></li><li>Consultation</li></ol>
+    <h1 class="h1 mt-2" data-split>Book a free 30-minute consultation</h1>
+    <p class="lead mt-2" data-hero-item>Talk through your idea, system or team with a senior architect. No sales script, no obligation.</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container with-aside">
+    <form method="post" class="form-card" novalidate data-reveal>
+      {% csrf_token %}
+      {% include "partials/honeypot.html" %}
+      {% if form.errors %}<div class="notice notice--error" style="margin-bottom:24px" role="alert"><i class="ph ph-warning-circle"></i><span>Please fix the highlighted fields.</span></div>{% endif %}
+      <div class="form-grid form-grid--2">
+        {% include "partials/field.html" with field=form.name %}
+        {% include "partials/field.html" with field=form.company %}
+        {% include "partials/field.html" with field=form.email %}
+        {% include "partials/field.html" with field=form.phone %}
+        {% include "partials/field.html" with field=form.topic span=True %}
+        {% include "partials/field.html" with field=form.preferred_date %}
+        {% include "partials/field.html" with field=form.preferred_slot %}
+        {% include "partials/field.html" with field=form.message span=True %}
+        {% include "partials/field.html" with field=form.consent span=True %}
+      </div>
+      <button class="btn btn--primary mt-3" type="submit">Request this time <i class="ph ph-calendar-check"></i></button>
+    </form>
+    <aside class="aside-sticky">
+      <div class="card" data-reveal>
+        <h2 class="h3">What to expect</h2>
+        <ul class="fact-list mt-2">
+          <li><span>Length</span><strong>30 minutes</strong></li>
+          <li><span>Format</span><strong>Google Meet or Teams</strong></li>
+          <li><span>With</span><strong>Solution architect</strong></li>
+          <li><span>Confirmation</span><strong>Within 1 working day</strong></li>
+        </ul>
+        <p class="muted mt-2" style="font-size:.9rem">Want a detailed plan and fixed quote? Our <a class="text-link" href="{% url 'commerce:product_detail' 'discovery-workshop' %}">two-day discovery workshop</a> is the next step.</p>
+      </div>
+    </aside>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,69 @@
+{% load static %}
+<footer class="site-footer">
+  <div class="container site-footer__inner" data-footer-inner>
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="{% url 'core:home' %}" class="brand"><img class="brand__logo" src="{% static 'img/logo-mark.png' %}" alt="" width="52" height="40">Zencraft Solution</a>
+        <p>{{ site.tagline }}. Engineering team in Rupandehi working with clients across Nepal, Europe, Australia and North America.</p>
+        <div class="socials">
+          <a href="{{ site.linkedin_url|default:'https://www.linkedin.com' }}" aria-label="LinkedIn" rel="noopener"><i class="ph ph-linkedin-logo"></i></a>
+          <a href="{{ site.github_url|default:'https://github.com' }}" aria-label="GitHub" rel="noopener"><i class="ph ph-github-logo"></i></a>
+          <a href="{{ site.facebook_url|default:'https://www.facebook.com' }}" aria-label="Facebook" rel="noopener"><i class="ph ph-facebook-logo"></i></a>
+          <a href="{{ site.x_url|default:'https://x.com' }}" aria-label="X" rel="noopener"><i class="ph ph-x-logo"></i></a>
+        </div>
+      </div>
+      <div class="footer-col">
+        <h3>Services</h3>
+        <ul>{% for s in nav_services %}<li><a href="{% url 'services:detail' s.slug %}">{{ s.name }}</a></li>{% endfor %}</ul>
+      </div>
+      <div class="footer-col">
+        <h3>Explore</h3>
+        <ul>
+          <li><a href="{% url 'portfolio:list' %}">Case studies</a></li>
+          <li><a href="{% url 'services:industries' %}">Industries</a></li>
+          <li><a href="{% url 'services:technologies' %}">Technologies</a></li>
+          <li><a href="{% url 'commerce:pricing' %}">Engagement models</a></li>
+          <li><a href="{% url 'commerce:store' %}">Fixed-price services</a></li>
+          <li><a href="{% url 'estimator:start' %}">Project estimator</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h3>Company</h3>
+        <ul>
+          <li><a href="{% url 'core:about' %}">About</a></li>
+          <li><a href="{% url 'careers:landing' %}">Careers</a></li>
+          <li><a href="{% url 'blog:list' %}">Insights</a></li>
+          <li><a href="{% url 'core:contact' %}">Contact</a></li>
+          <li><a href="{% url 'core:consultation' %}">Book a consultation</a></li>
+          <li><a href="{% url 'core:search' %}">Search</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h3>Newsletter</h3>
+        <p style="font-size:.93rem">Engineering notes and project lessons, once a month.</p>
+        <form class="newsletter" method="post" action="{% url 'core:newsletter' %}" data-newsletter>
+          {% csrf_token %}
+          <label class="sr-only" for="nl-email">Email address</label>
+          <input id="nl-email" type="email" name="email" placeholder="you@company.com" required autocomplete="email">
+          <div class="honeypot" aria-hidden="true"><label>Leave empty <input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>
+          <button class="btn btn--light" type="submit">Subscribe</button>
+        </form>
+        <p class="newsletter__msg" aria-live="polite" data-newsletter-msg></p>
+        <ul class="mt-2" style="list-style:none;display:grid;gap:6px;font-size:.9rem">
+          <li><a href="mailto:{{ site.email }}">{{ site.email }}</a></li>
+          <li><a href="tel:{{ site.phone|cut:' ' }}">{{ site.phone }}</a></li>
+          <li>{{ site.address }}</li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>&copy; {% now "Y" %} {{ site.company_name }} Pvt. Ltd. Registered in Nepal.</span>
+      <nav aria-label="Legal">
+        <a href="{% url 'core:privacy' %}">Privacy</a>
+        <a href="{% url 'core:terms' %}">Terms</a>
+        <a href="{% url 'core:cookies' %}">Cookies</a>
+        <a href="{% url 'sitemap' %}">Sitemap</a>
+      </nav>
+    </div>
+  </div>
+</footer>

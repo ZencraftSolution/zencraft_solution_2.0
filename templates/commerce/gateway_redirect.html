@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Redirecting to {{ gateway.label }}{% endblock %}
+{% block cta_band %}{% endblock %}
+{% block content %}
+<section class="section">
+  <div class="container container--narrow text-center">
+    <h1 class="h2">Taking you to {{ gateway.label }}</h1>
+    <p class="lead mt-2" style="margin-inline:auto">Please do not close this window. If nothing happens in a few seconds, press the button below.</p>
+    <form method="post" action="{{ result.url }}" id="gateway-form" class="mt-4">
+      {% for key, value in result.fields.items %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
+      <button class="btn btn--primary" type="submit">Continue to {{ gateway.label }}</button>
+    </form>
+  </div>
+</section>
+<script>document.getElementById("gateway-form").submit();</script>
+{% endblock %}

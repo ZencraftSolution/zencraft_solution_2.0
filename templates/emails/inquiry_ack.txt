@@ -1,0 +1,17 @@
+{% load zc %}Hi {{ inquiry.name }},
+
+Thank you for using the Zencraft Solution project estimator. Here is a copy of your indicative estimate.
+
+Reference: {{ inquiry.reference }}
+Project type: {{ inquiry.project_type_label }}
+Platforms: {{ inquiry.platform_labels|join:", " }}
+Features: {{ inquiry.feature_labels|join:", " }}
+
+Indicative range: {{ inquiry.estimate_low_npr|npr }} to {{ inquiry.estimate_high_npr|npr }}
+Likely timeline: {{ inquiry.estimate_weeks_low }} to {{ inquiry.estimate_weeks_high }} weeks
+
+This range is indicative and based on similar projects we have delivered. Final scope, timeline and pricing are confirmed after a free discovery call.
+
+Book your free consultation: {{ SITE_URL|default:"" }}/book-consultation/?topic=new-project
+
+Zencraft Solution

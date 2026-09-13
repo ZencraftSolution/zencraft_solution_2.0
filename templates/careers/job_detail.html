@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}{{ job.title }} | Careers | {{ site.company_name }}{% endblock %}
+{% block meta_description %}{{ job.summary }}{% endblock %}
+{% block cta_band %}{% endblock %}
+
+{% block json_ld %}
+<script type="application/ld+json">{
+  "@context": "https://schema.org/",
+  "@type": "JobPosting",
+  "title": "{{ job.title|escapejs }}",
+  "description": "<p>{{ job.description|escapejs }}</p><ul>{% for r in job.responsibility_list %}<li>{{ r|escapejs }}</li>{% endfor %}</ul>",
+  "identifier": {"@type": "PropertyValue", "name": "{{ site.company_name|escapejs }}", "value": "{{ job.slug }}"},
+  "datePosted": "{{ job.posted_at|date:'Y-m-d' }}",
+  {% if job.closing_date %}"validThrough": "{{ job.closing_date|date:'Y-m-d' }}T23:59:00+05:45",{% endif %}
+  "employmentType": "{% if job.employment_type == 'full-time' %}FULL_TIME{% elif job.employment_type == 'part-time' %}PART_TIME{% elif job.employment_type == 'contract' %}CONTRACTOR{% else %}INTERN{% endif %}",
+  "hiringOrganization": {"@type": "Organization", "name": "{{ site.company_name|escapejs }}", "sameAs": "{{ SITE_URL }}"},
+  {% if job.work_mode == "remote" %}"jobLocationType": "TELECOMMUTE", "applicantLocationRequirements": {"@type": "Country", "name": "Nepal"},{% endif %}
+  "jobLocation": {"@type": "Place", "address": {"@type": "PostalAddress", "streetAddress": "Jhamsikhel Road", "addressLocality": "Lalitpur", "postalCode": "44600", "addressCountry": "NP"}}{% if job.show_salary and job.salary_min_npr %},
+  "baseSalary": {"@type": "MonetaryAmount", "currency": "NPR", "value": {"@type": "QuantitativeValue", "minValue": {{ job.salary_min_npr|floatformat:0 }}, "maxValue": {{ job.salary_max_npr|floatformat:0 }}, "unitText": "MONTH"}}{% endif %}
+}</script>
+{% endblock %}
+
+{% block content %}
+<section class="page-hero blueprint">
+  <div class="container" style="padding-block:clamp(40px,6vw,80px)">
+    <ol class="crumbs" aria-label="Breadcrumb"><li><a href="{% url 'core:home' %}">Home</a></li><li><a href="{% url 'careers:jobs' %}">Open roles</a></li><li>{{ job.department.name }}</li></ol>
+    <h1 class="h1 mt-2" data-split>{{ job.title }}</h1>
+    <p class="lead mt-2" data-hero-item>{{ job.summary }}</p>
+    <div class="job-row__meta mt-3" data-hero-item>
+      <span class="tag tag--blue">{{ job.get_experience_level_display }}</span>
+      <span class="tag">{{ job.get_employment_type_display }}</span>
+      <span class="tag">{{ job.get_work_mode_display }}</span>
+      {% if job.experience_years %}<span class="tag">{{ job.experience_years }}</span>{% endif %}
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container with-aside">
+    <div class="prose">
+      <p data-reveal>{{ job.description }}</p>
+      <h2 data-reveal>What you will do</h2>
+      <ul data-reveal>{% for r in job.responsibility_list %}<li>{{ r }}</li>{% endfor %}</ul>
+      <h2 data-reveal>What we are looking for</h2>
+      <ul data-reveal>{% for r in job.requirement_list %}<li>{{ r }}</li>{% endfor %}</ul>
+      {% if job.nice_list %}<h2 data-reveal>Nice to have</h2><ul data-reveal>{% for r in job.nice_list %}<li>{{ r }}</li>{% endfor %}</ul>{% endif %}
+      {% if job.tech_stack.all %}
+      <h2 data-reveal>Tech stack for this role</h2>
+      <ul class="chips" style="padding-left:0" data-reveal>{% for t in job.tech_stack.all %}<li class="chip" style="margin:0"><img src="{{ t.logo_url }}" alt="" width="16" height="16" loading="lazy" data-logo>{{ t.name }}</li>{% endfor %}</ul>
+      {% endif %}
+      {% if job.growth_path %}<h2 data-reveal>Growth path</h2><p data-reveal>{{ job.growth_path }}</p>{% endif %}
+      <h2 data-reveal>Hiring process</h2>
+      <ol data-reveal><li>Application review within 5 working days</li><li>30-minute intro call with the hiring manager</li><li>Short practical task, 2 to 3 hours, with written feedback</li><li>Final conversation with the team you would join</li></ol>
+    </div>
+    <aside class="aside-sticky">
+      <div class="form-card" data-reveal>
+        <h2 class="h3">Role summary</h2>
+        <ul class="fact-list mt-2">
+          <li><span>Team</span><strong>{{ job.department.name }}</strong></li>
+          <li><span>Location</span><strong>{{ job.get_work_mode_display }}</strong></li>
+          <li><span>Openings</span><strong class="mono">{{ job.openings }}</strong></li>
+          {% if job.show_salary and job.salary_min_npr %}<li><span>Salary per month</span><strong class="mono">Rs. {{ job.salary_min_npr|floatformat:0 }} to {{ job.salary_max_npr|floatformat:0 }}</strong></li>{% endif %}
+          <li><span>Posted</span><strong>{{ job.posted_at|date:"j M Y" }}</strong></li>
+          {% if job.closing_date %}<li><span>Apply by</span><strong>{{ job.closing_date|date:"j M Y" }}</strong></li>{% endif %}
+        </ul>
+        {% if job.is_open %}
+        <a class="btn btn--primary btn--block mt-3" href="{% url 'careers:apply' job.slug %}">Apply for this role</a>
+        <p class="muted mt-2" style="font-size:.84rem">Upload your CV or fill in your details manually. Both take under 10 minutes.</p>
+        {% else %}
+        <div class="notice mt-3"><i class="ph ph-clock"></i><span>Applications for this role are closed.</span></div>
+        {% endif %}
+      </div>
+    </aside>
+  </div>
+</section>
+
+{% if similar %}
+<section class="section section--alt section--line">
+  <div class="container">
+    <h2 class="h2" style="margin-bottom:24px" data-reveal>Other roles in {{ job.department.name|lower }}</h2>
+    <div data-reveal-group>{% for j in similar %}{% include "careers/_job_row.html" with job=j %}{% endfor %}</div>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

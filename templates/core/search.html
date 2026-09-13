@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Search{% if q %}: {{ q }}{% endif %} | {{ site.company_name }}{% endblock %}
+{% block content %}
+<section class="page-hero blueprint">
+  <div class="container" style="padding-block:clamp(40px,6vw,80px)">
+    <h1 class="h1" data-split>Search</h1>
+    <form method="get" role="search" class="flex gap-1 mt-3" style="max-width:640px" data-hero-item>
+      <label class="sr-only" for="site-q">Search services, case studies and articles</label>
+      <input class="input" id="site-q" type="search" name="q" value="{{ q }}" placeholder="Try: mobile banking, cloud migration, QA" autofocus>
+      <button class="btn btn--primary" type="submit">Search</button>
+    </form>
+  </div>
+</section>
+<section class="section">
+  <div class="container container--narrow">
+    {% if q %}
+      <p class="muted">{{ total }} result{{ total|pluralize }} for <strong style="color:var(--ink)">&ldquo;{{ q }}&rdquo;</strong></p>
+      {% if services %}<h2 class="h3 mt-4">Services</h2><div class="mt-2">{% for s in services %}<a class="job-row" style="grid-template-columns:1fr auto" href="{{ s.get_absolute_url }}"><div><h3>{{ s.name }}</h3><p class="muted" style="font-size:.92rem">{{ s.summary }}</p></div><span class="job-row__cta"><i class="ph ph-arrow-right"></i></span></a>{% endfor %}</div>{% endif %}
+      {% if cases %}<h2 class="h3 mt-4">Case studies</h2><div class="mt-2">{% for c in cases %}<a class="job-row" style="grid-template-columns:1fr auto" href="{{ c.get_absolute_url }}"><div><h3>{{ c.title }}</h3><p class="muted" style="font-size:.92rem">{{ c.summary }}</p></div><span class="job-row__cta"><i class="ph ph-arrow-right"></i></span></a>{% endfor %}</div>{% endif %}
+      {% if posts %}<h2 class="h3 mt-4">Articles</h2><div class="mt-2">{% for p in posts %}<a class="job-row" style="grid-template-columns:1fr auto" href="{{ p.get_absolute_url }}"><div><h3>{{ p.title }}</h3><p class="muted" style="font-size:.92rem">{{ p.excerpt }}</p></div><span class="job-row__cta"><i class="ph ph-arrow-right"></i></span></a>{% endfor %}</div>{% endif %}
+      {% if not total %}<div class="empty-state mt-3"><i class="ph ph-magnifying-glass"></i><h3>Nothing found</h3><p>Try a broader term, or ask us directly on the contact page.</p></div>{% endif %}
+    {% else %}
+      <div class="empty-state"><i class="ph ph-magnifying-glass"></i><h3>Search the site</h3><p>Find services, case studies and articles by keyword.</p></div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

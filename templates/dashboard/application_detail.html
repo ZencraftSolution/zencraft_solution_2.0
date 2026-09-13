@@ -1,0 +1,77 @@
+{% extends "dashboard/base.html" %}
+{% block title %}{{ app.full_name }}{% endblock %}
+{% block top_title %}Application {{ app.reference }}{% endblock %}
+{% block content %}
+<div class="dash-head">
+  <div><a class="text-link" href="{% url 'dashboard:applications' %}"><i class="ph ph-arrow-left"></i> Recruitment</a><h1 class="mt-1">{{ app.full_name }}</h1><p>{{ app.job.title }} / applied {{ app.created_at|date:"j M Y, H:i" }} / {{ app.get_application_mode_display }}</p></div>
+  <span class="tag tag--blue" style="height:30px;font-size:.8rem">{{ app.get_status_display }}</span>
+</div>
+<div class="dash-grid dash-grid--main">
+  <div>
+    {% if app.application_mode == "cv" and app.cv %}
+    <div class="panel">
+      <div class="panel__title"><h2 class="h3" style="font-size:1rem">CV: {{ app.cv_original_name }}</h2><a class="btn btn--ghost btn--sm" href="{% url 'dashboard:application_cv' app.pk %}?download=1"><i class="ph ph-download-simple"></i> Download</a></div>
+      {% if app.cv_is_pdf %}
+      <iframe class="cv-frame" src="{% url 'dashboard:application_cv' app.pk %}" title="CV preview for {{ app.full_name }}"></iframe>
+      {% else %}
+      <div class="empty-state"><i class="ph ph-file-doc"></i><h3>DOCX files cannot be previewed in the browser</h3><p>Download the file to open it in Word or LibreOffice.</p></div>
+      {% endif %}
+    </div>
+    {% elif app.application_mode == "manual" %}
+    <div class="panel">
+      <h2 class="panel__title">Profile</h2>
+      <p style="color:var(--ink);font-weight:600">{{ app.headline }}</p>
+      <p class="mt-1" style="white-space:pre-line">{{ app.professional_summary }}</p>
+      <ul class="chips mt-2">{% for s in app.skill_list %}<li class="tag tag--blue">{{ s }}</li>{% endfor %}</ul>
+    </div>
+    <div class="panel">
+      <h2 class="panel__title">Experience</h2>
+      {% for e in app.experience.all %}<div class="note"><strong style="color:var(--ink)">{{ e.title }}</strong>, {{ e.company }}<small>{{ e.start_date }} to {% if e.is_current %}present{% else %}{{ e.end_date|default:"-" }}{% endif %}</small>{% if e.description %}<p class="mt-1" style="white-space:pre-line">{{ e.description }}</p>{% endif %}</div>{% empty %}<p class="muted">No experience entries.</p>{% endfor %}
+    </div>
+    <div class="panel">
+      <h2 class="panel__title">Education</h2>
+      {% for e in app.education.all %}<div class="note"><strong style="color:var(--ink)">{{ e.degree }}{% if e.field_of_study %} in {{ e.field_of_study }}{% endif %}</strong>, {{ e.institution }}<small>{{ e.start_year|default:"" }} to {{ e.end_year|default:"" }}{% if e.grade %} / {{ e.grade }}{% endif %}</small></div>{% empty %}<p class="muted">No education entries.</p>{% endfor %}
+    </div>
+    <div class="panel">
+      <h2 class="panel__title">Projects</h2>
+      {% for p in app.projects.all %}<div class="note"><strong style="color:var(--ink)">{{ p.name }}</strong>{% if p.url %} / <a class="text-link" href="{{ p.url }}" target="_blank" rel="noopener noreferrer">link</a>{% endif %}<small>{{ p.tech_used }}</small>{% if p.description %}<p class="mt-1">{{ p.description }}</p>{% endif %}</div>{% empty %}<p class="muted">No project entries.</p>{% endfor %}
+    </div>
+    {% else %}
+    <div class="panel"><p class="muted">{% if app.purged_at %}Personal data for this application was purged on {{ app.purged_at|date:"j M Y" }}.{% else %}No CV attached.{% endif %}</p></div>
+    {% endif %}
+
+    {% if app.cover_letter %}<div class="panel"><h2 class="panel__title">Cover letter</h2><p style="white-space:pre-line">{{ app.cover_letter }}</p></div>{% endif %}
+
+    <div class="panel">
+      <h2 class="panel__title">Reviewer notes</h2>
+      <form method="post" class="stack" style="--stack:10px">{% csrf_token %}{% include "partials/field.html" with field=note_form.body %}<button class="btn btn--dark btn--sm" type="submit" name="add_note" value="1">Add note</button></form>
+      <div class="mt-3">{% for n in notes %}<div class="note">{{ n.body|linebreaksbr }}<small>{{ n.author|default:"System" }} / {{ n.created_at|date:"j M Y, H:i" }}</small></div>{% empty %}<p class="muted">No notes yet.</p>{% endfor %}</div>
+    </div>
+  </div>
+  <div>
+    <div class="panel">
+      <h2 class="panel__title">Candidate</h2>
+      <dl class="dl" style="grid-template-columns:110px 1fr">
+        <dt>Email</dt><dd><a class="text-link" href="mailto:{{ app.email }}">{{ app.email }}</a></dd>
+        <dt>Phone</dt><dd>{{ app.phone }}</dd>
+        <dt>Location</dt><dd>{{ app.current_location }}</dd>
+        <dt>Experience</dt><dd>{{ app.years_experience }} years</dd>
+        <dt>Notice</dt><dd>{{ app.get_notice_period_display }}</dd>
+        <dt>Expected</dt><dd class="mono">{% if app.expected_salary_npr %}Rs. {{ app.expected_salary_npr|floatformat:0 }}{% else %}-{% endif %}</dd>
+        <dt>Source</dt><dd>{{ app.get_source_display }}</dd>
+        <dt>Links</dt><dd>{% if app.github_url %}<a class="text-link" href="{{ app.github_url }}" target="_blank" rel="noopener noreferrer">GitHub</a> {% endif %}{% if app.linkedin_url %}<a class="text-link" href="{{ app.linkedin_url }}" target="_blank" rel="noopener noreferrer">LinkedIn</a> {% endif %}{% if app.portfolio_url %}<a class="text-link" href="{{ app.portfolio_url }}" target="_blank" rel="noopener noreferrer">Portfolio</a>{% endif %}</dd>
+        <dt>Consent</dt><dd>{% if app.consent %}Given {{ app.consent_at|date:"j M Y" }}{% else %}Not given{% endif %}</dd>
+      </dl>
+    </div>
+    <div class="panel">
+      <h2 class="panel__title">Stage and rating</h2>
+      <form method="post" class="stack" style="--stack:14px">{% csrf_token %}
+        {% include "partials/field.html" with field=form.status %}
+        {% include "partials/field.html" with field=form.rating %}
+        <button class="btn btn--primary btn--block" type="submit">Save</button>
+      </form>
+    </div>
+    <p class="muted mt-2" style="font-size:.8rem"><i class="ph ph-shield-check"></i> Views of this record and CV access are recorded in the audit log.</p>
+  </div>
+</div>
+{% endblock %}

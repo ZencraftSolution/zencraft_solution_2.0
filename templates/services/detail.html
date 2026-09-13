@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% load zc %}
+{% block title %}{{ service.seo_title|default:service.name }}{% endblock %}
+{% block meta_description %}{{ service.seo_description|default:service.summary }}{% endblock %}
+{% block og_title %}{{ service.name }} | {{ site.company_name }}{% endblock %}
+{% block og_description %}{{ service.summary }}{% endblock %}
+{% block og_image %}{{ service.hero_image_url }}{% endblock %}
+
+{% block json_ld %}
+<script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@graph": [
+    {"@type": "Service", "name": "{{ service.name|escapejs }}", "description": "{{ service.summary|escapejs }}", "serviceType": "{{ service.name|escapejs }}",
+     "provider": {"@type": "Organization", "name": "{{ site.company_name|escapejs }}", "url": "{{ SITE_URL }}"}, "areaServed": ["NP", "Worldwide"], "url": "{{ SITE_URL }}{{ request.path }}"},
+    {"@type": "BreadcrumbList", "itemListElement": [
+      {"@type": "ListItem", "position": 1, "name": "Home", "item": "{{ SITE_URL }}/"},
+      {"@type": "ListItem", "position": 2, "name": "Services", "item": "{{ SITE_URL }}{% url 'services:list' %}"},
+      {"@type": "ListItem", "position": 3, "name": "{{ service.name|escapejs }}"}]}{% if faqs %},
+    {"@type": "FAQPage", "mainEntity": [{% for f in faqs %}{"@type": "Question", "name": "{{ f.question|escapejs }}", "acceptedAnswer": {"@type": "Answer", "text": "{{ f.answer|escapejs }}"}}{% if not forloop.last %},{% endif %}{% endfor %}]}{% endif %}
+  ]
+}</script>
+{% endblock %}
+
+{% block content %}
+<section class="page-hero blueprint">
+  <div class="container page-hero__inner page-hero__inner--media">
+    <div class="page-hero__copy">
+      <ol class="crumbs" aria-label="Breadcrumb"><li><a href="{% url 'core:home' %}">Home</a></li><li><a href="{% url 'services:list' %}">Services</a></li><li>{{ service.name }}</li></ol>
+      <p class="label" data-hero-item>{{ service.name }}</p>
+      <h1 class="h1" data-split>{{ service.outcome_headline }}</h1>
+      <p class="lead" data-hero-item>{{ service.summary }}</p>
+      <div class="page-hero__actions" data-hero-item>
+        <a class="btn btn--primary" href="{% url 'estimator:start' %}">Get an estimate <i class="ph ph-arrow-right"></i></a>
+        <a class="btn btn--ghost" href="{% url 'core:consultation' %}">Book a consultation</a>
+      </div>
+    </div>
+    <div class="page-hero__media" data-hero-visual>
+      <img src="{{ service.hero_image_url }}" alt="{{ service.name }} at Zencraft Solution" width="1200" height="900" fetchpriority="high" data-seed="{{ service.slug }}">
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container with-aside">
+    <div class="prose" data-reveal>
+      {% for p in service.intro|paragraphs %}<p>{{ p }}</p>{% endfor %}
+    </div>
+    <aside class="aside-sticky" data-reveal>
+      <div class="card">
+        <h2 class="h3">At a glance</h2>
+        <ul class="fact-list mt-2">
+          <li><span>Delivery stages</span><strong>{{ service.steps.all|length }}</strong></li>
+          <li><span>Engagement models</span><strong>{{ service.engagement_models.all|length }} available</strong></li>
+          <li><span>Core technologies</span><strong>{{ service.technologies.all|length }}</strong></li>
+          <li><span>Case studies</span><strong>{{ case_studies|length }}</strong></li>
+        </ul>
+        <a class="btn btn--dark btn--block mt-3" href="{% url 'estimator:start' %}">Estimate your project</a>
+      </div>
+    </aside>
+  </div>
+</section>
+
+<section class="section section--alt section--line" aria-labelledby="deliver-title">
+  <div class="container">
+    <div class="section-head" data-reveal><h2 class="h2" id="deliver-title">What we deliver</h2></div>
+    <div class="deliverables" data-reveal-group data-grid-wave>
+      {% for d in service.deliverables %}
+      <div class="deliverable">
+        <span class="deliverable__index">{{ forloop.counter|pad2 }}</span>
+        <div><h3>{{ d.title }}</h3><p>{{ d.text }}</p></div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="section" aria-labelledby="process-title">
+  <div class="container grid-2">
+    <div>
+      <div class="aside-sticky" data-reveal>
+        <h2 class="h2" id="process-title">How we run {{ service.name|lower }} projects</h2>
+        <p class="lead mt-2">Every stage has a named owner, a clear output and a point where you approve before we move on.</p>
+      </div>
+    </div>
+    <div class="process" data-process>
+      <div class="process__rail" aria-hidden="true"><div class="process__fill"></div></div>
+      <ol class="process__list">
+        {% for step in service.steps.all %}
+        <li class="process__step">
+          <span class="process__node">{{ forloop.counter|pad2 }}</span>
+          <div><h3>{{ step.title }}</h3><p>{{ step.description }}</p>{% if step.duration_hint %}<p class="process__meta">{{ step.duration_hint }}</p>{% endif %}</div>
+        </li>
+        {% endfor %}
+      </ol>
+    </div>
+  </div>
+</section>
+
+<section class="section section--alt section--line" aria-labelledby="tech-title">
+  <div class="container">
+    <div class="section-head" data-reveal><h2 class="h2" id="tech-title">Technologies we use</h2></div>
+    <ul class="logo-grid" data-reveal-group data-grid-wave>
+      {% for t in service.technologies.all %}
+      <li class="logo-tile"><img src="{{ t.logo_url }}" alt="{{ t.name }}" width="40" height="40" loading="lazy" data-logo><span>{{ t.name }}</span></li>
+      {% endfor %}
+    </ul>
+    <p class="mt-3"><a class="text-link" href="{% url 'services:technologies' %}">Full technology catalogue <i class="ph ph-arrow-right"></i></a></p>
+  </div>
+</section>
+
+<section class="section" aria-labelledby="models-title">
+  <div class="container">
+    <div class="section-head" data-reveal><h2 class="h2" id="models-title">Ways to engage us for this service</h2></div>
+    <div class="engagement-grid" data-reveal-group>
+      {% for m in service.engagement_models.all %}
+      <article class="engagement">
+        <div class="flex items-center gap-2"><i class="ph ph-{{ m.icon }}" style="font-size:1.6rem;color:var(--blue)"></i><h3>{{ m.name }}</h3></div>
+        <p class="muted">{{ m.summary }}</p>
+        <p><strong style="color:var(--ink)">Best for:</strong> {{ m.best_for }}</p>
+        <span class="tag tag--blue">{{ m.billing_note }}</span>
+      </article>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+{% if case_studies %}
+<section class="section section--alt section--line" aria-labelledby="work-title">
+  <div class="container">
+    <div class="section-head flex justify-between items-center flex-wrap gap-2" style="max-width:none" data-reveal>
+      <h2 class="h2" id="work-title">Related case studies</h2>
+      <a class="text-link" href="{% url 'portfolio:list' %}">All work <i class="ph ph-arrow-right"></i></a>
+    </div>
+    <div class="card-grid" data-reveal-group>
+      {% for c in case_studies %}{% include "portfolio/_card.html" with c=c %}{% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<section class="section" aria-labelledby="industry-title">
+  <div class="container grid-2" style="align-items:start">
+    <div data-reveal>
+      <h2 class="h2" id="industry-title">Industry applications</h2>
+      <p class="lead mt-2">Where this service has the biggest impact for our clients.</p>
+    </div>
+    <ul class="industry-list" data-reveal-group>
+      {% for i in service.industries.all %}
+      <li class="industry-row"><a href="{{ i.get_absolute_url }}"><i class="ph ph-{{ i.icon }}"></i><div><h3>{{ i.name }}</h3><p>{{ i.tagline }}</p></div><i class="ph ph-arrow-right arrow"></i></a></li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+
+{% if faqs %}
+<section class="section section--alt section--line" aria-labelledby="faq-title">
+  <div class="container grid-2" style="align-items:start">
+    <div data-reveal><h2 class="h2" id="faq-title">Frequently asked questions</h2><p class="lead mt-2">Still unsure? <a class="text-link" href="{% url 'core:contact' %}">Ask us directly</a>.</p></div>
+    <div class="faq" data-reveal>
+      {% for f in faqs %}
+      <details{% if forloop.first %} open{% endif %}><summary>{{ f.question }}<i class="ph ph-plus"></i></summary><div class="faq__answer">{{ f.answer }}</div></details>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{% if related_services %}
+<section class="section" aria-labelledby="related-title">
+  <div class="container">
+    <div class="section-head" data-reveal><h2 class="h2" id="related-title">Related services</h2></div>
+    <div class="bento" style="grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr))" data-reveal-group>
+      {% for r in related_services %}
+      <a class="bento-card{% if forloop.counter == 2 %} bento-card--tint{% endif %}" style="grid-column:auto" href="{% url 'services:detail' r.slug %}">
+        <span class="bento-card__icon"><i class="ph ph-{{ r.icon }}"></i></span><h3>{{ r.name }}</h3><p>{{ r.nav_blurb }}</p>
+        <span class="bento-card__more">Learn more <i class="ph ph-arrow-right"></i></span>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

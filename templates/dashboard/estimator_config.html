@@ -1,0 +1,35 @@
+{% extends "dashboard/base.html" %}
+{% block title %}Estimator engine{% endblock %}
+{% block top_title %}Estimator engine{% endblock %}
+{% block content %}
+<div class="dash-head">
+  <div><h1>Estimator engine</h1><p>Tune the pricing model without a deploy. New estimates use these values immediately.</p></div>
+  <div class="flex gap-1 flex-wrap">
+    <a class="btn btn--ghost btn--sm" href="{% url 'dashboard:crud_list' 'project-types' %}">Project types and base hours</a>
+    <a class="btn btn--ghost btn--sm" href="{% url 'dashboard:crud_list' 'features' %}">Feature options and hours</a>
+    <a class="btn btn--ghost btn--sm" href="{% url 'estimator:start' %}" target="_blank" rel="noopener"><i class="ph ph-arrow-square-out"></i> Test estimator</a>
+  </div>
+</div>
+<div class="dash-grid dash-grid--main">
+  <form method="post" class="panel" novalidate>
+    {% csrf_token %}
+    {% if form.errors %}<div class="notice notice--error" style="margin-bottom:16px"><i class="ph ph-warning-circle"></i><span>Please fix the highlighted fields.</span></div>{% endif %}
+    <div class="form-grid form-grid--2">
+      {% for field in form.visible_fields %}{% include "partials/field.html" with field=field span=field.field.widget.attrs.rows %}{% endfor %}
+    </div>
+    <button class="btn btn--primary mt-3" type="submit">Save configuration</button>
+  </form>
+  <div class="panel">
+    <h2 class="panel__title">How the estimate is calculated</h2>
+    <ol class="prose" style="font-size:.9rem;padding-left:1.2em">
+      <li>Hours = project type base hours + hours of each selected feature.</li>
+      <li>Each platform after the first adds its platform coefficient as a share of those hours.</li>
+      <li>Hours are multiplied by the design, urgency and team multipliers.</li>
+      <li>Cost = hours x blended hourly rate x (1 + contingency %), never below the minimum project value.</li>
+      <li>Displayed range = cost x low factor to cost x high factor, rounded to Rs. 10,000.</li>
+      <li>Weeks = hours / (suggested team FTE x productive hours per week), shown as a range.</li>
+    </ol>
+    <p class="muted mt-2" style="font-size:.84rem">Multiplier fields are JSON objects. Keep every key listed in the default values.</p>
+  </div>
+</div>
+{% endblock %}

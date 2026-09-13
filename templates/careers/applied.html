@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Application received | {{ site.company_name }}{% endblock %}
+{% block cta_band %}{% endblock %}
+{% block content %}
+<section class="section">
+  <div class="container container--narrow">
+    <div class="form-card">
+      <div class="notice notice--success"><i class="ph ph-check-circle"></i><span>Your application arrived safely{% if info %} and a confirmation email is on its way{% endif %}.</span></div>
+      <h1 class="h1 mt-3" data-split>{% if info %}Thank you, {{ info.name }}.{% else %}Thank you for applying.{% endif %}</h1>
+      <p class="lead mt-2" data-hero-item>{% if info %}We have your application for <strong style="color:var(--ink)">{{ info.job }}</strong>. {% endif %}A member of the hiring team will review it within 5 working days.</p>
+      {% if info %}<ul class="fact-list mt-3"><li><span>Application reference</span><strong class="mono">{{ info.ref }}</strong></li></ul>{% endif %}
+      <h2 class="h3 mt-4">What happens next</h2>
+      <ol class="prose mt-2" style="padding-left:1.2em">
+        <li>We review your application against the role.</li>
+        <li>If there is a fit, we invite you to a 30-minute intro call.</li>
+        <li>You complete a short practical task and receive written feedback.</li>
+        <li>You meet the team you would join.</li>
+      </ol>
+      <div class="flex gap-1 mt-4 flex-wrap">
+        <a class="btn btn--dark" href="{% url 'careers:jobs' %}">See other roles</a>
+        <a class="btn btn--ghost" href="{% url 'blog:category' 'careers-culture' %}">Read about our culture</a>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

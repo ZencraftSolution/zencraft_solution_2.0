@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}About {{ site.company_name }}{% endblock %}
+{% block meta_description %}Zencraft Solution is a software engineering company in Lalitpur, Nepal, founded in 2017. Meet the team and learn how we work.{% endblock %}
+
+{% block content %}
+<section class="page-hero blueprint">
+  <div class="container page-hero__inner page-hero__inner--media">
+    <div class="page-hero__copy">
+      <ol class="crumbs" aria-label="Breadcrumb"><li><a href="{% url 'core:home' %}">Home</a></li><li>About</li></ol>
+      <h1 class="h1" data-split>An engineering company built on long-term relationships</h1>
+      <p class="lead" data-hero-item>Founded in Lalitpur in 2017. Most of our clients from the first three years still work with us today.</p>
+    </div>
+    <div class="page-hero__media" data-hero-visual>
+      <img src="https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1200&h=900&q=80" alt="The Zencraft Solution office in Jhamsikhel" width="1200" height="900" data-seed="about-office">
+    </div>
+  </div>
+</section>
+
+<section class="container" aria-label="Company in numbers">
+  <div class="metrics">
+    <div class="metric"><div class="metric__value" data-count="{{ site.stat_years }}">{{ site.stat_years }}</div><p class="metric__label">Years in business</p></div>
+    <div class="metric"><div class="metric__value" data-count="{{ site.stat_engineers }}">{{ site.stat_engineers }}</div><p class="metric__label">People on the team</p></div>
+    <div class="metric"><div class="metric__value" data-count="{{ site.stat_projects }}">{{ site.stat_projects }}</div><p class="metric__label">Projects delivered</p></div>
+    <div class="metric"><div class="metric__value" data-count="{{ site.stat_clients }}">{{ site.stat_clients }}</div><p class="metric__label">Clients served</p></div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container grid-2" style="align-items:start">
+    <h2 class="h2" data-reveal>Why we started Zencraft</h2>
+    <div class="prose" data-reveal>
+      <p>Our founders spent years building software abroad and kept meeting the same frustration from businesses at home: projects handed to vendors who disappeared after launch, systems nobody could maintain, and invoices that never matched the original quote.</p>
+      <p>Zencraft Solution was set up to do the opposite. We publish our rates, write down our decisions, and stay with the software we build. Today, {{ site.stat_engineers }} engineers, designers and QA specialists work from our Jhamsikhel office and across Nepal for clients in 11 countries.</p>
+      <p>We are proud to be a Nepali company that competes on quality rather than price, and to train the next generation of engineers through our internship program.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section section--alt section--line" aria-labelledby="process-title">
+  <div class="container">
+    <div class="section-head" data-reveal><h2 class="h2" id="process-title">Our engineering standards</h2><p class="lead">Non-negotiable on every project, whatever the budget.</p></div>
+    <div class="benefits" data-reveal-group data-grid-wave>
+      <div class="benefit"><i class="ph ph-git-pull-request"></i><h3>Every change reviewed</h3><p>No code reaches production without review by a second engineer.</p></div>
+      <div class="benefit"><i class="ph ph-flask"></i><h3>Automated tests in CI</h3><p>Critical flows are covered by tests that run on every merge.</p></div>
+      <div class="benefit"><i class="ph ph-notebook"></i><h3>Decisions written down</h3><p>Architecture decision records explain why, not just what.</p></div>
+      <div class="benefit"><i class="ph ph-shield-check"></i><h3>Security by default</h3><p>Dependency scanning, secrets management and least-privilege access.</p></div>
+      <div class="benefit"><i class="ph ph-monitor"></i><h3>Observable from day one</h3><p>Logs, metrics and alerts set up before the first release.</p></div>
+      <div class="benefit"><i class="ph ph-key"></i><h3>You own everything</h3><p>Code, infrastructure accounts and documentation live in your organisation.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="section" aria-labelledby="leaders-title">
+  <div class="container">
+    <div class="section-head" data-reveal><h2 class="h2" id="leaders-title">Leadership</h2></div>
+    <div class="team-grid" data-reveal-group>
+      {% for m in leaders %}
+      <div class="person">
+        <img src="{{ m.photo_url }}" alt="{{ m.name }}" width="600" height="750" loading="lazy" data-seed="{{ m.name }}">
+        <h3>{{ m.name }}</h3><p>{{ m.role }}</p>
+        {% if m.bio %}<p class="mt-1" style="font-size:.88rem">{{ m.bio }}</p>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% if team %}
+    <h2 class="h3 mt-5" style="margin-bottom:24px" data-reveal>Team leads</h2>
+    <div class="team-grid" data-reveal-group>
+      {% for m in team %}<div class="person"><img src="{{ m.photo_url }}" alt="{{ m.name }}" width="600" height="750" loading="lazy" data-seed="{{ m.name }}"><h3>{{ m.name }}</h3><p>{{ m.role }}</p></div>{% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+{% if gallery %}
+<section class="section section--alt section--line">
+  <div class="container">
+    <div class="section-head flex justify-between items-center flex-wrap gap-2" style="max-width:none" data-reveal>
+      <h2 class="h2">Inside the office</h2>
+      <a class="text-link" href="{% url 'careers:landing' %}">Join the team <i class="ph ph-arrow-right"></i></a>
+    </div>
+    <div class="gallery-grid" data-reveal-group data-grid-wave>
+      {% for g in gallery %}<figure><img src="{{ g.image_url }}" alt="{{ g.caption }}" width="1200" height="750" loading="lazy" data-seed="gallery-{{ forloop.counter }}"><figcaption>{{ g.caption }}</figcaption></figure>{% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

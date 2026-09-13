@@ -1,0 +1,11 @@
+Hi {{ booking.name }},
+
+Thanks for requesting a consultation with Zencraft Solution.
+
+Topic: {{ booking.get_topic_display }}
+Preferred date: {{ booking.preferred_date|date:"l, j F Y" }}
+Preferred time: {{ booking.get_preferred_slot_display }}
+
+We will confirm the exact time and send a calendar invite within one working day.
+
+Zencraft Solution
