@@ -53,14 +53,22 @@
     var toggle = $("[data-menu-toggle]");
     var menu = $("#mobile-menu");
     if (toggle && menu) {
-      toggle.addEventListener("click", function () {
-        var open = !menu.classList.contains("is-open");
+      var setMenu = function (open) {
         menu.classList.toggle("is-open", open);
         toggle.setAttribute("aria-expanded", String(open));
         toggle.setAttribute("aria-label", open ? "Close menu" : "Open menu");
         toggle.innerHTML = open ? '<i class="ph ph-x" aria-hidden="true"></i>' : '<i class="ph ph-list" aria-hidden="true"></i>';
         document.body.style.overflow = open ? "hidden" : "";
+      };
+      toggle.addEventListener("click", function () { setMenu(!menu.classList.contains("is-open")); });
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape" && menu.classList.contains("is-open")) { setMenu(false); toggle.focus(); }
       });
+      // Resizing to the desktop breakpoint hides the panel in CSS; keep body scroll and ARIA in step.
+      var desktop = window.matchMedia("(min-width: 1140px)");
+      var onBreakpoint = function (e) { if (e.matches) setMenu(false); };
+      if (desktop.addEventListener) desktop.addEventListener("change", onBreakpoint);
+      else if (desktop.addListener) desktop.addListener(onBreakpoint);
     }
   }
 

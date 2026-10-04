@@ -47,23 +47,58 @@
     </div>
   </div>
 
-  <div class="mobile-menu" id="mobile-menu">
+</header>
+
+<!-- Mobile menu lives OUTSIDE <header>: the header uses backdrop-filter, which makes it a
+     containing block for position:fixed children and would clip this panel to the 68px bar. -->
+<div class="mobile-menu" id="mobile-menu">
+  <nav class="mobile-menu__inner" aria-label="Mobile navigation">
     <div class="mobile-menu__group">
       <p class="mobile-menu__title">Services</p>
-      {% for s in nav_services %}<a href="{% url 'services:detail' s.slug %}">{{ s.name }}</a>{% endfor %}
+      <ul class="mobile-menu__list">
+        {% for s in nav_services %}
+        <li><a href="{% url 'services:detail' s.slug %}">
+          <i class="ph ph-{{ s.icon }}" aria-hidden="true"></i>
+          <span><strong>{{ s.name }}</strong><small>{{ s.nav_blurb }}</small></span>
+          <i class="ph ph-caret-right mobile-menu__chevron" aria-hidden="true"></i>
+        </a></li>
+        {% endfor %}
+      </ul>
     </div>
+
     <div class="mobile-menu__group">
       <p class="mobile-menu__title">Company</p>
-      <a href="{% url 'services:industries' %}">Industries</a>
-      <a href="{% url 'portfolio:list' %}">Work</a>
-      <a href="{% url 'commerce:pricing' %}">Pricing</a>
-      <a href="{% url 'commerce:store' %}">Store</a>
-      <a href="{% url 'careers:landing' %}">Careers</a>
-      <a href="{% url 'blog:list' %}">Insights</a>
-      <a href="{% url 'core:about' %}">About</a>
-      <a href="{% url 'core:contact' %}">Contact</a>
+      <ul class="mobile-menu__list">
+        <li><a href="{% url 'services:industries' %}"><i class="ph ph-buildings" aria-hidden="true"></i><span><strong>Industries</strong></span><i class="ph ph-caret-right mobile-menu__chevron" aria-hidden="true"></i></a></li>
+        <li><a href="{% url 'portfolio:list' %}"><i class="ph ph-folder-open" aria-hidden="true"></i><span><strong>Work</strong></span><i class="ph ph-caret-right mobile-menu__chevron" aria-hidden="true"></i></a></li>
+        <li><a href="{% url 'commerce:pricing' %}"><i class="ph ph-tag" aria-hidden="true"></i><span><strong>Pricing</strong></span><i class="ph ph-caret-right mobile-menu__chevron" aria-hidden="true"></i></a></li>
+        <li><a href="{% url 'commerce:store' %}"><i class="ph ph-shopping-bag-open" aria-hidden="true"></i><span><strong>Store</strong></span><i class="ph ph-caret-right mobile-menu__chevron" aria-hidden="true"></i></a></li>
+        <li><a href="{% url 'careers:landing' %}"><i class="ph ph-briefcase" aria-hidden="true"></i><span><strong>Careers</strong></span><i class="ph ph-caret-right mobile-menu__chevron" aria-hidden="true"></i></a></li>
+        <li><a href="{% url 'blog:list' %}"><i class="ph ph-article" aria-hidden="true"></i><span><strong>Insights</strong></span><i class="ph ph-caret-right mobile-menu__chevron" aria-hidden="true"></i></a></li>
+        <li><a href="{% url 'core:about' %}"><i class="ph ph-users-three" aria-hidden="true"></i><span><strong>About</strong></span><i class="ph ph-caret-right mobile-menu__chevron" aria-hidden="true"></i></a></li>
+        <li><a href="{% url 'core:contact' %}"><i class="ph ph-chat-circle-text" aria-hidden="true"></i><span><strong>Contact</strong></span><i class="ph ph-caret-right mobile-menu__chevron" aria-hidden="true"></i></a></li>
+      </ul>
     </div>
-    <div class="currency-toggle mobile-currency" role="group" aria-label="Display prices in"><button type="button" data-currency="npr" aria-pressed="true">NPR</button><button type="button" data-currency="usd" aria-pressed="false">USD</button></div>
-    <a class="btn btn--primary btn--block" href="{% url 'estimator:start' %}">Get an estimate</a>
-  </div>
-</header>
+
+    <div class="mobile-menu__group mobile-menu__group--row">
+      <p class="mobile-menu__title">Show prices in</p>
+      <div class="currency-toggle mobile-currency" role="group" aria-label="Display prices in">
+        <button type="button" data-currency="npr" aria-pressed="true">NPR</button>
+        <button type="button" data-currency="usd" aria-pressed="false">USD</button>
+      </div>
+    </div>
+
+    <div class="mobile-menu__actions">
+      <a class="btn btn--primary btn--block" href="{% url 'estimator:start' %}">Get an estimate</a>
+      <a class="btn btn--ghost btn--block" href="{% url 'core:consultation' %}">Book a consultation</a>
+    </div>
+
+    <div class="mobile-menu__contact">
+      {% firstof site.secondary_email site.email as menu_email %}
+      {% firstof site.secondary_phone site.phone as menu_phone %}
+      <a href="mailto:{{ menu_email }}"><i class="ph ph-envelope-simple" aria-hidden="true"></i>{{ menu_email }}</a>
+      <a href="tel:{{ menu_phone|cut:' ' }}"><i class="ph ph-phone" aria-hidden="true"></i>{{ menu_phone }}</a>
+    </div>
+  </nav>
+</div>
+

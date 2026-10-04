@@ -84,7 +84,7 @@ class SiteSettingsForm(forms.ModelForm):
     class Meta:
         model = SiteSettings
         fields = [
-            "company_name", "tagline", "email", "careers_email", "phone", "whatsapp", "address", "office_hours",
+            "company_name", "tagline", "email", "secondary_email", "careers_email", "phone", "secondary_phone", "whatsapp", "address", "office_hours",
             "linkedin_url", "github_url", "facebook_url", "x_url", "exchange_rate_npr_per_usd", "hero_title", "hero_subtitle",
             "stat_projects", "stat_clients", "stat_engineers", "stat_uptime", "stat_years",
         ]

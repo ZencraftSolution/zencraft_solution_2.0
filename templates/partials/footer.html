@@ -50,8 +50,10 @@
         </form>
         <p class="newsletter__msg" aria-live="polite" data-newsletter-msg></p>
         <ul class="mt-2" style="list-style:none;display:grid;gap:6px;font-size:.9rem">
-          <li><a href="mailto:{{ site.email }}">{{ site.email }}</a></li>
-          <li><a href="tel:{{ site.phone|cut:' ' }}">{{ site.phone }}</a></li>
+          {% firstof site.secondary_email site.email as footer_email %}
+          {% firstof site.secondary_phone site.phone as footer_phone %}
+          <li><a href="mailto:{{ footer_email }}">{{ footer_email }}</a></li>
+          <li><a href="tel:{{ footer_phone|cut:' ' }}">{{ footer_phone }}</a></li>
           <li>{{ site.address }}</li>
         </ul>
       </div>
