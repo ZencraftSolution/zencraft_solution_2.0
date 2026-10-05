@@ -115,7 +115,7 @@ class Command(BaseCommand):
         for order, data in enumerate(C.CASE_STUDIES):
             case, _ = CaseStudy.objects.update_or_create(slug=data["slug"], defaults=dict(
                 title=data["title"], client_name=data["client"], is_anonymized=data["anonymized"],
-                industry=Industry.objects.get(slug=data["industry"]), summary=data["summary"], challenge=data["challenge"],
+                industry=Industry.objects.filter(slug=data["industry"]).first(), summary=data["summary"], challenge=data["challenge"],
                 solution=data["solution"], results=data["results"], architecture_note=data["architecture"],
                 code_language=data["code_language"], code_snippet=data["code"], cover_image_url=data["cover"],
                 duration=data["duration"], team_size=data["team"], year=data["year"], featured=data["featured"], is_published=True, order=order,

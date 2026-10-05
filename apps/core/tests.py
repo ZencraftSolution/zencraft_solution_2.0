@@ -407,9 +407,24 @@ class SeededSiteSmokeTests(TestCase):
             with self.subTest(url=url):
                 self.assertEqual(self.client.get(url).status_code, 200)
         home = self.client.get("/")
-        self.assertEqual(len(home.context["hero_slides"]), 5)
+        self.assertEqual(len(home.context["hero_slides"]), 4)
         self.assertContains(home, "data-hero-slider")
         self.assertContains(home, '"@type":"Organization"')
+
+    def test_removed_industry_is_gone_everywhere(self):
+        from apps.services.models import Industry
+
+        self.assertFalse(Industry.objects.filter(slug="finance").exists())
+        self.assertEqual(self.client.get("/services/industries/finance/").status_code, 404)
+        listing = self.client.get(reverse("services:industries"))
+        self.assertNotContains(listing, "Banking and finance")
+        self.assertEqual(len(listing.context["industries"]), 6)
+        # Its case study survives without an industry label, and no hero slide links to the dead page.
+        case = self.client.get("/work/mobile-banking-development-bank/")
+        self.assertEqual(case.status_code, 200)
+        self.assertNotContains(case, "/services/industries/finance/")
+        self.assertNotContains(self.client.get("/"), "/services/industries/finance/")
+        self.assertNotIn("/services/industries/finance/", self.client.get("/sitemap.xml").content.decode())
 
     def test_site_search_spans_services_case_studies_and_posts(self):
         response = self.client.get(reverse("core:search") + "?q=banking")

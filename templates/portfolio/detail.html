@@ -9,14 +9,14 @@
 <article>
   <header class="page-hero blueprint">
     <div class="container" style="padding-block:clamp(40px,6vw,80px)">
-      <ol class="crumbs" aria-label="Breadcrumb"><li><a href="{% url 'core:home' %}">Home</a></li><li><a href="{% url 'portfolio:list' %}">Work</a></li><li>{{ case.industry.name }}</li></ol>
+      <ol class="crumbs" aria-label="Breadcrumb"><li><a href="{% url 'core:home' %}">Home</a></li><li><a href="{% url 'portfolio:list' %}">Work</a></li>{% if case.industry %}<li>{{ case.industry.name }}</li>{% endif %}</ol>
       <div class="grid-2 mt-3" style="align-items:end">
         <div class="stack" style="--stack:18px">
           <p class="label" data-hero-item>{{ case.client_name }}</p>
           <h1 class="h1" data-split>{{ case.title }}</h1>
         </div>
         <ul class="fact-list" data-hero-item>
-          <li><span>Industry</span><strong>{{ case.industry.name }}</strong></li>
+          {% if case.industry %}<li><span>Industry</span><strong>{{ case.industry.name }}</strong></li>{% endif %}
           <li><span>Duration</span><strong>{{ case.duration }}</strong></li>
           <li><span>Team size</span><strong class="mono">{{ case.team_size }} people</strong></li>
           <li><span>Year</span><strong class="mono">{{ case.year }}</strong></li>

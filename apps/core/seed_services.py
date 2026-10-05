@@ -81,18 +81,6 @@ INDUSTRIES = [
         ],
     },
     {
-        "slug": "finance", "name": "Banking and finance", "icon": "bank",
-        "tagline": "Mobile banking, lending platforms and reconciliation tools for regulated institutions",
-        "image": U("photo-1554224155-6726b3ff858f", 1000, 1250),
-        "description": "Banks, microfinance institutions, cooperatives and insurers need software that passes audit on the first attempt. We build digital channels and internal tools with the controls, logging and performance that regulated environments demand.",
-        "challenges": "Legacy core banking systems with limited APIs\nNRB compliance and IT guideline requirements\nFraud and account takeover risk on digital channels\nManual reconciliation across wallets, cards and branches",
-        "solutions": "Mobile and internet banking apps on top of existing core systems\nLoan origination and collection platforms for MFIs and cooperatives\nAutomated reconciliation for eSewa, Khalti, ConnectIPS and card settlements\nRisk dashboards and regulatory reporting",
-        "faqs": [
-            ("Have you worked with Nepali core banking systems?", "Yes. We have built integration layers on top of Pumori, Finacle and T24 deployments through their middleware and direct database views."),
-            ("Can you support an IS audit?", "We prepare architecture documents, access matrices and test evidence, and join audit sessions to answer technical questions."),
-        ],
-    },
-    {
         "slug": "education", "name": "Education", "icon": "graduation-cap",
         "tagline": "Learning platforms, admissions and exam systems for schools and universities",
         "image": U("photo-1541339907198-e08756dedf3f", 1000, 1250),
@@ -177,7 +165,7 @@ SERVICES = [
             ("Support", "SLA-backed maintenance, update releases and a quarterly improvement roadmap.", "Ongoing"),
         ],
         "techs": ["dotnet", "wpf", "electron", "tauri", "qt", "python", "postgresql", "mysql"],
-        "industries": ["healthcare", "retail-ecommerce", "logistics", "finance"],
+        "industries": ["healthcare", "retail-ecommerce", "logistics"],
         "models": ["fixed", "dedicated", "retainer"],
         "related": ["application-services", "testing-qa", "it-consulting"],
         "faqs": [
@@ -213,7 +201,7 @@ SERVICES = [
             ("Growth and support", "Monitoring, A/B tests, feature iterations and security updates.", "Ongoing"),
         ],
         "techs": ["react", "nextjs", "typescript", "django", "nodejs", "postgresql", "redis", "aws"],
-        "industries": ["retail-ecommerce", "education", "hospitality", "finance"],
+        "industries": ["retail-ecommerce", "education", "hospitality"],
         "models": ["fixed", "dedicated", "tm"],
         "related": ["mobile-application-development", "testing-qa", "infrastructure-services"],
         "faqs": [
@@ -249,7 +237,7 @@ SERVICES = [
             ("Iterate", "Monthly releases guided by analytics, reviews and support tickets.", "Ongoing"),
         ],
         "techs": ["flutter", "react-native", "kotlin", "swift", "django", "nodejs", "postgresql", "google-cloud"],
-        "industries": ["finance", "healthcare", "logistics", "retail-ecommerce"],
+        "industries": ["healthcare", "logistics", "retail-ecommerce"],
         "models": ["fixed", "dedicated", "tm"],
         "related": ["web-development", "testing-qa", "data-analytics"],
         "faqs": [
@@ -285,7 +273,7 @@ SERVICES = [
             ("Implementation support", "Optional ongoing advisory during delivery by any vendor.", "Ongoing"),
         ],
         "techs": ["aws", "azure", "kubernetes", "terraform", "postgresql", "python"],
-        "industries": ["finance", "government-ngo", "healthcare", "education"],
+        "industries": ["government-ngo", "healthcare", "education"],
         "models": ["fixed", "tm", "retainer"],
         "related": ["infrastructure-services", "application-services", "data-analytics"],
         "faqs": [
@@ -321,7 +309,7 @@ SERVICES = [
             ("Operate", "Monthly reports on uptime, incidents, changes and upcoming risks.", "Ongoing"),
         ],
         "techs": ["django", "laravel", "dotnet", "nodejs", "docker", "postgresql", "mysql", "aws"],
-        "industries": ["finance", "government-ngo", "hospitality", "education"],
+        "industries": ["government-ngo", "hospitality", "education"],
         "models": ["retainer", "dedicated", "tm"],
         "related": ["infrastructure-services", "testing-qa", "custom-software-development"],
         "faqs": [
@@ -357,7 +345,7 @@ SERVICES = [
             ("Report", "Monthly quality dashboard with escaped defects and coverage trends.", "Monthly"),
         ],
         "techs": ["playwright", "cypress", "selenium", "jest", "pytest", "postman", "k6", "github-actions"],
-        "industries": ["finance", "healthcare", "retail-ecommerce", "education"],
+        "industries": ["healthcare", "retail-ecommerce", "education"],
         "models": ["dedicated", "tm", "fixed"],
         "related": ["web-development", "mobile-application-development", "application-services"],
         "faqs": [
@@ -393,7 +381,7 @@ SERVICES = [
             ("Operate", "Monitor freshness, accuracy and adoption.", "Ongoing"),
         ],
         "techs": ["python", "pandas", "airflow", "dbt", "kafka", "postgresql", "metabase", "pytorch"],
-        "industries": ["finance", "retail-ecommerce", "government-ngo", "logistics"],
+        "industries": ["retail-ecommerce", "government-ngo", "logistics"],
         "models": ["fixed", "dedicated", "tm"],
         "related": ["it-consulting", "infrastructure-services", "custom-software-development"],
         "faqs": [
@@ -429,7 +417,7 @@ SERVICES = [
             ("Review", "Monthly service review with your IT lead.", "Monthly"),
         ],
         "techs": ["python", "nodejs", "postgresql", "azure", "aws"],
-        "industries": ["hospitality", "finance", "education", "government-ngo"],
+        "industries": ["hospitality", "education", "government-ngo"],
         "models": ["retainer", "dedicated"],
         "related": ["infrastructure-services", "application-services", "it-consulting"],
         "faqs": [
@@ -465,7 +453,7 @@ SERVICES = [
             ("Optimise", "Quarterly architecture and cost reviews.", "Quarterly"),
         ],
         "techs": ["aws", "azure", "google-cloud", "kubernetes", "docker", "terraform", "github-actions", "nginx"],
-        "industries": ["finance", "hospitality", "retail-ecommerce", "healthcare"],
+        "industries": ["hospitality", "retail-ecommerce", "healthcare"],
         "models": ["retainer", "dedicated", "fixed"],
         "related": ["application-services", "help-desk-services", "it-consulting"],
         "faqs": [

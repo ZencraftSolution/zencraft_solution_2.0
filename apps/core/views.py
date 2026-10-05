@@ -29,11 +29,6 @@ HERO_SLIDES = [
         "caption": "Hospital information system", "metric": "63% shorter OPD wait", "link": "Our healthcare work",
     },
     {
-        "label": "Banking", "industry": "finance", "tint": "#dbe8ff",
-        "image": "photo-1551288049-bebda4e38f71", "background": "photo-1563986768609-322da13575f3",
-        "caption": "Mobile banking platform", "metric": "412k active app users", "link": "Our banking and finance work",
-    },
-    {
         "label": "Retail", "industry": "retail-ecommerce", "tint": "#e3e2ff",
         "image": "photo-1441986300917-64674bd600d8", "background": "photo-1441984904996-e0b6ba687e04",
         "caption": "Omnichannel commerce", "metric": "3.1x online revenue in a year", "link": "Our retail and e-commerce work",

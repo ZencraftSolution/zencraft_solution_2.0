@@ -146,7 +146,7 @@ FEATURES = [
 CASE_STUDIES = [
     dict(
         slug="mobile-banking-development-bank", title="Mobile banking that moved 38% of branch visits online",
-        client="A class B development bank", anonymized=True, industry="finance", services=["mobile-application-development", "web-development", "testing-qa"],
+        client="A class B development bank", anonymized=True, industry="", services=["mobile-application-development", "web-development", "testing-qa"],
         techs=["flutter", "django", "postgresql", "redis", "kubernetes", "playwright"], year=2025, duration="7 months", team=9, featured=True,
         cover=U("photo-1563986768609-322da13575f3", 1600, 1000),
         summary="A Flutter banking app and API layer on top of a legacy core banking system, serving over 400,000 customers.",

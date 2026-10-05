@@ -1,7 +1,7 @@
 <a class="case-card" style="flex:initial" href="{% url 'portfolio:detail' c.slug %}" data-flip-card>
   <div class="case-card__media"><img src="{{ c.cover_image_url }}" alt="{{ c.title }}" width="960" height="600" loading="lazy" data-seed="{{ c.slug }}" data-flip-img></div>
   <div class="case-card__body">
-    <div class="case-card__meta"><span>{{ c.industry.name }}</span><span>{{ c.year }}</span></div>
+    <div class="case-card__meta">{% if c.industry %}<span>{{ c.industry.name }}</span>{% endif %}<span>{{ c.year }}</span></div>
     <h3>{{ c.title }}</h3>
     <p>{{ c.summary }}</p>
     <div class="case-card__results">
