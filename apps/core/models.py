@@ -16,9 +16,12 @@ class SiteSettings(models.Model):
     whatsapp = models.CharField(max_length=40, blank=True, default="+977 9857055518")
     address = models.CharField(max_length=255, default="Tilottama Municipality-3, Rupandehi, Nepal")
     office_hours = models.CharField(max_length=120, default="Sun to Fri, 9:30 to 18:00 NPT")
-    linkedin_url = models.URLField(blank=True)
+    # Only the networks with a link are shown in the footer, so leaving one blank hides it.
+    linkedin_url = models.URLField(blank=True, default="https://www.linkedin.com/in/zencraft-solution-pvt-ltd-93ab8143b")
+    facebook_url = models.URLField(blank=True, default="https://www.facebook.com/share/1GpaRpTZJy/")
+    instagram_url = models.URLField(blank=True, default="https://www.instagram.com/zencraftsolution")
+    tiktok_url = models.URLField(blank=True, default="https://www.tiktok.com/@zencraft.solution")
     github_url = models.URLField(blank=True)
-    facebook_url = models.URLField(blank=True)
     x_url = models.URLField(blank=True)
 
     exchange_rate_npr_per_usd = models.DecimalField(

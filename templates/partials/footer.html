@@ -5,12 +5,15 @@
       <div class="footer-brand">
         <a href="{% url 'core:home' %}" class="brand"><img class="brand__logo" src="{% static 'img/logo-mark.png' %}" alt="" width="52" height="40">Zencraft Solution</a>
         <p>{{ site.tagline }}. Engineering team in Rupandehi working with clients across Nepal, Europe, Australia and North America.</p>
-        <div class="socials">
-          <a href="{{ site.linkedin_url|default:'https://www.linkedin.com' }}" aria-label="LinkedIn" rel="noopener"><i class="ph ph-linkedin-logo"></i></a>
-          <a href="{{ site.github_url|default:'https://github.com' }}" aria-label="GitHub" rel="noopener"><i class="ph ph-github-logo"></i></a>
-          <a href="{{ site.facebook_url|default:'https://www.facebook.com' }}" aria-label="Facebook" rel="noopener"><i class="ph ph-facebook-logo"></i></a>
-          <a href="{{ site.x_url|default:'https://x.com' }}" aria-label="X" rel="noopener"><i class="ph ph-x-logo"></i></a>
-        </div>
+        {# Brand logos come from a CDN; a network with no link in site settings is left out. #}
+        <ul class="socials">
+          {% include "partials/social_link.html" with url=site.facebook_url name="Facebook" logo="facebook" %}
+          {% include "partials/social_link.html" with url=site.instagram_url name="Instagram" logo="instagram-icon" %}
+          {% include "partials/social_link.html" with url=site.tiktok_url name="TikTok" logo="tiktok-icon" %}
+          {% include "partials/social_link.html" with url=site.linkedin_url name="LinkedIn" logo="linkedin-icon" %}
+          {% include "partials/social_link.html" with url=site.github_url name="GitHub" logo="github-icon" %}
+          {% include "partials/social_link.html" with url=site.x_url name="X" logo="x" %}
+        </ul>
       </div>
       <div class="footer-col">
         <h3>Services</h3>

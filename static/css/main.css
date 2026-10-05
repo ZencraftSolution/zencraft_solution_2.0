@@ -554,9 +554,11 @@ html.veil-in .page-veil { opacity: 1; }
 .footer-bottom { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; margin-top: 56px; padding-top: 24px; border-top: 1px solid var(--navy-line); font-size: 0.86rem; }
 .footer-bottom nav { display: flex; gap: 20px; flex-wrap: wrap; }
 .footer-bottom a:hover { color: #fff; }
-.socials { display: flex; gap: 8px; margin-top: 20px; }
-.socials a { width: 38px; height: 38px; border-radius: var(--r-sm); border: 1px solid var(--navy-line); display: grid; place-items: center; color: #fff; font-size: 1.1rem; }
-.socials a:hover { background: var(--navy-2); }
+/* Brand logos sit on a white chip so marks that are black, like TikTok, stay readable on the navy footer. */
+.socials { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; list-style: none; padding: 0; }
+.socials .social { width: 38px; height: 38px; border-radius: var(--r-sm); background: #fff; display: grid; place-items: center; transition: transform var(--dur-fast), box-shadow var(--dur-fast); }
+.socials .social img { width: 22px; height: 22px; display: block; }
+.socials .social:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgb(0 0 0 / 0.35); }
 @media (min-width: 720px) { .footer-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (min-width: 1080px) { .footer-grid { grid-template-columns: 1.5fr 1fr 1fr 1fr 1.4fr; } }
 

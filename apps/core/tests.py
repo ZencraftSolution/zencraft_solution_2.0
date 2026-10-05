@@ -251,6 +251,32 @@ class MiddlewareAndContextTests(TestCase):
         self.assertEqual(site.pk, 1)
 
 
+class FooterSocialLinkTests(TestCase):
+    """The footer shows a brand logo for each network that has a link, and nothing for the rest."""
+
+    def setUp(self):
+        cache.clear()  # site settings are cached, and that cache outlives the test transaction
+
+    def test_configured_profiles_are_linked_and_empty_ones_are_skipped(self):
+        page = self.client.get("/legal/privacy/").content.decode()
+        for url in ["https://www.facebook.com/share/1GpaRpTZJy/", "https://www.instagram.com/zencraftsolution",
+                    "https://www.tiktok.com/@zencraft.solution",
+                    "https://www.linkedin.com/in/zencraft-solution-pvt-ltd-93ab8143b"]:
+            self.assertIn(url, page)
+        for logo in ["facebook.svg", "instagram-icon.svg", "tiktok-icon.svg", "linkedin-icon.svg"]:
+            self.assertIn(logo, page)
+        self.assertEqual(page.count('class="social"'), 4)  # GitHub and X have no account yet
+        self.assertNotIn("github-icon.svg", page)
+
+    def test_clearing_a_link_removes_its_logo(self):
+        site = SiteSettings.load()
+        site.tiktok_url = ""
+        site.save()
+        page = self.client.get("/legal/privacy/").content.decode()
+        self.assertNotIn("tiktok-icon.svg", page)
+        self.assertEqual(page.count('class="social"'), 3)
+
+
 class ErrorPageTests(TestCase):
     def test_404_terminal_page(self):
         response = self.client.get("/definitely/missing/")
