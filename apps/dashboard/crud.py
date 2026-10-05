@@ -119,7 +119,7 @@ def crud_edit(request, slug, pk=None):
     model = cfg["model"]
     instance = get_object_or_404(model, pk=pk) if pk else None
     FormClass = _form_class(model)
-    form = FormClass(request.POST or None, instance=instance)
+    form = FormClass(request.POST or None, request.FILES or None, instance=instance)
     if request.method == "POST" and form.is_valid():
         obj = form.save()
         log_action(request, "updated" if pk else "created", obj, detail=f"{cfg['title']}: {', '.join(form.changed_data)}")

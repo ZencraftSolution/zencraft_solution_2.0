@@ -85,6 +85,25 @@ def validate_document(uploaded, allowed=("pdf", "docx"), max_bytes=None):
     return detected
 
 
+IMAGE_EXTENSIONS = ("jpg", "jpeg", "png", "webp")
+
+
+def validate_image_upload(uploaded):
+    """Size and extension guard for staff-uploaded public images.
+
+    Django's ImageField already proves the bytes are a real image via Pillow, so this adds the
+    limits that matter for a public media library. These files are not virus-scanned: they are
+    uploaded by signed-in staff and served as images, never executed.
+    """
+    max_bytes = getattr(settings, "IMAGE_UPLOAD_MAX_BYTES", 4 * 1024 * 1024)
+    if uploaded.size and uploaded.size > max_bytes:
+        raise ValidationError(f"This image is too large. The limit is {max_bytes // (1024 * 1024)} MB.")
+    ext = Path(uploaded.name).suffix.lower().lstrip(".")
+    if ext not in IMAGE_EXTENSIONS:
+        raise ValidationError("Please upload a JPG, PNG or WebP image.")
+    return ext
+
+
 def noop_scan(uploaded):
     """Accepts every file. Only permitted when DEBUG=True (enforced in settings.py)."""
     return True

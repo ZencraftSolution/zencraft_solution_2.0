@@ -18,7 +18,7 @@
       <h1 class="h1 mt-2" data-split>{{ post.title }}</h1>
       <p class="lead mt-2" data-hero-item>{{ post.excerpt }}</p>
       <div class="flex items-center gap-2 mt-3" data-hero-item>
-        {% if post.author %}<img src="{{ post.author.photo_url }}" alt="" width="44" height="44" style="width:44px;height:44px;border-radius:50%;object-fit:cover" data-seed="{{ post.author.name }}">{% endif %}
+        {% if post.author %}<img src="{{ post.author.photo_src }}" alt="" width="44" height="44" style="width:44px;height:44px;border-radius:50%;object-fit:cover" data-seed="{{ post.author.name }}">{% endif %}
         <div>
           <strong style="color:var(--ink);display:block">{{ post.author.name|default:"Zencraft team" }}</strong>
           <span class="mono muted" style="font-size:.8rem">{{ post.published_at|date:"j M Y" }} / {{ post.reading_minutes }} min read</span>

@@ -1,7 +1,10 @@
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.urls import reverse
+
+from apps.core.uploads import RandomisedPath, validate_image_upload
 
 
 class CaseStudy(models.Model):
@@ -76,7 +79,11 @@ class TeamMember(models.Model):
     name = models.CharField(max_length=120)
     role = models.CharField(max_length=120)
     bio = models.TextField(blank=True)
-    photo_url = models.URLField()
+    photo = models.ImageField(
+        "Photo upload", upload_to=RandomisedPath("team"), blank=True, validators=[validate_image_upload],
+        help_text="JPG, PNG or WebP, up to 4 MB. Used instead of the photo URL when set.",
+    )
+    photo_url = models.URLField(blank=True, help_text="Link to a hosted image, used when no photo is uploaded.")
     linkedin_url = models.URLField(blank=True)
     github_url = models.URLField(blank=True)
     is_leadership = models.BooleanField(default=False)
@@ -87,6 +94,15 @@ class TeamMember(models.Model):
 
     def __str__(self):
         return self.name
+
+    def clean(self):
+        if not self.photo and not self.photo_url:
+            raise ValidationError({"photo": "Add a photo: either upload an image or paste a photo URL."})
+
+    @property
+    def photo_src(self):
+        """Uploaded photo wins over the pasted URL, so templates never have to choose."""
+        return self.photo.url if self.photo else self.photo_url
 
 
 class GalleryImage(models.Model):

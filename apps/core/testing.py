@@ -101,3 +101,13 @@ def release_file_response(response):
     """Close a FileResponse's file handle without firing request_finished (which would close the test DB connection)."""
     for closer in list(getattr(response, "_resource_closers", [])):
         closer()
+
+
+def image_upload(name="photo.png", size=(40, 40), fmt="PNG", color=(31, 79, 216)):
+    """A genuine image file, so ImageField's Pillow validation passes."""
+    from PIL import Image
+
+    buf = io.BytesIO()
+    Image.new("RGB", size, color).save(buf, format=fmt)
+    content_type = "image/png" if fmt == "PNG" else f"image/{fmt.lower()}"
+    return SimpleUploadedFile(name, buf.getvalue(), content_type=content_type)

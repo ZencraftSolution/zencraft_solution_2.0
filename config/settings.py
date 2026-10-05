@@ -133,6 +133,7 @@ STORAGES = {
 # dashboard views.
 PRIVATE_MEDIA_ROOT = BASE_DIR / "private_media"
 UPLOAD_MAX_BYTES = 5 * 1024 * 1024
+IMAGE_UPLOAD_MAX_BYTES = env.int("IMAGE_UPLOAD_MAX_BYTES", default=4 * 1024 * 1024)
 # Virus scanning for CVs and requirement documents. ClamAV is the default; the no-op scanner is
 # only allowed for local development with DEBUG=True.
 UPLOAD_SCAN_HOOK = env(

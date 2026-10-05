@@ -6,7 +6,7 @@
   <div><a class="text-link" href="{% url 'dashboard:crud_list' slug %}"><i class="ph ph-arrow-left"></i> {{ cfg.title }}</a><h1 class="mt-1">{% if instance %}{{ instance|truncatechars:80 }}{% else %}New record{% endif %}</h1></div>
   {% if public_url %}<a class="btn btn--ghost btn--sm" href="{{ public_url }}" target="_blank" rel="noopener"><i class="ph ph-arrow-square-out"></i> View on site</a>{% endif %}
 </div>
-<form method="post" class="panel" novalidate>
+<form method="post" class="panel" enctype="multipart/form-data" novalidate>
   {% csrf_token %}
   {% if form.errors %}<div class="notice notice--error" style="margin-bottom:16px"><i class="ph ph-warning-circle"></i><span>Please fix the highlighted fields.{% for e in form.non_field_errors %} {{ e }}{% endfor %}</span></div>{% endif %}
   <div class="form-grid form-grid--2">

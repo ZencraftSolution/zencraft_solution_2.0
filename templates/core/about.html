@@ -56,7 +56,7 @@
     <div class="team-grid" data-reveal-group>
       {% for m in leaders %}
       <div class="person">
-        <img src="{{ m.photo_url }}" alt="{{ m.name }}" width="600" height="750" loading="lazy" data-seed="{{ m.name }}">
+        <img src="{{ m.photo_src }}" alt="{{ m.name }}" width="600" height="750" loading="lazy" data-seed="{{ m.name }}">
         <h3>{{ m.name }}</h3><p>{{ m.role }}</p>
         {% if m.bio %}<p class="mt-1" style="font-size:.88rem">{{ m.bio }}</p>{% endif %}
       </div>
@@ -65,7 +65,7 @@
     {% if team %}
     <h2 class="h3 mt-5" style="margin-bottom:24px" data-reveal>Team leads</h2>
     <div class="team-grid" data-reveal-group>
-      {% for m in team %}<div class="person"><img src="{{ m.photo_url }}" alt="{{ m.name }}" width="600" height="750" loading="lazy" data-seed="{{ m.name }}"><h3>{{ m.name }}</h3><p>{{ m.role }}</p></div>{% endfor %}
+      {% for m in team %}<div class="person"><img src="{{ m.photo_src }}" alt="{{ m.name }}" width="600" height="750" loading="lazy" data-seed="{{ m.name }}"><h3>{{ m.name }}</h3><p>{{ m.role }}</p></div>{% endfor %}
     </div>
     {% endif %}
   </div>

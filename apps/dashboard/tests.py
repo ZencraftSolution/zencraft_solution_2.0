@@ -1,6 +1,7 @@
 import csv
 import io
 import json
+import tempfile
 from datetime import timedelta
 from decimal import Decimal
 
@@ -17,9 +18,10 @@ from apps.blog.models import BlogCategory
 from apps.careers.models import JobApplication
 from apps.commerce.models import Order
 from apps.core.models import AuditLog, NewsletterSubscriber, SiteSettings
-from apps.core.testing import PASSWORD, docx_bytes, make_application, make_job, make_staff, make_user, release_file_response
+from apps.core.testing import PASSWORD, docx_bytes, image_upload, make_application, make_job, make_staff, make_user, release_file_response
 from apps.dashboard.crud import REGISTRY
 from apps.estimator.models import EstimatorConfig, ProjectInquiry
+from apps.portfolio.models import TeamMember
 from apps.services.models import Technology
 
 DASH_LOGIN = reverse("dashboard:login")
@@ -423,3 +425,62 @@ class ConfigurationTests(DashboardTestCase):
         self.assertEqual(SiteSettings.load().exchange_rate_npr_per_usd, Decimal("140.5000"))
         self.assertContains(self.client.get("/contact/"), "+977 9800000001")
         self.assertTrue(audit("updated site settings", detail__contains="exchange_rate_npr_per_usd").exists())
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp(prefix="zc-media-"))
+class TeamPhotoUploadTests(DashboardTestCase):
+    """Staff can attach a photo file in the dashboard instead of pasting an image URL."""
+
+    CREATE = reverse("dashboard:crud_create", args=["team"])
+
+    def form_data(self, **overrides):
+        data = {"name": "Shankar Adhikari", "role": "Co-founder", "bio": "", "photo_url": "", "linkedin_url": "",
+                "github_url": "", "order": 0}
+        data.update(overrides)
+        return data
+
+    def test_form_accepts_files_and_offers_a_file_input(self):
+        response = self.client.get(self.CREATE)
+        self.assertContains(response, 'enctype="multipart/form-data"')
+        self.assertContains(response, 'type="file"')
+        self.assertContains(response, 'name="photo"')
+
+    def test_uploaded_photo_is_stored_and_preferred_over_the_url(self):
+        response = self.client.post(self.CREATE, self.form_data(photo=image_upload("Shankar Photo.png")))
+        self.assertRedirects(response, reverse("dashboard:crud_list", args=["team"]))
+        member = TeamMember.objects.get()
+        self.assertTrue(member.photo.name.startswith("team/"))
+        self.assertNotIn("Shankar", member.photo.name)  # stored under an unguessable name
+        self.assertEqual(member.photo_src, member.photo.url)
+        self.assertTrue(audit("created", object_id=str(member.pk)).exists())
+
+        member.photo_url = "https://example.com/hosted.jpg"
+        member.save()
+        self.assertEqual(member.photo_src, member.photo.url)  # the upload still wins
+
+    def test_photo_url_alone_is_still_allowed(self):
+        self.client.post(self.CREATE, self.form_data(photo_url="https://example.com/a.jpg"))
+        member = TeamMember.objects.get()
+        self.assertFalse(member.photo)
+        self.assertEqual(member.photo_src, "https://example.com/a.jpg")
+
+    def test_a_photo_is_required_in_one_form_or_the_other(self):
+        response = self.client.post(self.CREATE, self.form_data())
+        self.assertContains(response, "either upload an image or paste a photo URL")
+        self.assertFalse(TeamMember.objects.exists())
+
+    def test_rejects_non_images_and_oversized_files(self):
+        bad_type = SimpleUploadedFile("cv.pdf", b"%PDF-1.4 not an image", content_type="application/pdf")
+        response = self.client.post(self.CREATE, self.form_data(photo=bad_type))
+        self.assertContains(response, "valid image")
+        with override_settings(IMAGE_UPLOAD_MAX_BYTES=100):
+            response = self.client.post(self.CREATE, self.form_data(photo=image_upload(size=(300, 300))))
+            self.assertContains(response, "image is too large")
+        response = self.client.post(self.CREATE, self.form_data(photo=image_upload("photo.gif", fmt="GIF")))
+        self.assertContains(response, "JPG, PNG or WebP")
+        self.assertFalse(TeamMember.objects.exists())
+
+    def test_uploaded_photo_shows_on_the_public_about_page(self):
+        self.client.post(self.CREATE, self.form_data(is_leadership="on", photo=image_upload()))
+        member = TeamMember.objects.get()
+        self.assertContains(Client().get(reverse("core:about")), member.photo.url)
