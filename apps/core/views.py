@@ -10,7 +10,7 @@ from django.views.decorators.http import require_POST
 
 from apps.blog.models import BlogPost
 from apps.commerce.models import EngagementModel
-from apps.portfolio.models import CaseStudy, GalleryImage, TeamMember, Testimonial
+from apps.portfolio.models import CaseStudy, TeamMember, Testimonial
 from apps.services.models import Industry, Service, Technology
 
 from .forms import ConsultationForm, ContactForm, NewsletterForm
@@ -96,7 +96,6 @@ def about(request):
     return render(request, "core/about.html", {
         "leaders": TeamMember.objects.filter(is_leadership=True),
         "team": TeamMember.objects.filter(is_leadership=False),
-        "gallery": GalleryImage.objects.all()[:8],
         "testimonials": Testimonial.objects.filter(featured=True)[:3],
     })
 

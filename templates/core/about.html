@@ -70,18 +70,4 @@
     {% endif %}
   </div>
 </section>
-
-{% if gallery %}
-<section class="section section--alt section--line">
-  <div class="container">
-    <div class="section-head flex justify-between items-center flex-wrap gap-2" style="max-width:none" data-reveal>
-      <h2 class="h2">Inside the office</h2>
-      <a class="text-link" href="{% url 'careers:landing' %}">Join the team <i class="ph ph-arrow-right"></i></a>
-    </div>
-    <div class="gallery-grid" data-reveal-group data-grid-wave>
-      {% for g in gallery %}<figure><img src="{{ g.image_url }}" alt="{{ g.caption }}" width="1200" height="750" loading="lazy" data-seed="gallery-{{ forloop.counter }}"><figcaption>{{ g.caption }}</figcaption></figure>{% endfor %}
-    </div>
-  </div>
-</section>
-{% endif %}
 {% endblock %}
