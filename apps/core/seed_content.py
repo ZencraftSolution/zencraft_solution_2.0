@@ -347,15 +347,15 @@ TESTIMONIALS = [
      "Monthly donor reporting went from a week of spreadsheet work to an afternoon. The numbers finally match across every report.", "ngo-program-analytics"),
 ]
 
+# Photos live in static/img/ and are copied into the TeamMember.photo field by the seed command,
+# so they survive on hosted media storage instead of pointing at someone else's server.
 TEAM = [
-    ("Rohan Adhikari", "Co-founder and CEO", True, U("photo-1506794778202-cad84cf45f1d", 600, 750), "Rohan spent eight years building banking software in Singapore before returning to Nepal to start Zencraft in 2026."),
-    ("Sabina Rai", "Co-founder and CTO", True, U("photo-1573497019940-1c28c88b4f3e", 600, 750), "Sabina leads architecture and engineering standards. She has designed systems for banks, hospitals and three national-scale platforms."),
-    ("Bikash Lama", "Head of Delivery", True, U("photo-1519085360753-af0119f7cbe7", 600, 750), "Bikash runs delivery across 20 active projects and makes sure every client has a plan they can hold us to."),
-    ("Pooja Bajracharya", "Head of Design", True, U("photo-1534528741775-53994a69daeb", 600, 750), "Pooja leads product design and research, with a focus on software that works for first-time digital users."),
-    ("Suraj K.C.", "Principal Engineer", False, U("photo-1531427186611-ecfd6d936c79", 600, 750), "Backend and distributed systems."),
-    ("Anisha Tamang", "QA Lead", False, U("photo-1438761681033-6461ffad8d80", 600, 750), "Test automation and release quality."),
-    ("Kiran Poudel", "DevOps Lead", False, U("photo-1472099645785-5658abf4ff4e", 600, 750), "Cloud infrastructure and reliability."),
-    ("Meera Joshi", "People and Talent Lead", False, U("photo-1494790108377-be9c29b29330", 600, 750), "Hiring, growth paths and culture."),
+    ("Shankar Poudel", "Co-founder and CEO", True, "shankar.jpeg",
+     "Shankar leads Zencraft and is the person clients call when something matters. He starts every engagement by sitting with the people who will actually use the software, and he will tell you honestly when a smaller build will serve you better."),
+    ("Khem Bahadur Lodh", "Co-founder, CTO and Software Engineer", True, "khem.jpeg",
+     "Khem designs the systems behind our work and still writes code on every project. He keeps releases boring: reviewed by a second engineer, covered by tests and safe to roll back, so your platform stays up while it keeps growing."),
+    ("Birendra Kumar Chaudhary", "Co-founder and CPO", True, "birendra.jpeg",
+     "Birendra turns business goals into a product plan you can hold us to, with a clear scope, schedule and first release. He tests every design with real users, including people opening a digital service for the first time."),
 ]
 
 GALLERY = [
@@ -433,7 +433,7 @@ JOBS = [
 BLOG_CATEGORIES = [("Engineering", "engineering"), ("Product and strategy", "product-strategy"), ("Cloud and DevOps", "cloud-devops"), ("Careers and culture", "careers-culture")]
 
 BLOG_POSTS = [
-    dict(slug="fixed-price-vs-dedicated-team", title="Fixed price or dedicated team? How to choose an engagement model", category="product-strategy", author="Bikash Lama",
+    dict(slug="fixed-price-vs-dedicated-team", title="Fixed price or dedicated team? How to choose an engagement model", category="product-strategy", author="Shankar Poudel",
          image=U("photo-1552664730-d307ca884978", 1400, 875), tags="engagement models, budgeting, outsourcing",
          excerpt="Both models work well in the right situation and fail badly in the wrong one. A practical checklist for deciding before you sign.",
          body="""<p>Most failed outsourcing projects did not fail because of bad engineers. They failed because the contract model did not match how certain the scope really was.</p>
@@ -446,7 +446,7 @@ BLOG_POSTS = [
 <h2>The hybrid most clients choose</h2>
 <p>In practice, many of our clients start with a fixed-price discovery and first release, then move to a dedicated team once the product is live. That combines budget certainty early with flexibility later.</p>
 <p>If you are unsure, our project estimator asks the questions that usually decide it, and a 30-minute call is free.</p>"""),
-    dict(slug="core-web-vitals-nepal-mobile", title="Why your site is slow on Nepali mobile networks, and what to fix first", category="engineering", author="Suraj K.C.",
+    dict(slug="core-web-vitals-nepal-mobile", title="Why your site is slow on Nepali mobile networks, and what to fix first", category="engineering", author="Khem Bahadur Lodh",
          image=U("photo-1460925895917-afdab827c52f", 1400, 875), tags="performance, core web vitals, mobile",
          excerpt="Most performance advice assumes fast phones on fast networks. Here is what actually moves the numbers for users on mid-range Android devices.",
          body="""<p>We test every client site on a Rs. 18,000 Android phone over a throttled 4G connection. It changes priorities quickly.</p>
@@ -459,7 +459,7 @@ BLOG_POSTS = [
 <h2>4. Measure real users</h2>
 <p>Lab scores are a guide. Real user monitoring shows what customers actually experience, broken down by device and network.</p>
 <blockquote>For one retail client, removing two unused tracking scripts improved mobile Largest Contentful Paint by 1.3 seconds.</blockquote>"""),
-    dict(slug="legacy-modernization-without-rewrite", title="Modernizing a legacy system without a risky full rewrite", category="engineering", author="Sabina Rai",
+    dict(slug="legacy-modernization-without-rewrite", title="Modernizing a legacy system without a risky full rewrite", category="engineering", author="Khem Bahadur Lodh",
          image=U("photo-1504639725590-34d0984388bd", 1400, 875), tags="modernization, legacy, architecture",
          excerpt="The strangler pattern lets you replace an old system one piece at a time while the business keeps running. Here is how we apply it.",
          body="""<p>Full rewrites are tempting. The old code is messy, the framework is unsupported and nobody wants to touch it. Yet rewrites regularly run over time and budget, because the old system contains years of business rules nobody wrote down.</p>
@@ -471,7 +471,7 @@ BLOG_POSTS = [
 <p>The hardest part is usually data. We use change data capture or scheduled synchronisation so old and new systems agree during the transition.</p>
 <h2>Retire with evidence</h2>
 <p>Once a legacy module receives no traffic for an agreed period, remove it. Over several quarters the old system shrinks until it disappears.</p>"""),
-    dict(slug="cloud-costs-five-quick-wins", title="Five quick wins that cut cloud bills by a quarter", category="cloud-devops", author="Kiran Poudel",
+    dict(slug="cloud-costs-five-quick-wins", title="Five quick wins that cut cloud bills by a quarter", category="cloud-devops", author="Khem Bahadur Lodh",
          image=U("photo-1451187580459-43490279c0fa", 1400, 875), tags="cloud, cost optimisation, aws",
          excerpt="Cloud spend grows quietly. These five checks take a day and usually save 20 to 30 percent.",
          body="""<p>Cloud providers make it easy to start resources and easy to forget them. These are the checks we run first in every infrastructure review.</p>
@@ -480,7 +480,7 @@ BLOG_POSTS = [
 <h2>3. Schedule non-production</h2><p>Development and staging rarely need to run nights and weekends. Scheduling them off saves around 65 percent of their cost.</p>
 <h2>4. Commit for steady workloads</h2><p>Reserved instances or savings plans for predictable production workloads cut compute costs significantly.</p>
 <h2>5. Watch data transfer</h2><p>Traffic between regions and out to the internet is often the surprise line on the bill. A CDN and keeping services in one region help.</p>"""),
-    dict(slug="how-we-hire-junior-engineers", title="How we hire junior engineers, and why we skip trick questions", category="careers-culture", author="Meera Joshi",
+    dict(slug="how-we-hire-junior-engineers", title="How we hire junior engineers, and why we skip trick questions", category="careers-culture", author="Shankar Poudel",
          image=U("photo-1522202176988-66273c2fd55f", 1400, 875), tags="hiring, careers, interviews",
          excerpt="Our interview process for junior roles focuses on how people learn and communicate, not on memorised algorithms.",
          body="""<p>Several of our engineers joined as interns or juniors. Hiring well at the entry level is one of the best investments we make.</p>
@@ -492,7 +492,7 @@ BLOG_POSTS = [
 <p>In the interview, you walk us through your solution. We ask what you would change with more time, and how you would explain it to a non-technical client.</p>
 <h2>Feedback for everyone</h2>
 <p>Every candidate who completes the task receives written feedback, whether or not we make an offer.</p>"""),
-    dict(slug="discovery-workshop-what-to-expect", title="What happens in a discovery workshop, and why it saves money", category="product-strategy", author="Pooja Bajracharya",
+    dict(slug="discovery-workshop-what-to-expect", title="What happens in a discovery workshop, and why it saves money", category="product-strategy", author="Birendra Kumar Chaudhary",
          image=U("photo-1531403009284-440f080d1e12", 1400, 875), tags="discovery, product, workshops",
          excerpt="Two days of structured work before development can prevent months of rework. Here is the agenda we follow.",
          body="""<p>Clients sometimes ask why they should pay for a workshop instead of starting development straight away. The answer is simple: changing a sticky note costs nothing, changing shipped code costs a lot.</p>

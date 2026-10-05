@@ -16,6 +16,7 @@ from apps.core import seed_services as S
 from apps.core.models import SiteSettings
 from apps.estimator.models import EstimatorConfig, FeatureOption, ProjectType
 from apps.portfolio.models import CaseStudy, GalleryImage, TeamMember, Testimonial
+from apps.portfolio.photos import attach_static_photo
 from apps.services.models import FAQ, Industry, ProcessStep, Service, ServiceCategory, Technology
 from config.settings import env
 
@@ -131,7 +132,9 @@ class Command(BaseCommand):
                                        case_study=CaseStudy.objects.filter(slug=case_slug).first(), verification="verified", featured=True, order=order)
         TeamMember.objects.all().delete()
         for order, (name, role, lead, photo, bio) in enumerate(C.TEAM):
-            TeamMember.objects.create(name=name, role=role, is_leadership=lead, photo_url=photo, bio=bio, order=order, linkedin_url="https://www.linkedin.com")
+            member = TeamMember.objects.create(name=name, role=role, is_leadership=lead, bio=bio, order=order, linkedin_url="https://www.linkedin.com")
+            if not attach_static_photo(member, photo):
+                self.stdout.write(self.style.WARNING(f"  missing team photo static/img/{photo}"))
         GalleryImage.objects.all().delete()
         for order, (url, caption, cat) in enumerate(C.GALLERY):
             GalleryImage.objects.create(image_url=url, caption=caption, category=cat, order=order)

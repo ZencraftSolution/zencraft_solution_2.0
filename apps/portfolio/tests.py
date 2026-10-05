@@ -1,7 +1,8 @@
 from django.test import TestCase
 from django.urls import reverse
 
-from apps.portfolio.models import CaseStudy, Testimonial
+from apps.portfolio.models import CaseStudy, TeamMember, Testimonial
+from apps.portfolio.photos import attach_static_photo
 from apps.services.models import Industry, Technology
 
 
@@ -57,3 +58,25 @@ class PortfolioTests(TestCase):
 
     def test_unpublished_detail_404(self):
         self.assertEqual(self.client.get(self.hidden.get_absolute_url()).status_code, 404)
+
+
+class FoundingTeamTests(TestCase):
+    """The three founders are installed by a migration, so the live site gets them without a reseed."""
+
+    FOUNDERS = ["Shankar Poudel", "Khem Bahadur Lodh", "Birendra Kumar Chaudhary"]
+
+    def test_only_the_founders_exist_and_each_has_a_stored_photo(self):
+        self.assertEqual([m.name for m in TeamMember.objects.all()], self.FOUNDERS)
+        for member in TeamMember.objects.all():
+            self.assertTrue(member.photo, f"{member.name} has no uploaded photo")
+            self.assertEqual(member.photo_src, member.photo.url)
+
+    def test_about_page_shows_the_founders_and_no_placeholder_team(self):
+        response = self.client.get(reverse("core:about"))
+        for name in self.FOUNDERS:
+            self.assertContains(response, name)
+        self.assertNotContains(response, "Team leads")
+
+    def test_attach_static_photo_reports_a_missing_file_instead_of_raising(self):
+        member = TeamMember.objects.first()
+        self.assertFalse(attach_static_photo(member, "no-such-photo.jpeg"))

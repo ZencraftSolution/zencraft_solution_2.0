@@ -770,6 +770,8 @@ html[data-currency="usd"] .price__npr { order: 2; font-size: 0.8em; color: var(-
 
 /* Team ----------------------------------------------------------------------------------------------------------- */
 .team-grid { display: grid; gap: 28px 20px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); }
+/* Leadership is a short row, so cap it at three tracks instead of leaving an empty cell. */
+.team-grid--lead { max-width: 1000px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); }
 .person img { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; border-radius: var(--r-md); background: var(--surface-2); filter: grayscale(0.2); transition: filter var(--dur-base); }
 .person:hover img { filter: none; }
 .person h3 { font-size: 1.05rem; margin-top: 14px; }

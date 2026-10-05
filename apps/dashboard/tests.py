@@ -433,8 +433,12 @@ class TeamPhotoUploadTests(DashboardTestCase):
 
     CREATE = reverse("dashboard:crud_create", args=["team"])
 
+    def setUp(self):
+        super().setUp()
+        TeamMember.objects.all().delete()  # the founders ship in a migration; these tests start from an empty table
+
     def form_data(self, **overrides):
-        data = {"name": "Shankar Adhikari", "role": "Co-founder", "bio": "", "photo_url": "", "linkedin_url": "",
+        data = {"name": "Asmita Gurung", "role": "Co-founder", "bio": "", "photo_url": "", "linkedin_url": "",
                 "github_url": "", "order": 0}
         data.update(overrides)
         return data
@@ -446,11 +450,11 @@ class TeamPhotoUploadTests(DashboardTestCase):
         self.assertContains(response, 'name="photo"')
 
     def test_uploaded_photo_is_stored_and_preferred_over_the_url(self):
-        response = self.client.post(self.CREATE, self.form_data(photo=image_upload("Shankar Photo.png")))
+        response = self.client.post(self.CREATE, self.form_data(photo=image_upload("Asmita Photo.png")))
         self.assertRedirects(response, reverse("dashboard:crud_list", args=["team"]))
         member = TeamMember.objects.get()
         self.assertTrue(member.photo.name.startswith("team/"))
-        self.assertNotIn("Shankar", member.photo.name)  # stored under an unguessable name
+        self.assertNotIn("Asmita", member.photo.name)  # stored under an unguessable name
         self.assertEqual(member.photo_src, member.photo.url)
         self.assertTrue(audit("created", object_id=str(member.pk)).exists())
 
