@@ -62,8 +62,8 @@
 
 <section class="container" aria-label="Company in numbers">
   <div class="metrics">
-    <div class="metric"><div class="metric__value" data-count="{{ site.stat_projects }}">{{ site.stat_projects }}</div><p class="metric__label">Projects delivered since 2017</p></div>
-    <div class="metric"><div class="metric__value" data-count="{{ site.stat_clients }}">{{ site.stat_clients }}</div><p class="metric__label">Clients in 11 countries</p></div>
+    <div class="metric"><div class="metric__value" data-count="{{ site.stat_projects }}">{{ site.stat_projects }}</div><p class="metric__label">Projects delivered since 2026</p></div>
+    <div class="metric"><div class="metric__value" data-count="{{ site.stat_clients }}">{{ site.stat_clients }}</div><p class="metric__label">Clients in Nepal and abroad</p></div>
     <div class="metric"><div class="metric__value" data-count="{{ site.stat_engineers }}">{{ site.stat_engineers }}</div><p class="metric__label">Engineers, designers and QA</p></div>
     <div class="metric"><div class="metric__value"><span data-count="{{ site.stat_uptime }}" data-decimals="2">{{ site.stat_uptime }}</span>%</div><p class="metric__label">Uptime across supported systems</p></div>
   </div>
@@ -108,7 +108,7 @@
 <section class="section section--alt section--line" aria-labelledby="capability-title">
   <div class="container grid-2" style="align-items:center">
     <div class="terminal" data-reveal>
-      <div class="terminal__bar"><span></span><span></span><span></span><em>zencraft@lalitpur: ~</em></div>
+      <div class="terminal__bar"><span></span><span></span><span></span><em>zencraft@rupandehi: ~</em></div>
       {{ terminal_lines|json_script:"terminal-lines" }}
       <div class="terminal__body" data-terminal="terminal-lines"><span class="terminal__prompt">$</span> zencraft --services{% for s in services %}
 <span class="terminal__ok">+</span> {{ s.name }}{% endfor %}</div>
@@ -117,7 +117,7 @@
       <h2 class="h2" id="capability-title">Engineers first, account managers second</h2>
       <p class="lead mt-2">You talk to the tech lead from the first call. Every project has written architecture decisions, code review on every change and a staging environment you can open any day.</p>
       <ul class="fact-list mt-4">
-        <li><span>Average engineer tenure</span><strong class="mono">3.8 years</strong></li>
+        <li><span>Changes reviewed before release</span><strong class="mono">100%</strong></li>
         <li><span>Automated test coverage on active projects</span><strong class="mono">81%</strong></li>
         <li><span>Median response on P1 incidents</span><strong class="mono">14 min</strong></li>
         <li><span>Working-hour overlap with EU and Australia</span><strong class="mono">4 to 6 h</strong></li>

@@ -21,7 +21,7 @@ class Department(models.Model):
 class JobOpening(models.Model):
     TYPE_CHOICES = [("full-time", "Full-time"), ("part-time", "Part-time"), ("contract", "Contract"), ("internship", "Internship")]
     LEVEL_CHOICES = [("intern", "Intern"), ("junior", "Junior"), ("mid", "Mid-level"), ("senior", "Senior"), ("lead", "Lead")]
-    MODE_CHOICES = [("onsite", "On-site, Lalitpur"), ("hybrid", "Hybrid, Lalitpur"), ("remote", "Remote, Nepal")]
+    MODE_CHOICES = [("onsite", "On-site, Rupandehi"), ("hybrid", "Hybrid, Rupandehi"), ("remote", "Remote, Nepal")]
 
     title = models.CharField(max_length=120)
     slug = models.SlugField(unique=True)

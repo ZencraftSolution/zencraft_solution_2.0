@@ -147,13 +147,13 @@ CASE_STUDIES = [
     dict(
         slug="mobile-banking-development-bank", title="Mobile banking that moved 38% of branch visits online",
         client="A class B development bank", anonymized=True, industry="", services=["mobile-application-development", "web-development", "testing-qa"],
-        techs=["flutter", "django", "postgresql", "redis", "kubernetes", "playwright"], year=2025, duration="7 months", team=9, featured=True,
+        techs=["flutter", "django", "postgresql", "redis", "kubernetes", "playwright"], year=2026, duration="5 months", team=6, featured=True,
         cover=U("photo-1563986768609-322da13575f3", 1600, 1000),
         summary="A Flutter banking app and API layer on top of a legacy core banking system, serving over 400,000 customers.",
         challenge="The bank's existing app was a thin wrapper around its internet banking site. It crashed on low-end Android phones, timed out during salary days and could not add features because every change required the core banking vendor.\n\nBranches were crowded with customers doing simple tasks like statement requests and fund transfers, and the bank was losing younger customers to wallets.",
         solution="We built an integration layer in Django that exposes safe, idempotent APIs over the core banking middleware, with Redis caching for balances and a queue for transfers so the app never waits on the core system.\n\nThe new Flutter app supports fund transfers, QR payments through Fonepay, bill payments, fixed deposit requests and card controls. Biometric login and device binding protect accounts, and a staged rollout moved customers over in four weeks.",
         architecture="Flutter client, Django API gateway on Kubernetes, Redis for caching and idempotency keys, Celery workers talking to core banking middleware, PostgreSQL for app data and a full audit trail.",
-        results=[{"value": "412k", "label": "Active app users"}, {"value": "38%", "label": "Fewer routine branch visits"}, {"value": "99.97%", "label": "API uptime in year one"}, {"value": "4.6", "label": "Play Store rating, up from 2.1"}],
+        results=[{"value": "412k", "label": "Active app users"}, {"value": "38%", "label": "Fewer routine branch visits"}, {"value": "99.9%", "label": "API uptime since launch"}, {"value": "4.6", "label": "Play Store rating, up from 2.1"}],
         code_language="python",
         code="""@transaction.atomic
 def create_transfer(user, payload, idempotency_key):
@@ -177,7 +177,7 @@ def create_transfer(user, payload, idempotency_key):
     dict(
         slug="hospital-information-system", title="A hospital information system that cut OPD waiting time by 63%",
         client="A 300-bed teaching hospital in Kathmandu Valley", anonymized=True, industry="healthcare", services=["custom-software-development", "data-analytics", "help-desk-services"],
-        techs=["dotnet", "wpf", "postgresql", "python", "metabase"], year=2024, duration="11 months", team=12, featured=True,
+        techs=["dotnet", "wpf", "postgresql", "python", "metabase"], year=2026, duration="6 months", team=7, featured=True,
         cover=U("photo-1519494026892-80bbd2d6fd0d", 1600, 1000),
         summary="Registration, OPD, pharmacy, lab and billing unified in one desktop and web system across 14 departments.",
         challenge="Patients registered separately at each counter, lab results were delivered on paper and billing was reconciled by hand every night. Queues at the OPD often exceeded an hour, and doctors could not see a patient's history from previous visits.",
@@ -207,13 +207,13 @@ def create_transfer(user, payload, idempotency_key):
     dict(
         slug="omnichannel-fashion-retail", title="Omnichannel commerce that tripled online revenue for a fashion retailer",
         client="Kathmandu Kapda House", anonymized=False, industry="retail-ecommerce", services=["web-development", "mobile-application-development", "infrastructure-services"],
-        techs=["nextjs", "django", "postgresql", "elasticsearch", "aws", "flutter"], year=2025, duration="6 months", team=7, featured=True,
+        techs=["nextjs", "django", "postgresql", "elasticsearch", "aws", "flutter"], year=2026, duration="4 months", team=5, featured=True,
         cover=U("photo-1441984904996-e0b6ba687e04", 1600, 1000),
         summary="A headless storefront, mobile app and inventory sync across 9 stores and 2 warehouses.",
         challenge="Stock shown on the website was often wrong, so customers ordered items that had already sold in a shop. Checkout supported only cash on delivery, and the old site took more than six seconds to load on mobile data.",
         solution="We connected the retailer's POS system to a new inventory service that updates stock across every channel within seconds. A Next.js storefront with image optimisation brought mobile load times under two seconds.\n\nCheckout now supports eSewa, Khalti, Fonepay and cards, and a delivery partner integration prints labels and sends tracking SMS automatically.",
         architecture="Next.js storefront on a CDN, Django commerce API, Elasticsearch for search, event-driven stock sync from POS, AWS with autoscaling for festival sales.",
-        results=[{"value": "3.1x", "label": "Online revenue in 12 months"}, {"value": "1.4s", "label": "Median mobile page load"}, {"value": "71%", "label": "Orders paid online, up from 0"}, {"value": "27%", "label": "Repeat purchase rate"}],
+        results=[{"value": "3.1x", "label": "Online revenue in 6 months"}, {"value": "1.4s", "label": "Median mobile page load"}, {"value": "71%", "label": "Orders paid online, up from 0"}, {"value": "27%", "label": "Repeat purchase rate"}],
         code_language="typescript",
         code="""export async function reserveStock(items: CartItem[], orderId: string) {
   // Reserve across locations, nearest warehouse first, all or nothing
@@ -235,7 +235,7 @@ def create_transfer(user, payload, idempotency_key):
     dict(
         slug="fleet-tracking-logistics", title="Live fleet tracking and dispatch for 180 trucks across Nepal",
         client="Trishuli Cargo Services", anonymized=False, industry="logistics", services=["mobile-application-development", "data-analytics", "infrastructure-services"],
-        techs=["kotlin", "nodejs", "kafka", "postgresql", "google-cloud", "grafana"] , year=2024, duration="5 months", team=6, featured=True,
+        techs=["kotlin", "nodejs", "kafka", "postgresql", "google-cloud", "grafana"] , year=2026, duration="3 months", team=4, featured=True,
         cover=U("photo-1601584115197-04ecc0da31d7", 1600, 1000),
         summary="GPS tracking, driver apps and a dispatch console that plans routes around real road conditions.",
         challenge="Dispatchers coordinated drivers over phone calls and could not tell customers when a delivery would arrive. Monsoon road closures on the Prithvi and BP highways caused missed deadlines, and proof of delivery was on paper slips that often went missing.",
@@ -260,7 +260,7 @@ LIMIT 5;""",
     dict(
         slug="university-learning-platform", title="A learning platform for 46,000 students that held up on results day",
         client="A university affiliate network of 22 colleges", anonymized=True, industry="education", services=["web-development", "testing-qa", "infrastructure-services"],
-        techs=["react", "django", "postgresql", "redis", "aws", "k6"], year=2023, duration="8 months", team=8, featured=True,
+        techs=["react", "django", "postgresql", "redis", "aws", "k6"], year=2026, duration="5 months", team=6, featured=True,
         cover=U("photo-1427504494785-3a9ca7044f45", 1600, 1000),
         summary="Courses, assignments, online exams and result publishing for 22 colleges on one platform.",
         challenge="The previous portal crashed every results day and students waited hours to see marks. Colleges used different tools for attendance, assignments and exams, and students outside Kathmandu struggled with heavy video lectures on slow connections.",
@@ -280,7 +280,7 @@ LIMIT 5;""",
     dict(
         slug="hotel-group-cloud-support", title="Cloud migration and 24/7 support for a heritage hotel group",
         client="Annapurna Heritage Hotels", anonymized=False, industry="hospitality", services=["infrastructure-services", "help-desk-services", "application-services"],
-        techs=["aws", "terraform", "docker", "nginx", "mysql", "laravel"], year=2025, duration="4 months, then ongoing", team=5, featured=True,
+        techs=["aws", "terraform", "docker", "nginx", "mysql", "laravel"], year=2026, duration="3 months, then ongoing", team=4, featured=True,
         cover=U("photo-1542314831-068cd1dbfeeb", 1600, 1000),
         summary="Booking engine, property management and back-office systems moved to the cloud with round-the-clock support.",
         challenge="Six properties ran on ageing servers in a single office. A power failure during the autumn trekking season took the booking engine offline for two days, and staff had no reliable way to get IT help at night.",
@@ -308,7 +308,7 @@ LIMIT 5;""",
     dict(
         slug="ngo-program-analytics", title="One view of programs and donor reporting across nine country offices",
         client="An international development NGO", anonymized=True, industry="government-ngo", services=["data-analytics", "it-consulting", "custom-software-development"],
-        techs=["python", "airflow", "dbt", "postgresql", "metabase", "azure"], year=2024, duration="6 months", team=5, featured=False,
+        techs=["python", "airflow", "dbt", "postgresql", "metabase", "azure"], year=2026, duration="4 months", team=4, featured=False,
         cover=U("photo-1488521787991-ed7bbaae773c", 1600, 1000),
         summary="Field data collection, a program warehouse and donor dashboards replacing monthly spreadsheet consolidation.",
         challenge="Each country office reported in its own spreadsheet format. Consolidating figures for donors took the regional team six working days every month, and numbers regularly disagreed between reports.",
@@ -335,7 +335,7 @@ group by 1, 2, 3""",
 TESTIMONIALS = [
     ("Sushma Karki", "Chief Digital Officer", "A class B development bank", U("photo-1573496359142-b8d87734a5a2", 200, 200), 5,
      "Zencraft understood our core banking limits better than the vendor did. The app launched on schedule and our branches are finally quieter.", "mobile-banking-development-bank"),
-    ("Dr. Anil Shrestha", "Medical Director", "Teaching hospital, Lalitpur", U("photo-1612349317150-e413f6a5b16d", 200, 200), 5,
+    ("Dr. Anil Shrestha", "Medical Director", "Teaching hospital, Kathmandu", U("photo-1612349317150-e413f6a5b16d", 200, 200), 5,
      "Doctors see full patient history in seconds now. The team sat with our counter staff for weeks, and it shows in how the system works.", "hospital-information-system"),
     ("Pratik Maharjan", "Head of E-commerce", "Kathmandu Kapda House", U("photo-1507003211169-0a1dd7228f2d", 200, 200), 5,
      "Our Dashain sale used to break the website. This year we did three times the orders and nobody on the team lost sleep.", "omnichannel-fashion-retail"),
@@ -348,7 +348,7 @@ TESTIMONIALS = [
 ]
 
 TEAM = [
-    ("Rohan Adhikari", "Co-founder and CEO", True, U("photo-1506794778202-cad84cf45f1d", 600, 750), "Rohan spent eight years building banking software in Singapore before returning to Nepal to start Zencraft in 2017."),
+    ("Rohan Adhikari", "Co-founder and CEO", True, U("photo-1506794778202-cad84cf45f1d", 600, 750), "Rohan spent eight years building banking software in Singapore before returning to Nepal to start Zencraft in 2026."),
     ("Sabina Rai", "Co-founder and CTO", True, U("photo-1573497019940-1c28c88b4f3e", 600, 750), "Sabina leads architecture and engineering standards. She has designed systems for banks, hospitals and three national-scale platforms."),
     ("Bikash Lama", "Head of Delivery", True, U("photo-1519085360753-af0119f7cbe7", 600, 750), "Bikash runs delivery across 20 active projects and makes sure every client has a plan they can hold us to."),
     ("Pooja Bajracharya", "Head of Design", True, U("photo-1534528741775-53994a69daeb", 600, 750), "Pooja leads product design and research, with a focus on software that works for first-time digital users."),
@@ -359,7 +359,7 @@ TEAM = [
 ]
 
 GALLERY = [
-    (U("photo-1522071820081-009f0129c71c", 1200, 900), "Sprint planning in the Jhamsikhel office", "team"),
+    (U("photo-1522071820081-009f0129c71c", 1200, 900), "Sprint planning in the Tilottama office", "team"),
     (U("photo-1497366216548-37526070297c", 1200, 900), "Our main engineering floor", "office"),
     (U("photo-1528605248644-14dd04022da1", 1200, 900), "Friday learning session", "events"),
     (U("photo-1600880292203-757bb62b4baf", 1200, 900), "Client workshop", "team"),
@@ -483,7 +483,7 @@ BLOG_POSTS = [
     dict(slug="how-we-hire-junior-engineers", title="How we hire junior engineers, and why we skip trick questions", category="careers-culture", author="Meera Joshi",
          image=U("photo-1522202176988-66273c2fd55f", 1400, 875), tags="hiring, careers, interviews",
          excerpt="Our interview process for junior roles focuses on how people learn and communicate, not on memorised algorithms.",
-         body="""<p>Half of our current senior engineers joined as interns or juniors. Hiring well at the entry level is one of the best investments we make.</p>
+         body="""<p>Several of our engineers joined as interns or juniors. Hiring well at the entry level is one of the best investments we make.</p>
 <h2>You can apply without a polished CV</h2>
 <p>Our application form lets you upload a CV or fill in your education, experience and projects directly. A strong project matters more to us than formatting.</p>
 <h2>A short, realistic take-home task</h2>

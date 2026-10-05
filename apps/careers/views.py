@@ -14,7 +14,7 @@ from .models import Department, JobApplication, JobOpening
 BENEFITS = [
     ("heartbeat", "Health cover for you and your family", "Group medical insurance from day one, including parents on request."),
     ("graduation-cap", "Yearly learning budget", "Rs. 60,000 a year for courses, certifications and conference tickets."),
-    ("house-line", "Hybrid by default", "Most teams work from the Jhamsikhel office three days a week."),
+    ("house-line", "Hybrid by default", "Most of the team works from the Tilottama office three days a week."),
     ("airplane-tilt", "Leave that is actually taken", "18 days of paid leave plus Dashain and Tihar festival leave."),
     ("chart-line-up", "Clear levels and reviews", "Published engineering levels and salary reviews every six months."),
     ("bowl-food", "Lunch on the house", "Daily team lunch in the office and snacks that are not an afterthought."),

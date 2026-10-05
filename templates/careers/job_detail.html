@@ -15,7 +15,7 @@
   "employmentType": "{% if job.employment_type == 'full-time' %}FULL_TIME{% elif job.employment_type == 'part-time' %}PART_TIME{% elif job.employment_type == 'contract' %}CONTRACTOR{% else %}INTERN{% endif %}",
   "hiringOrganization": {"@type": "Organization", "name": "{{ site.company_name|escapejs }}", "sameAs": "{{ SITE_URL }}"},
   {% if job.work_mode == "remote" %}"jobLocationType": "TELECOMMUTE", "applicantLocationRequirements": {"@type": "Country", "name": "Nepal"},{% endif %}
-  "jobLocation": {"@type": "Place", "address": {"@type": "PostalAddress", "streetAddress": "Jhamsikhel Road", "addressLocality": "Lalitpur", "postalCode": "44600", "addressCountry": "NP"}}{% if job.show_salary and job.salary_min_npr %},
+  "jobLocation": {"@type": "Place", "address": {"@type": "PostalAddress", "streetAddress": "Tilottama Municipality-3", "addressLocality": "Rupandehi", "addressCountry": "NP"}}{% if job.show_salary and job.salary_min_npr %},
   "baseSalary": {"@type": "MonetaryAmount", "currency": "NPR", "value": {"@type": "QuantitativeValue", "minValue": {{ job.salary_min_npr|floatformat:0 }}, "maxValue": {{ job.salary_max_npr|floatformat:0 }}, "unitText": "MONTH"}}{% endif %}
 }</script>
 {% endblock %}

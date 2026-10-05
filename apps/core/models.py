@@ -32,11 +32,11 @@ class SiteSettings(models.Model):
         default="We design, build and support custom platforms for teams in Nepal and abroad, from first workshop to long-term operations.",
     )
 
-    stat_projects = models.PositiveIntegerField(default=148)
-    stat_clients = models.PositiveIntegerField(default=63)
-    stat_engineers = models.PositiveIntegerField(default=41)
-    stat_uptime = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("99.95"))
-    stat_years = models.PositiveIntegerField(default=9)
+    stat_projects = models.PositiveIntegerField(default=14)
+    stat_clients = models.PositiveIntegerField(default=9)
+    stat_engineers = models.PositiveIntegerField(default=11)
+    stat_uptime = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("99.90"))
+    stat_years = models.PositiveIntegerField(default=1)
 
     updated_at = models.DateTimeField(auto_now=True)
 
