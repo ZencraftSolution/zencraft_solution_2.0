@@ -1,17 +1,18 @@
 {% extends "base.html" %}
-{% block title %}About {{ site.company_name }}{% endblock %}
+{% load zc %}
+{% block title %}{% page_title "About us: the team and how we work" %}{% endblock %}
 {% block meta_description %}Zencraft Solution is a software engineering company in Tilottama, Rupandehi, founded in 2026. Meet the team and learn how we work.{% endblock %}
 
 {% block content %}
 <section class="page-hero blueprint">
   <div class="container page-hero__inner page-hero__inner--media">
     <div class="page-hero__copy">
-      <ol class="crumbs" aria-label="Breadcrumb"><li><a href="{% url 'core:home' %}">Home</a></li><li>About</li></ol>
+      {% breadcrumbs "About" "" %}
       <h1 class="h1" data-split>An engineering company built on long-term relationships</h1>
       <p class="lead" data-hero-item>Founded in Rupandehi in 2026. A young team, built around people who have shipped software for years.</p>
     </div>
     <div class="page-hero__media" data-hero-visual>
-      <img src="https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1200&h=900&q=80" alt="The Zencraft Solution office in Tilottama, Rupandehi" width="1200" height="900" data-seed="about-office">
+      <img src="https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1200&h=900&q=80" alt="The Zencraft Solution office in Tilottama, Rupandehi" fetchpriority="high" width="1200" height="900" data-seed="about-office">
     </div>
   </div>
 </section>

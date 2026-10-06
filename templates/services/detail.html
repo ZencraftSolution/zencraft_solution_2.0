@@ -1,31 +1,19 @@
 {% extends "base.html" %}
 {% load zc %}
-{% block title %}{{ service.seo_title|default:service.name }}{% endblock %}
-{% block meta_description %}{{ service.seo_description|default:service.summary }}{% endblock %}
+{% block title %}{% page_title service.seo_title|default:service.outcome_headline %}{% endblock %}
+{% block meta_description %}{% page_description service.seo_description|default:service.summary %}{% endblock %}
+{% block social_meta %}{% share_meta service.name service.seo_description|default:service.summary service.hero_image_url %}{% endblock %}
 {% block og_title %}{{ service.name }} | {{ site.company_name }}{% endblock %}
 {% block og_description %}{{ service.summary }}{% endblock %}
 {% block og_image %}{{ service.hero_image_url }}{% endblock %}
 
-{% block json_ld %}
-<script type="application/ld+json" nonce="{{ request.csp_nonce }}">{
-  "@context": "https://schema.org",
-  "@graph": [
-    {"@type": "Service", "name": "{{ service.name|escapejs }}", "description": "{{ service.summary|escapejs }}", "serviceType": "{{ service.name|escapejs }}",
-     "provider": {"@type": "Organization", "name": "{{ site.company_name|escapejs }}", "url": "{{ SITE_URL }}"}, "areaServed": ["NP", "Worldwide"], "url": "{{ SITE_URL }}{{ request.path }}"},
-    {"@type": "BreadcrumbList", "itemListElement": [
-      {"@type": "ListItem", "position": 1, "name": "Home", "item": "{{ SITE_URL }}/"},
-      {"@type": "ListItem", "position": 2, "name": "Services", "item": "{{ SITE_URL }}{% url 'services:list' %}"},
-      {"@type": "ListItem", "position": 3, "name": "{{ service.name|escapejs }}"}]}{% if faqs %},
-    {"@type": "FAQPage", "mainEntity": [{% for f in faqs %}{"@type": "Question", "name": "{{ f.question|escapejs }}", "acceptedAnswer": {"@type": "Answer", "text": "{{ f.answer|escapejs }}"}}{% if not forloop.last %},{% endif %}{% endfor %}]}{% endif %}
-  ]
-}</script>
-{% endblock %}
+{% block json_ld %}{% schema "service" service %}{% schema "faq" faqs %}{% endblock %}
 
 {% block content %}
 <section class="page-hero blueprint">
   <div class="container page-hero__inner page-hero__inner--media">
     <div class="page-hero__copy">
-      <ol class="crumbs" aria-label="Breadcrumb"><li><a href="{% url 'core:home' %}">Home</a></li><li><a href="{% url 'services:list' %}">Services</a></li><li>{{ service.name }}</li></ol>
+      {% breadcrumbs "Services" "services:list" service.name "" %}
       <p class="label" data-hero-item>{{ service.name }}</p>
       <h1 class="h1" data-split>{{ service.outcome_headline }}</h1>
       <p class="lead" data-hero-item>{{ service.summary }}</p>
@@ -35,7 +23,7 @@
       </div>
     </div>
     <div class="page-hero__media" data-hero-visual>
-      <img src="{{ service.hero_image_url }}" alt="{{ service.name }} at Zencraft Solution" width="1200" height="900" fetchpriority="high" data-seed="{{ service.slug }}">
+      <img src="{{ service.hero_image_url }}" srcset="{% srcset service.hero_image_url %}" sizes="(min-width: 1000px) 560px, 100vw" alt="{{ service.name }} at Zencraft Solution" width="1200" height="900" fetchpriority="high" data-seed="{{ service.slug }}">
     </div>
   </div>
 </section>

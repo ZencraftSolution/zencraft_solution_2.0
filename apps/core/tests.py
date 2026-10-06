@@ -732,6 +732,12 @@ class TransactionalEmailTests(TestCase):
         self.assertIn("Asmita", mail.outbox[0].body)
 
 
+def next_working_day(after_days=3):
+    """A bookable date. The consultation form refuses Saturdays, so never offer one."""
+    date = timezone.localdate() + timedelta(days=after_days)
+    return date + timedelta(days=1) if date.weekday() == 5 else date
+
+
 class EmailFailureDoesNotBreakTheSiteTests(TestCase):
     """Every public form keeps working when the mail server is unreachable."""
 
@@ -752,7 +758,7 @@ class EmailFailureDoesNotBreakTheSiteTests(TestCase):
 
     def test_a_consultation_request_is_still_recorded(self):
         data = {"name": "Asmita", "email": "a@example.com", "phone": "9800000000", "company": "C",
-                "topic": "new-project", "preferred_date": (timezone.localdate() + timedelta(days=3)).isoformat(),
+                "topic": "new-project", "preferred_date": next_working_day().isoformat(),
                 "preferred_slot": "morning", "message": "Hello", "consent": "on"}
         with self.broken_mail(), self.assertLogs("apps.core.mail", level="ERROR"):
             response = self.client.post(reverse("core:consultation"), data)

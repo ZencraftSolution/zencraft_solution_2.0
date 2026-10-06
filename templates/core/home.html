@@ -1,7 +1,8 @@
 {% extends "base.html" %}
 {% load zc static %}
 
-{% block title %}{{ site.company_name }}: software development company in Nepal{% endblock %}
+{% block title %}Software development company in Nepal{% endblock %}
+{% block meta_description %}Zencraft Solution builds custom software, web platforms and mobile apps for businesses in Nepal and abroad, from the first workshop to long-term support.{% endblock %}
 
 {% block content %}
 <section class="hs" data-hero-slider aria-roledescription="carousel" aria-label="Industries we build software for">
@@ -37,7 +38,7 @@
           <figure class="hs__slide{% if forloop.first %} is-active{% endif %}" id="hs-slide-{{ forloop.counter0 }}" role="tabpanel"
                   aria-labelledby="hs-tab-{{ forloop.counter0 }}" aria-roledescription="slide" aria-label="{{ forloop.counter }} of {{ hero_slides|length }}"
                   {% if not forloop.first %}aria-hidden="true"{% endif %} data-hs-slide>
-            <div class="hs__media"><img src="{{ s.image_url }}" alt="{{ s.caption }} built by Zencraft Solution" width="1200" height="760" {% if not forloop.first %}loading="lazy"{% endif %} data-seed="hero-{{ forloop.counter }}"></div>
+            <div class="hs__media"><img src="{{ s.image_url }}" srcset="{% srcset s.image_url %}" sizes="(min-width: 1000px) 640px, 100vw" alt="{{ s.caption }} built by Zencraft Solution" width="1200" height="760" {% if not forloop.first %}loading="lazy"{% endif %} data-seed="hero-{{ forloop.counter }}"></div>
             <figcaption class="hs__caption">
               <span>{{ s.caption }}</span>
               <strong class="mono">{{ s.metric }}</strong>
@@ -161,7 +162,7 @@
     <div class="cases__track" data-cases-track>
       {% for c in case_studies %}
       <a class="case-card" href="{% url 'portfolio:detail' c.slug %}" data-flip-card data-flip-id="case-{{ c.slug }}">
-        <div class="case-card__media"><img src="{{ c.cover_image_url }}" alt="{{ c.title }}" width="1040" height="650" loading="lazy" data-seed="{{ c.slug }}" data-flip-img></div>
+        <div class="case-card__media"><img src="{{ c.cover_image_url }}" srcset="{% srcset c.cover_image_url %}" sizes="(min-width: 900px) 520px, 100vw" alt="{{ c.title }}" width="1040" height="650" loading="lazy" data-seed="{{ c.slug }}" data-flip-img></div>
         <div class="case-card__body">
           <div class="case-card__meta">{% if c.industry %}<span>{{ c.industry.name }}</span>{% endif %}<span>{{ c.year }}</span><span>{{ c.duration }}</span></div>
           <h3>{{ c.title }}</h3>

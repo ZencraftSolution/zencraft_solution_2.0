@@ -1,12 +1,13 @@
 {% extends "base.html" %}
-{% block title %}Book a free consultation | {{ site.company_name }}{% endblock %}
+{% load zc %}
+{% block title %}{% page_title "Book a free 30-minute consultation" %}{% endblock %}
 {% block meta_description %}Book a free 30-minute consultation with a Zencraft Solution architect about your software project, team or system.{% endblock %}
 {% block cta_band %}{% endblock %}
 
 {% block content %}
 <section class="page-hero blueprint">
   <div class="container" style="padding-block:clamp(40px,6vw,80px)">
-    <ol class="crumbs" aria-label="Breadcrumb"><li><a href="{% url 'core:home' %}">Home</a></li><li>Consultation</li></ol>
+    {% breadcrumbs "Book a consultation" "" %}
     <h1 class="h1 mt-2" data-split>Book a free 30-minute consultation</h1>
     <p class="lead mt-2" data-hero-item>Talk through your idea, system or team with a senior architect. No sales script, no obligation.</p>
   </div>

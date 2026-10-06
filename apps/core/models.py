@@ -3,6 +3,9 @@ from decimal import Decimal
 from django.conf import settings
 from django.core.cache import cache
 from django.db import models
+from django.templatetags.static import static
+
+from apps.core.uploads import RandomisedPath, validate_image_upload
 
 
 class SiteSettings(models.Model):
@@ -23,6 +26,13 @@ class SiteSettings(models.Model):
     tiktok_url = models.URLField(blank=True, default="https://www.tiktok.com/@zencraft.solution")
     github_url = models.URLField(blank=True)
     x_url = models.URLField(blank=True)
+
+    # The picture shown when a page is shared and has no image of its own. 1200x630 works best.
+    share_image = models.ImageField(
+        "Default sharing image", upload_to=RandomisedPath("branding"), blank=True, validators=[validate_image_upload],
+        help_text="1200x630 JPG, PNG or WebP. Shown on Facebook, LinkedIn and X when a page has no image of its own.",
+    )
+    share_image_url = models.URLField(blank=True, help_text="Used instead of an upload, if you host the image elsewhere.")
 
     exchange_rate_npr_per_usd = models.DecimalField(
         max_digits=10, decimal_places=4, default=Decimal("134.2500"),
@@ -64,6 +74,16 @@ class SiteSettings(models.Model):
             obj, _ = cls.objects.get_or_create(pk=1)
             cache.set(cls.CACHE_KEY, obj, 300)
         return obj
+
+    @property
+    def share_image_src(self):
+        """An uploaded card wins, then a hosted one, then the logo, so sharing never shows nothing."""
+        try:
+            if self.share_image and self.share_image.name:
+                return self.share_image.url
+        except ValueError:  # a name with no file behind it, e.g. after a form posted an empty value
+            pass
+        return self.share_image_url or static("img/logo.png")
 
 
 class ScannedUpload(models.Model):

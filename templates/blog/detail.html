@@ -1,24 +1,24 @@
 {% extends "base.html" %}
-{% block title %}{{ post.seo_title|default:post.title }} | {{ site.company_name }}{% endblock %}
-{% block meta_description %}{{ post.seo_description|default:post.excerpt }}{% endblock %}
+{% load zc %}
+{% block title %}{% page_title post.seo_title|default:post.title "Insights" %}{% endblock %}
+{% block meta_description %}{% page_description post.seo_description|default:post.excerpt %}{% endblock %}
+{% block social_meta %}{% share_meta post.title post.seo_description|default:post.excerpt post.hero_image_url %}{% endblock %}
 {% block og_type %}article{% endblock %}
 {% block og_title %}{{ post.title }}{% endblock %}
 {% block og_description %}{{ post.excerpt }}{% endblock %}
 {% block og_image %}{{ post.hero_image_url }}{% endblock %}
 
-{% block json_ld %}
-<script type="application/ld+json" nonce="{{ request.csp_nonce }}">{"@context":"https://schema.org","@type":"BlogPosting","headline":"{{ post.title|escapejs }}","description":"{{ post.excerpt|escapejs }}","image":"{{ post.hero_image_url }}","datePublished":"{{ post.published_at|date:'c' }}","author":{"@type":"Person","name":"{{ post.author.name|default:site.company_name|escapejs }}"},"publisher":{"@type":"Organization","name":"{{ site.company_name|escapejs }}"},"mainEntityOfPage":"{{ SITE_URL }}{{ request.path }}"}</script>
-{% endblock %}
+{% block json_ld %}{% schema "article" post %}{% endblock %}
 
 {% block content %}
 <article>
   <header class="section" style="padding-bottom:0">
     <div class="container container--narrow">
-      <ol class="crumbs" aria-label="Breadcrumb"><li><a href="{% url 'blog:list' %}">Insights</a></li>{% if post.category %}<li><a href="{% url 'blog:category' post.category.slug %}">{{ post.category.name }}</a></li>{% endif %}</ol>
+      {% breadcrumbs "Insights" "blog:list" post.title "" %}
       <h1 class="h1 mt-2" data-split>{{ post.title }}</h1>
       <p class="lead mt-2" data-hero-item>{{ post.excerpt }}</p>
       <div class="flex items-center gap-2 mt-3" data-hero-item>
-        {% if post.author %}<img src="{{ post.author.photo_src }}" alt="" width="44" height="44" style="width:44px;height:44px;border-radius:50%;object-fit:cover" data-seed="{{ post.author.name }}">{% endif %}
+        {% if post.author %}<img src="{{ post.author.photo_src }}" alt="" loading="lazy" width="44" height="44" style="width:44px;height:44px;border-radius:50%;object-fit:cover" data-seed="{{ post.author.name }}">{% endif %}
         <div>
           <strong style="color:var(--ink);display:block">{{ post.author.name|default:"Zencraft team" }}</strong>
           <span class="mono muted" style="font-size:.8rem">{{ post.published_at|date:"j M Y" }} / {{ post.reading_minutes }} min read</span>
@@ -26,7 +26,7 @@
       </div>
     </div>
     <div class="container" style="margin-top:40px">
-      <div class="case-hero__media" style="margin-top:0" data-hero-visual><img src="{{ post.hero_image_url }}" alt="" width="1600" height="686" fetchpriority="high" data-seed="{{ post.slug }}"></div>
+      <div class="case-hero__media" style="margin-top:0" data-hero-visual><img src="{{ post.hero_image_url }}" srcset="{% srcset post.hero_image_url %}" sizes="(min-width: 1100px) 1100px, 100vw" alt="" width="1600" height="686" fetchpriority="high" data-seed="{{ post.slug }}"></div>
     </div>
   </header>
   <div class="section" style="padding-top:56px">

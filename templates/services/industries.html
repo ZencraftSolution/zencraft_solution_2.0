@@ -1,12 +1,13 @@
 {% extends "base.html" %}
-{% block title %}Industries we serve | {{ site.company_name }}{% endblock %}
+{% load zc %}
+{% block title %}{% page_title "Industries we build software for" %}{% endblock %}
 {% block meta_description %}Software for healthcare, banking, education, retail, logistics, hospitality and NGOs, built by Zencraft Solution.{% endblock %}
 
 {% block content %}
 <section class="page-hero blueprint">
   <div class="container page-hero__inner">
     <div class="page-hero__copy" style="max-width:780px">
-      <ol class="crumbs" aria-label="Breadcrumb"><li><a href="{% url 'core:home' %}">Home</a></li><li>Industries</li></ol>
+      {% breadcrumbs "Industries" "" %}
       <h1 class="h1" data-split>Software that understands the rules of your sector</h1>
       <p class="lead" data-hero-item>Seven industry teams with the integrations, compliance knowledge and reference projects to move quickly.</p>
     </div>

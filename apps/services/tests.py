@@ -1,8 +1,11 @@
+import json
+
 from django.contrib.contenttypes.models import ContentType
 from django.core.cache import cache
 from django.test import TestCase
 from django.urls import reverse
 
+from apps.core import seo
 from apps.services.models import FAQ, Industry, ProcessStep, Service, ServiceCategory, Technology
 
 
@@ -45,8 +48,9 @@ class ServicesTests(TestCase):
         response = self.client.get(self.web.get_absolute_url())
         for text in ("Fast web", "Design system", "Discovery", "2 weeks", "Django", "Healthcare", "Will the site be fast?", "Second paragraph."):
             self.assertContains(response, text)
-        self.assertContains(response, '"@type": "FAQPage"')
-        self.assertContains(response, '"@type": "Service"')
+        types = {json.loads(block).get("@type") for block in seo.parse(response.content.decode()).json_ld}
+        self.assertIn("FAQPage", types)
+        self.assertIn("Service", types)
         self.assertEqual(list(response.context["related_services"]), [])  # unpublished related service is hidden
 
     def test_unpublished_detail_404(self):

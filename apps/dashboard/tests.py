@@ -9,6 +9,7 @@ from decimal import Decimal
 from django.conf import settings
 from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db.models.fields.files import FieldFile
 from django.forms.models import model_to_dict
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
@@ -414,6 +415,12 @@ class ConfigurationTests(DashboardTestCase):
         data = {}
         for key, value in model_to_dict(instance).items():
             if key == "id" or value is None:
+                continue
+            if isinstance(value, FieldFile):
+                # An empty FileField: the test client treats a file-like value as an upload and
+                # raises when there is nothing behind it. isinstance avoids touching the file.
+                if value.name:
+                    data[key] = value
                 continue
             data[key] = json.dumps(value) if isinstance(value, (dict, list)) else value
         data.update(overrides)

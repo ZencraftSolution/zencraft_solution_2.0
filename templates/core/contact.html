@@ -1,12 +1,13 @@
 {% extends "base.html" %}
-{% block title %}Contact {{ site.company_name }}{% endblock %}
+{% load zc %}
+{% block title %}{% page_title "Contact us in Rupandehi, Nepal" %}{% endblock %}
 {% block meta_description %}Contact Zencraft Solution in Tilottama, Rupandehi. Email, phone, office address and a contact form. We reply within one working day.{% endblock %}
 {% block cta_band %}{% endblock %}
 
 {% block content %}
 <section class="page-hero blueprint">
   <div class="container" style="padding-block:clamp(40px,6vw,80px)">
-    <ol class="crumbs" aria-label="Breadcrumb"><li><a href="{% url 'core:home' %}">Home</a></li><li>Contact</li></ol>
+    {% breadcrumbs "Contact" "" %}
     <h1 class="h1 mt-2" data-split>Tell us what you are working on</h1>
     <p class="lead mt-2" data-hero-item>A real engineer reads every message and replies within one working day.</p>
   </div>

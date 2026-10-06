@@ -1,18 +1,20 @@
 {% extends "base.html" %}
-{% block title %}{{ industry.name }} software development | {{ site.company_name }}{% endblock %}
-{% block meta_description %}{{ industry.tagline }}{% endblock %}
+{% load zc %}
+{% block title %}{% page_title industry.seo_title|default:industry.name "Software" %}{% endblock %}
+{% block meta_description %}{% page_description industry.seo_description|default:industry.tagline %}{% endblock %}
+{% block social_meta %}{% share_meta industry.name industry.seo_description|default:industry.tagline industry.image_url %}{% endblock %}
 {% block og_image %}{{ industry.image_url }}{% endblock %}
 
 {% block content %}
 <section class="page-hero blueprint">
   <div class="container page-hero__inner page-hero__inner--media">
     <div class="page-hero__copy">
-      <ol class="crumbs" aria-label="Breadcrumb"><li><a href="{% url 'core:home' %}">Home</a></li><li><a href="{% url 'services:industries' %}">Industries</a></li><li>{{ industry.name }}</li></ol>
+      {% breadcrumbs "Industries" "services:industries" industry.name "" %}
       <h1 class="h1" data-split>{{ industry.name }}</h1>
       <p class="lead" data-hero-item>{{ industry.tagline }}</p>
       <div class="page-hero__actions" data-hero-item><a class="btn btn--primary" href="{% url 'core:consultation' %}">Book a consultation</a></div>
     </div>
-    <div class="page-hero__media" data-hero-visual><img src="{{ industry.image_url }}" alt="{{ industry.name }}" width="1000" height="750" data-seed="{{ industry.slug }}"></div>
+    <div class="page-hero__media" data-hero-visual><img src="{{ industry.image_url }}" srcset="{% srcset industry.image_url %}" sizes="(min-width: 1000px) 500px, 100vw" alt="{{ industry.name }}" fetchpriority="high" width="1000" height="750" data-seed="{{ industry.slug }}"></div>
   </div>
 </section>
 

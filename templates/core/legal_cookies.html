@@ -1,5 +1,7 @@
 {% extends "core/legal_base.html" %}
-{% block title %}Cookie policy | {{ site.company_name }}{% endblock %}
+{% load zc %}
+{% block title %}{% page_title "Cookie policy" %}{% endblock %}
+{% block meta_description %}Which cookies this site sets, what each one is for, how long it lasts and how to refuse them. We use no advertising or third-party tracking cookies.{% endblock %}
 {% block legal_title %}Cookie policy{% endblock %}
 {% block legal_body %}
 <p>This website uses as few cookies as possible and no advertising or cross-site tracking cookies.</p>

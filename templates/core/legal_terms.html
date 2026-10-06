@@ -1,5 +1,7 @@
 {% extends "core/legal_base.html" %}
-{% block title %}Terms of service | {{ site.company_name }}{% endblock %}
+{% load zc %}
+{% block title %}{% page_title "Terms of service" %}{% endblock %}
+{% block meta_description %}The terms covering this website and the fixed-price services bought through it: estimates, prices and VAT, refunds, intellectual property and governing law.{% endblock %}
 {% block legal_title %}Terms of service{% endblock %}
 {% block legal_body %}
 <p>These terms apply to your use of this website and to fixed-price services purchased through our online store. Custom development, dedicated team and consulting engagements are governed by a separate signed agreement.</p>

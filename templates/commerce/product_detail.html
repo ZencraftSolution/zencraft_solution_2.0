@@ -1,16 +1,15 @@
 {% extends "base.html" %}
 {% load zc %}
-{% block title %}{{ product }} | {{ site.company_name }}{% endblock %}
-{% block meta_description %}{{ product.summary }}{% endblock %}
+{% block title %}{% page_title product.name "Fixed price" %}{% endblock %}
+{% block meta_description %}{% page_description product.summary %}{% endblock %}
+{% block social_meta %}{% share_meta product.name product.summary %}{% endblock %}
 
-{% block json_ld %}
-<script type="application/ld+json" nonce="{{ request.csp_nonce }}">{"@context":"https://schema.org","@type":"Product","name":"{{ product|escapejs }}","description":"{{ product.summary|escapejs }}","brand":{"@type":"Brand","name":"{{ site.company_name|escapejs }}"},"offers":{"@type":"Offer","priceCurrency":"NPR","price":"{{ product.price_npr|floatformat:0 }}","availability":"https://schema.org/InStock","url":"{{ SITE_URL }}{{ request.path }}"}}</script>
-{% endblock %}
+{% block json_ld %}{% schema "product" product %}{% endblock %}
 
 {% block content %}
 <section class="page-hero blueprint">
   <div class="container page-hero__inner">
-    <ol class="crumbs" aria-label="Breadcrumb"><li><a href="{% url 'core:home' %}">Home</a></li><li><a href="{% url 'commerce:store' %}">Store</a></li><li>{{ product.get_category_display }}</li></ol>
+    {% breadcrumbs "Pricing" "commerce:pricing" "Store" "commerce:store" product.name "" %}
     <div class="with-aside" style="align-items:start">
       <div class="stack" style="--stack:20px">
         <i class="ph ph-{{ product.icon }}" style="font-size:2.4rem;color:var(--blue)" data-hero-item></i>

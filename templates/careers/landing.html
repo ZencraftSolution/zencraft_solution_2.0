@@ -1,5 +1,6 @@
 {% extends "base.html" %}
-{% block title %}Careers at {{ site.company_name }} | Software jobs in Rupandehi, Nepal{% endblock %}
+{% load zc %}
+{% block title %}{% page_title "Careers: software jobs in Rupandehi" %}{% endblock %}
 {% block meta_description %}Join Zencraft Solution. Open roles for developers, QA engineers, designers, DevOps and support in Tilottama, Rupandehi and remote across Nepal.{% endblock %}
 {% block cta_band %}{% endblock %}
 
@@ -7,7 +8,7 @@
 <section class="page-hero blueprint">
   <div class="container page-hero__inner page-hero__inner--media">
     <div class="page-hero__copy">
-      <ol class="crumbs" aria-label="Breadcrumb"><li><a href="{% url 'core:home' %}">Home</a></li><li>Careers</li></ol>
+      {% breadcrumbs "Careers" "" %}
       <h1 class="h1" data-split>Do the best engineering work of your career, from Nepal</h1>
       <p class="lead" data-hero-item>Real products, thoughtful code review and a clear path to grow. {{ job_count }} open role{{ job_count|pluralize }} right now.</p>
       <div class="page-hero__actions" data-hero-item>
@@ -15,7 +16,7 @@
       </div>
     </div>
     <div class="page-hero__media" data-hero-visual>
-      <img src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=1200&h=900&q=80" alt="Zencraft engineers planning a sprint together" width="1200" height="900" data-seed="careers-team">
+      <img src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=1200&h=900&q=80" alt="Zencraft engineers planning a sprint together" fetchpriority="high" width="1200" height="900" data-seed="careers-team">
     </div>
   </div>
 </section>

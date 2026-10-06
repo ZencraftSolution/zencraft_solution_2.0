@@ -1,9 +1,10 @@
 {% extends "base.html" %}
+{% load zc %}
 {% block cta_band %}{% endblock %}
 {% block content %}
 <section class="page-hero blueprint">
   <div class="container" style="padding-block:clamp(40px,6vw,72px)">
-    <ol class="crumbs" aria-label="Breadcrumb"><li><a href="{% url 'core:home' %}">Home</a></li><li>Legal</li></ol>
+    {% breadcrumbs "Legal" "" %}
     <h1 class="h1 mt-2" data-split>{% block legal_title %}{% endblock %}</h1>
     <p class="mono muted mt-2" data-hero-item style="font-size:.85rem">Last updated 1 September 2026</p>
     <ul class="chips mt-3" data-hero-item>

@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Search{% if q %}: {{ q }}{% endif %} | {{ site.company_name }}{% endblock %}
+{% block robots %}<meta name="robots" content="noindex, follow">{% endblock %}
 {% block content %}
 <section class="page-hero blueprint">
   <div class="container" style="padding-block:clamp(40px,6vw,80px)">

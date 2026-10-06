@@ -3,29 +3,37 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}{{ site.company_name }}: custom software, web and mobile development in Nepal{% endblock %}</title>
+  <title>{% block title %}{% page_title "Custom software, web and mobile development in Nepal" "" %}{% endblock %}</title>
   <meta name="description" content="{% block meta_description %}{{ site.company_name }} designs, builds and supports custom software, web platforms and mobile apps for businesses in Nepal and abroad.{% endblock %}">
-  <link rel="canonical" href="{{ SITE_URL }}{{ request.path }}">
+  {# Built from SITE_URL, not the Host header, and without tracking parameters, so one page has
+     one address however it was linked to. #}
+  <link rel="canonical" href="{% canonical %}">
+  {% block robots %}{% endblock %}
   <meta name="theme-color" content="#ffffff">
+
   <meta property="og:type" content="{% block og_type %}website{% endblock %}">
   <meta property="og:site_name" content="{{ site.company_name }}">
-  <meta property="og:title" content="{% block og_title %}{{ site.company_name }}{% endblock %}">
-  <meta property="og:description" content="{% block og_description %}{{ site.tagline }}{% endblock %}">
-  <meta property="og:url" content="{{ SITE_URL }}{{ request.path }}">
-  <meta property="og:image" content="{% block og_image %}https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=1200&h=630&q=80{% endblock %}">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:url" content="{% canonical %}">
   <meta name="twitter:card" content="summary_large_image">
+  {% block social_meta %}{% share_meta site.company_name site.tagline %}{% endblock %}
   <link rel="icon" href="{% static 'img/favicon.ico' %}" sizes="48x48">
   <link rel="icon" type="image/png" sizes="32x32" href="{% static 'img/favicon-32.png' %}">
   <link rel="icon" type="image/png" sizes="192x192" href="{% static 'img/favicon-192.png' %}">
   <link rel="apple-touch-icon" href="{% static 'img/apple-touch-icon.png' %}">
 
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  {# Fonts, icons and stylesheets are served from this origin: no DNS lookup, TLS handshake and
+     round trip to two more hosts before the first paint. Regenerate with scripts/fetch_fonts.py
+     and scripts/fetch_icons.py. #}
   <link rel="preconnect" href="https://images.unsplash.com">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@500;600&display=swap">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/regular/style.css">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/fill/style.css">
+  <link rel="preload" href="{% static 'fonts/geist-400-latin.woff2' %}" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="{% static 'fonts/geist-600-latin.woff2' %}" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="{% static 'css/fonts.css' %}">
   <link rel="stylesheet" href="{% static 'css/main.css' %}">
+  {# Loaded normally rather than with the media="print" onload swap: that trick needs an inline
+     event handler, which this site's Content-Security-Policy refuses. Self-hosted the stylesheet
+     compresses to a fraction of its size and the font itself only downloads when an icon paints. #}
+  <link rel="stylesheet" href="{% static 'css/icons.css' %}">
 
   <script nonce="{{ request.csp_nonce }}">
     (function () {
@@ -59,7 +67,8 @@
     })();
   </script>
 
-  <script type="application/ld+json" nonce="{{ request.csp_nonce }}">{"@context":"https://schema.org","@type":"Organization","name":"{{ site.company_name|escapejs }}","url":"{{ SITE_URL }}","logo":"{{ SITE_URL }}{% static 'img/favicon-192.png' %}","email":"{{ site.email }}","telephone":"{{ site.phone|escapejs }}","address":{"@type":"PostalAddress","streetAddress":"{{ site.address|escapejs }}","addressCountry":"NP"}}</script>
+  {% schema "organization" %}
+  {% schema "website" %}
   {% block json_ld %}{% endblock %}
   {% block extra_head %}{% endblock %}
 </head>

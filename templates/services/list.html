@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 {% load zc %}
-{% block title %}Software development services | {{ site.company_name }}{% endblock %}
+{% block title %}{% page_title "Software development services" %}{% endblock %}
 {% block meta_description %}Custom software, web and mobile development, IT consulting, QA, data analytics, help desk and infrastructure services from Zencraft Solution in Nepal.{% endblock %}
 
 {% block content %}
 <section class="page-hero blueprint">
   <div class="container page-hero__inner">
     <div class="page-hero__copy" style="max-width:780px">
-      <ol class="crumbs" aria-label="Breadcrumb"><li><a href="{% url 'core:home' %}">Home</a></li><li>Services</li></ol>
+      {% breadcrumbs "Services" "" %}
       <h1 class="h1" data-split>Engineering services for the whole life of your software</h1>
       <p class="lead" data-hero-item>Plan it, build it, test it, run it and support it. Use one service or combine several under a single team and contract.</p>
     </div>

@@ -1,12 +1,13 @@
 {% extends "base.html" %}
-{% block title %}Open roles | Careers | {{ site.company_name }}{% endblock %}
-{% block meta_description %}Browse open software engineering, QA, design, DevOps and support jobs at Zencraft Solution.{% endblock %}
+{% load zc %}
+{% block title %}{% page_title "Open roles" "Careers" %}{% endblock %}
+{% block meta_description %}Browse every open software engineering, QA, design, DevOps and support role at Zencraft Solution, with the salary range published on each one.{% endblock %}
 {% block cta_band %}{% endblock %}
 
 {% block content %}
 <section class="page-hero blueprint">
   <div class="container" style="padding-block:clamp(40px,6vw,72px)">
-    <ol class="crumbs" aria-label="Breadcrumb"><li><a href="{% url 'core:home' %}">Home</a></li><li><a href="{% url 'careers:landing' %}">Careers</a></li><li>Open roles</li></ol>
+    {% breadcrumbs "Careers" "careers:landing" "Open roles" "" %}
     <h1 class="h1 mt-2" data-split>Open roles</h1>
     <p class="lead mt-2" data-hero-item>Filter by team, level, contract type and where you want to work.</p>
   </div>
@@ -26,12 +27,13 @@
       <button class="btn btn--dark" type="submit" data-job-submit>Filter</button>
     </form>
 
+    <h2 class="h3" style="margin-bottom:20px" data-reveal>{{ jobs|length }} open role{{ jobs|length|pluralize }}</h2>
     <div data-job-list style="position:relative">
       {% for job in jobs %}{% include "careers/_job_row.html" with job=job %}{% endfor %}
     </div>
     <div class="empty-state" data-job-empty {% if jobs %}hidden{% endif %}>
       <i class="ph ph-magnifying-glass"></i>
-      <h3>No roles match these filters</h3>
+      <h2 class="h3">No roles match these filters</h2>
       <p>Try widening your search, or send a speculative application to {{ site.careers_email }}.</p>
     </div>
   </div>

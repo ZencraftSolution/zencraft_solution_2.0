@@ -1,29 +1,16 @@
 {% extends "base.html" %}
-{% block title %}{{ job.title }} | Careers | {{ site.company_name }}{% endblock %}
-{% block meta_description %}{{ job.summary }}{% endblock %}
+{% load zc %}
+{% block title %}{% page_title job.seo_title|default:job.title "Careers" %}{% endblock %}
+{% block meta_description %}{% page_description job.seo_description|default:job.summary %}{% endblock %}
+{% block social_meta %}{% share_meta job.title job.seo_description|default:job.summary %}{% endblock %}
 {% block cta_band %}{% endblock %}
 
-{% block json_ld %}
-<script type="application/ld+json" nonce="{{ request.csp_nonce }}">{
-  "@context": "https://schema.org/",
-  "@type": "JobPosting",
-  "title": "{{ job.title|escapejs }}",
-  "description": "<p>{{ job.description|escapejs }}</p><ul>{% for r in job.responsibility_list %}<li>{{ r|escapejs }}</li>{% endfor %}</ul>",
-  "identifier": {"@type": "PropertyValue", "name": "{{ site.company_name|escapejs }}", "value": "{{ job.slug }}"},
-  "datePosted": "{{ job.posted_at|date:'Y-m-d' }}",
-  {% if job.closing_date %}"validThrough": "{{ job.closing_date|date:'Y-m-d' }}T23:59:00+05:45",{% endif %}
-  "employmentType": "{% if job.employment_type == 'full-time' %}FULL_TIME{% elif job.employment_type == 'part-time' %}PART_TIME{% elif job.employment_type == 'contract' %}CONTRACTOR{% else %}INTERN{% endif %}",
-  "hiringOrganization": {"@type": "Organization", "name": "{{ site.company_name|escapejs }}", "sameAs": "{{ SITE_URL }}"},
-  {% if job.work_mode == "remote" %}"jobLocationType": "TELECOMMUTE", "applicantLocationRequirements": {"@type": "Country", "name": "Nepal"},{% endif %}
-  "jobLocation": {"@type": "Place", "address": {"@type": "PostalAddress", "streetAddress": "Tilottama Municipality-3", "addressLocality": "Rupandehi", "addressCountry": "NP"}}{% if job.show_salary and job.salary_min_npr %},
-  "baseSalary": {"@type": "MonetaryAmount", "currency": "NPR", "value": {"@type": "QuantitativeValue", "minValue": {{ job.salary_min_npr|floatformat:0 }}, "maxValue": {{ job.salary_max_npr|floatformat:0 }}, "unitText": "MONTH"}}{% endif %}
-}</script>
-{% endblock %}
+{% block json_ld %}{% schema "job" job %}{% endblock %}
 
 {% block content %}
 <section class="page-hero blueprint">
   <div class="container" style="padding-block:clamp(40px,6vw,80px)">
-    <ol class="crumbs" aria-label="Breadcrumb"><li><a href="{% url 'core:home' %}">Home</a></li><li><a href="{% url 'careers:jobs' %}">Open roles</a></li><li>{{ job.department.name }}</li></ol>
+    {% breadcrumbs "Careers" "careers:landing" "Open roles" "careers:jobs" job.title "" %}
     <h1 class="h1 mt-2" data-split>{{ job.title }}</h1>
     <p class="lead mt-2" data-hero-item>{{ job.summary }}</p>
     <div class="job-row__meta mt-3" data-hero-item>

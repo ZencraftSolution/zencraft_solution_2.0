@@ -45,6 +45,11 @@ class JobOpening(models.Model):
     posted_at = models.DateField(default=timezone.localdate)
     closing_date = models.DateField(null=True, blank=True)
 
+    # Optional overrides for what a search result shows. Left empty, one is built from the
+    # content above, trimmed to the length Google actually displays.
+    seo_title = models.CharField(max_length=60, blank=True, help_text="Overrides the search-result title.")
+    seo_description = models.CharField(max_length=160, blank=True, help_text="Overrides the search-result description. Aim for 70 to 160 characters.")
+
     class Meta:
         ordering = ["department__order", "-posted_at"]
 

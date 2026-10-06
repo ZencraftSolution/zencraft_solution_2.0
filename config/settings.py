@@ -273,8 +273,9 @@ CSP_DIRECTIVES = {
     "default-src": ["'self'"],
     # jsdelivr: GSAP. cdnjs: highlight.js on case study pages.
     "script-src": ["'self'", "{nonce}", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"],
-    "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdn.jsdelivr.net"],
-    "font-src": ["'self'", "https://fonts.gstatic.com", "https://cdn.jsdelivr.net", "data:"],
+    # Fonts and icons are served from this origin now, so no third party can supply either.
+    "style-src": ["'self'", "'unsafe-inline'"],
+    "font-src": ["'self'", "data:"],
     "img-src": [
         "'self'",
         "data:",

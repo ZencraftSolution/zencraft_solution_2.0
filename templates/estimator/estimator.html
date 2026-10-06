@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static zc %}
 {% block title %}Project cost estimator | {{ site.company_name }}{% endblock %}
 {% block meta_description %}Get an indicative budget range, timeline and team for your software project in about five minutes. NPR and USD.{% endblock %}
 {% block cta_band %}{% endblock %}
@@ -7,7 +7,7 @@
 {% block content %}
 <section class="page-hero blueprint">
   <div class="container" style="padding-block:clamp(36px,5vw,64px)">
-    <ol class="crumbs" aria-label="Breadcrumb"><li><a href="{% url 'core:home' %}">Home</a></li><li>Project estimator</li></ol>
+    {% breadcrumbs "Project estimator" "" %}
     <h1 class="h1 mt-2" data-split>Estimate your project in five minutes</h1>
     <p class="lead mt-2" data-hero-item>Six short questions. You get an honest range, a likely timeline and the team shape we would propose.</p>
   </div>

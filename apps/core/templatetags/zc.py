@@ -2,9 +2,12 @@ import json
 import random
 
 from django import template
+from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 
+from apps.core import seo
+from apps.core import structured_data as sd
 from apps.core.models import SiteSettings
 from apps.core.utils import format_npr, format_usd, npr_to_usd
 
@@ -79,13 +82,17 @@ def pad2(value):
         return value
 
 
-@register.simple_tag
-def json_ld(data):
+@register.simple_tag(takes_context=True)
+def json_ld(context, data):
     """Renders a structured-data block. Not executable, and not a place user input reaches."""
     # json.dumps escapes the content and "</" is broken up, so the payload cannot close the tag
     # early. The data comes from our own models, never from a request.
-    payload = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
-    return mark_safe(f'<script type="application/ld+json">{payload}</script>')  # noqa: S308  # nosec B308 B703 - escaped above
+    payload = json.dumps(data, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
+    # A data block is never executed, so the nonce is not required; carrying it anyway keeps
+    # "every script tag on the page has one" true, which is a far easier rule to check.
+    request = context.get("request")
+    nonce = f' nonce="{request.csp_nonce}"' if request is not None and hasattr(request, "csp_nonce") else ""
+    return mark_safe(f'<script type="application/ld+json"{nonce}>{payload}</script>')  # noqa: S308  # nosec B308 B703 - escaped above
 
 
 @register.simple_tag
@@ -123,3 +130,112 @@ def star_range(value):
         return range(int(value))
     except (TypeError, ValueError):
         return range(0)
+
+
+@register.simple_tag(takes_context=True)
+def page_title(context, primary, suffix=""):
+    """The <title> for a page, trimmed to what a search result shows.
+
+    Used instead of writing "X | Zencraft Solution" by hand in every template, which is how
+    titles drifted to 104 characters and got cut off mid-sentence in the results.
+    """
+    site_settings = context.get("site")
+    brand = getattr(site_settings, "company_name", "Zencraft Solution")
+    return seo.compose_title(primary, brand, suffix)
+
+
+@register.simple_tag
+def page_description(value, fallback=""):
+    """The meta description, trimmed on a word boundary."""
+    return seo.compose_description(value, fallback)
+
+
+@register.simple_tag(takes_context=True)
+def canonical(context):
+    """The absolute URL this page should be indexed under, without tracking parameters."""
+    request = context.get("request")
+    return seo.canonical_url(request) if request else ""
+
+
+@register.simple_tag
+def absolute_url(value):
+    """Turns a stored path into an absolute URL, for og:image and structured data."""
+    return seo.absolute(value)
+
+
+@register.inclusion_tag("partials/share_meta.html", takes_context=True)
+def share_meta(context, title, description, image=""):
+    """Renders every Open Graph and Twitter tag from one title, description and image."""
+    site_settings = context.get("site")
+    return {
+        "share_title": seo.truncate_title(title, 70),
+        "share_description": seo.compose_description(description),
+        "share_image": seo.absolute(image or getattr(site_settings, "share_image_src", "")),
+        "share_image_alt": getattr(site_settings, "company_name", "Zencraft Solution"),
+    }
+
+
+@register.simple_tag(takes_context=True)
+def schema(context, kind, obj=None, *extra):
+    """Renders one structured-data block, built in apps/core/structured_data.py.
+
+    Templates ask for a kind rather than writing JSON, so every page's blocks share one shape
+    and the tests can assert on them.
+    """
+    site_settings = context.get("site")
+    builders = {
+        "organization": lambda: sd.organization(site_settings),
+        "website": lambda: sd.website(site_settings),
+        "service": lambda: sd.service(obj, site_settings),
+        "article": lambda: sd.article(obj, site_settings),
+        "case_study": lambda: sd.case_study(obj, site_settings),
+        "job": lambda: sd.job_posting(obj, site_settings),
+        "product": lambda: sd.product(obj, site_settings),
+        "faq": lambda: sd.faq_page(obj or []),
+    }
+    data = builders[kind]()
+    return json_ld(context, data) if data else ""
+
+
+@register.inclusion_tag("partials/breadcrumbs.html", takes_context=True)
+def breadcrumbs(context, *pairs):
+    """Renders the visible trail and its BreadcrumbList from one list of label/URL pairs.
+
+    Takes label, url, label, url, ... with an empty url for the page you are on. Keeping both
+    outputs on one source is the point: a visible trail that disagrees with the structured data
+    is worse than having neither.
+    """
+    items = [(pairs[i], _trail_url(pairs[i + 1])) for i in range(0, len(pairs) - 1, 2)]
+    full = [("Home", reverse("core:home")), *items]
+    return {"items": full, "json_ld": json_ld(context, sd.breadcrumbs(full))}
+
+
+def _trail_url(value):
+    """Accepts a URL name ("blog:list"), a path, or "" for the page you are already on."""
+    if not value:
+        return ""
+    if ":" in value and "/" not in value:
+        return reverse(value)
+    return value
+
+
+# Widths offered to the browser. A phone on a Nepali mobile network should not download a
+# 1200px image to paint it 380px wide.
+SRCSET_WIDTHS = (480, 768, 1200, 1600)
+
+
+@register.simple_tag
+def srcset(url, widths=None):
+    """Builds a srcset for an image, when the host can resize it on request.
+
+    Cloudinary and Unsplash both do. Anything else is returned empty, so the template falls back
+    to the single src rather than offering the same file four times under four different widths.
+    """
+    if not url:
+        return ""
+    widths = widths or SRCSET_WIDTHS
+    candidates = [(seo.image_at_width(url, width), width) for width in widths]
+    usable = [(resized, width) for resized, width in candidates if resized]
+    if not usable:
+        return ""
+    return mark_safe(", ".join(f"{resized} {width}w" for resized, width in usable))  # noqa: S308  # nosec B308 B703 - URLs built from our own data

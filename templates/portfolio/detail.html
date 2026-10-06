@@ -1,7 +1,9 @@
 {% extends "base.html" %}
 {% load static zc %}
-{% block title %}{{ case.title }} | Case study | {{ site.company_name }}{% endblock %}
-{% block meta_description %}{{ case.summary }}{% endblock %}
+{% block title %}{% page_title case.seo_title|default:case.title "Case study" %}{% endblock %}
+{% block meta_description %}{% page_description case.seo_description|default:case.summary %}{% endblock %}
+{% block json_ld %}{% schema "case_study" case %}{% endblock %}
+{% block social_meta %}{% share_meta case.title case.seo_description|default:case.summary case.cover_image_url %}{% endblock %}
 {% block og_type %}article{% endblock %}
 {% block og_image %}{{ case.cover_image_url }}{% endblock %}
 
@@ -9,7 +11,7 @@
 <article>
   <header class="page-hero blueprint">
     <div class="container" style="padding-block:clamp(40px,6vw,80px)">
-      <ol class="crumbs" aria-label="Breadcrumb"><li><a href="{% url 'core:home' %}">Home</a></li><li><a href="{% url 'portfolio:list' %}">Work</a></li>{% if case.industry %}<li>{{ case.industry.name }}</li>{% endif %}</ol>
+      {% breadcrumbs "Work" "portfolio:list" case.title "" %}
       <div class="grid-2 mt-3" style="align-items:end">
         <div class="stack" style="--stack:18px">
           <p class="label" data-hero-item>{{ case.client_name }}</p>
@@ -23,7 +25,7 @@
         </ul>
       </div>
       <div class="case-hero__media" data-hero-visual>
-        <img src="{{ case.cover_image_url }}" alt="{{ case.title }}" width="1600" height="686" fetchpriority="high" data-seed="{{ case.slug }}">
+        <img src="{{ case.cover_image_url }}" srcset="{% srcset case.cover_image_url %}" sizes="(min-width: 1200px) 1200px, 100vw" alt="{{ case.title }}" width="1600" height="686" fetchpriority="high" data-seed="{{ case.slug }}">
       </div>
     </div>
   </header>

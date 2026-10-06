@@ -70,6 +70,10 @@ class Industry(models.Model):
     challenges = models.TextField(help_text="One challenge per line")
     solutions = models.TextField(help_text="One solution per line")
     image_url = models.URLField()
+    # Optional overrides for what a search result shows. Left empty, one is built from the
+    # content above, trimmed to the length Google actually displays.
+    seo_title = models.CharField(max_length=60, blank=True, help_text="Overrides the search-result title.")
+    seo_description = models.CharField(max_length=160, blank=True, help_text="Overrides the search-result description. Aim for 70 to 160 characters.")
     order = models.PositiveIntegerField(default=0)
     faqs = GenericRelation(FAQ)
 

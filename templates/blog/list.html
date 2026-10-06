@@ -1,11 +1,12 @@
 {% extends "base.html" %}
-{% block title %}{% if active_category %}{{ active_category.name }} | {% endif %}Insights | {{ site.company_name }}{% endblock %}
+{% load zc %}
+{% block title %}{% if active_category %}{% page_title active_category.name "Insights" %}{% else %}{% page_title "Insights: engineering and product notes" %}{% endif %}{% endblock %}
 {% block meta_description %}Practical articles on software engineering, product strategy, cloud and careers from the Zencraft Solution team.{% endblock %}
 
 {% block content %}
 <section class="page-hero blueprint">
   <div class="container" style="padding-block:clamp(40px,6vw,80px)">
-    <ol class="crumbs" aria-label="Breadcrumb"><li><a href="{% url 'core:home' %}">Home</a></li><li>Insights</li></ol>
+    {% breadcrumbs "Insights" "" %}
     <div class="flex justify-between items-center flex-wrap gap-2 mt-2">
       <h1 class="h1" data-split>{% if active_category %}{{ active_category.name }}{% else %}Insights from the team{% endif %}</h1>
       <form method="get" role="search" class="flex gap-1" style="width:min(100%,380px)" data-hero-item>
@@ -27,7 +28,7 @@
 
     {% if lead %}
     <a class="grid-2 post-card" style="align-items:center;margin-bottom:64px" href="{{ lead.get_absolute_url }}" data-reveal>
-      <div class="post-card__media"><img src="{{ lead.hero_image_url }}" alt="" width="1200" height="750" data-seed="{{ lead.slug }}"></div>
+      <div class="post-card__media"><img src="{{ lead.hero_image_url }}" srcset="{% srcset lead.hero_image_url %}" sizes="(min-width: 900px) 760px, 100vw" alt="" fetchpriority="high" width="1200" height="750" data-seed="{{ lead.slug }}"></div>
       <div class="stack" style="--stack:14px">
         <div class="post-card__meta"><span>{{ lead.category.name }}</span><span>{{ lead.published_at|date:"j M Y" }}</span><span>{{ lead.reading_minutes }} min read</span></div>
         <h2 class="h2">{{ lead.title }}</h2>

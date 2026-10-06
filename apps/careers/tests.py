@@ -1,4 +1,5 @@
 import io
+import json
 from datetime import timedelta
 from decimal import Decimal
 from unittest import mock
@@ -12,6 +13,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.careers.models import JobApplication
+from apps.core import seo
 from apps.core.models import ScannedUpload
 from apps.core.testing import (
     NOOP_SCAN,
@@ -82,7 +84,8 @@ class CareersViewTests(TestCase):
 
     def test_job_detail_json_ld_and_inactive_404(self):
         response = self.client.get(self.job.get_absolute_url())
-        self.assertContains(response, '"@type": "JobPosting"')
+        types = {json.loads(block).get("@type") for block in seo.parse(response.content.decode()).json_ld}
+        self.assertIn("JobPosting", types)
         self.assertContains(response, "Apply for this role")
         self.job.is_active = False
         self.job.save()

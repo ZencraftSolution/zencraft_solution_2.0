@@ -1,12 +1,13 @@
 {% extends "base.html" %}
-{% block title %}Technology stack | {{ site.company_name }}{% endblock %}
+{% load zc %}
+{% block title %}{% page_title "Our technology stack" %}{% endblock %}
 {% block meta_description %}The languages, frameworks, databases, cloud platforms and testing tools Zencraft Solution engineers use in production.{% endblock %}
 
 {% block content %}
 <section class="page-hero blueprint">
   <div class="container page-hero__inner">
     <div class="page-hero__copy" style="max-width:780px">
-      <ol class="crumbs" aria-label="Breadcrumb"><li><a href="{% url 'core:home' %}">Home</a></li><li>Technologies</li></ol>
+      {% breadcrumbs "Technologies" "" %}
       <h1 class="h1" data-split>{{ total }} technologies we run in production today</h1>
       <p class="lead" data-hero-item>We pick proven, well-supported tools your future team can hire for. Each one below is in use on at least one live client system.</p>
     </div>
