@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Apply: {{ job.title }} | {{ site.company_name }}{% endblock %}
+{% block cta_band %}{% endblock %}
+
+{% block content %}
+<section class="page-hero blueprint">
+  <div class="container" style="padding-block:clamp(36px,5vw,64px)">
+    <ol class="crumbs" aria-label="Breadcrumb"><li><a href="{% url 'careers:jobs' %}">Open roles</a></li><li><a href="{{ job.get_absolute_url }}">{{ job.title }}</a></li><li>Apply</li></ol>
+    <h1 class="h1 mt-2" data-split>Apply for {{ job.title }}</h1>
+    <p class="lead mt-2" data-hero-item>Five short steps. Start with your email address so we can check you have not already applied for this role.</p>
+  </div>
+</section>
+
+<section class="section" style="padding-top:clamp(40px,5vw,64px)">
+  <div class="container with-aside">
+    <div>
+      {% include "careers/_apply_steps.html" %}
+      <form method="post" class="form-card mt-4" novalidate>
+        {% csrf_token %}
+        {% include "partials/honeypot.html" %}
+        <div class="form-section form-section--first">
+          <h2>Step 1 of 5: your email</h2>
+          <p class="muted" style="margin:-8px 0 20px;font-size:.95rem">We use it to send your reference number and every update about this application.</p>
+          {% if form.non_field_errors %}
+          <div class="notice notice--error" role="alert" style="margin-bottom:20px"><i class="ph ph-warning-circle"></i>
+            <span>{% for e in form.non_field_errors %}{{ e }}{% endfor %}</span>
+          </div>
+          {% endif %}
+          <div class="form-grid">
+            {% include "partials/field.html" with field=form.email %}
+          </div>
+          <button class="btn btn--primary mt-3" type="submit">Continue to step 2 <i class="ph ph-arrow-right"></i></button>
+        </div>
+      </form>
+    </div>
+
+    <aside class="aside-sticky">
+      <div class="form-card">
+        <p class="label">You are applying for</p>
+        <h2 class="h3 mt-1">{{ job.title }}</h2>
+        <ul class="fact-list mt-2">
+          <li><span>Team</span><strong>{{ job.department.name }}</strong></li>
+          <li><span>Level</span><strong>{{ job.get_experience_level_display }}</strong></li>
+          <li><span>Location</span><strong>{{ job.get_work_mode_display }}</strong></li>
+        </ul>
+        <a class="text-link mt-2" href="{{ job.get_absolute_url }}"><i class="ph ph-arrow-left"></i> Back to role details</a>
+      </div>
+    </aside>
+  </div>
+</section>
+{% endblock %}

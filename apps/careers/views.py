@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.contrib import messages
 from django.core.mail import send_mail
 from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
@@ -8,8 +9,44 @@ from django.utils import timezone
 from apps.core.utils import make_reference, rate_limit
 from apps.portfolio.models import GalleryImage
 
-from .forms import EducationFormSet, ExperienceFormSet, JobApplicationForm, ProjectFormSet
+from .forms import (
+    DUPLICATE_MESSAGE,
+    ApplyEmailForm,
+    EducationFormSet,
+    ExperienceFormSet,
+    JobApplicationForm,
+    ProjectFormSet,
+    already_applied,
+)
 from .models import Department, JobApplication, JobOpening
+
+# Every step of an application, shown as a marked progress bar from the first screen to the last.
+APPLY_STEPS = [
+    ("Your email", "The address we reply to"),
+    ("About you", "Name, contact and availability"),
+    ("Your experience", "Upload a CV, or fill it in here"),
+    ("Links", "Profiles and a cover letter"),
+    ("Review and send", "Check it over and submit"),
+]
+SESSION_KEY = "apply_email"
+
+# Which step a field belongs to, so a rejected form reopens on the step that needs fixing.
+STEP_FIELDS = {
+    2: ["full_name", "email", "phone", "current_location", "years_experience", "notice_period", "expected_salary_npr", "source"],
+    3: ["application_mode", "cv", "headline", "professional_summary", "skills"],
+    4: ["github_url", "linkedin_url", "portfolio_url", "cover_letter"],
+    5: ["consent"],
+}
+
+
+def apply_steps(current, done_through=None):
+    """Builds the marked step list: everything before `current` is done, the rest is still to come."""
+    done_through = current - 1 if done_through is None else done_through
+    steps = []
+    for number, (title, hint) in enumerate(APPLY_STEPS, start=1):
+        state = "done" if number <= done_through else "current" if number == current else "todo"
+        steps.append({"number": number, "title": title, "hint": hint, "state": state})
+    return steps
 
 BENEFITS = [
     ("heartbeat", "Health cover for you and your family", "Group medical insurance from day one, including parents on request."),
@@ -86,15 +123,40 @@ def job_detail(request, slug):
     return render(request, "careers/job_detail.html", {"job": job, "similar": similar})
 
 
-@rate_limit("apply", limit=6, window=1800)
+@rate_limit("apply_email", limit=10, window=1800)
 def apply(request, slug):
+    """Step 1. The email on its own, so a repeat applicant hears about it before filling anything in."""
     job = get_object_or_404(JobOpening, slug=slug, is_active=True)
     if not job.is_open:
         return render(request, "careers/closed.html", {"job": job}, status=410)
 
+    form = ApplyEmailForm(request.POST or None, job=job, initial={"email": _remembered_email(request, job)})
+    if request.method == "POST" and form.is_valid():
+        _remember_email(request, job, form.cleaned_data["email"])
+        return redirect("careers:apply_details", slug=job.slug)
+
+    return render(request, "careers/apply_email.html", {"job": job, "form": form, "steps": apply_steps(1, done_through=0)})
+
+
+@rate_limit("apply", limit=6, window=1800)
+def apply_details(request, slug):
+    """Steps 2 to 5. One submit, so the CV upload and the manual history still go in together."""
+    job = get_object_or_404(JobOpening, slug=slug, is_active=True)
+    if not job.is_open:
+        return render(request, "careers/closed.html", {"job": job}, status=410)
+
+    email = _remembered_email(request, job)
+    if not email:
+        return redirect("careers:apply", slug=job.slug)
+    if already_applied(job, email):
+        # The address was used for this role between the two steps.
+        _forget_email(request, job)
+        messages.error(request, DUPLICATE_MESSAGE)
+        return redirect("careers:apply", slug=job.slug)
+
     data = request.POST or None
     files = request.FILES or None
-    form = JobApplicationForm(data, files, job=job)
+    form = JobApplicationForm(data, files, job=job, locked_email=email)
     edu = EducationFormSet(data, prefix="edu", instance=JobApplication())
     exp = ExperienceFormSet(data, prefix="exp", instance=JobApplication())
     prj = ProjectFormSet(data, prefix="prj", instance=JobApplication())
@@ -136,14 +198,43 @@ def apply(request, slug):
                 f"{application.full_name} <{application.email}>, {application.years_experience} years, {application.get_application_mode_display()}",
                 settings.DEFAULT_FROM_EMAIL, [settings.INTERNAL_NOTIFY_EMAIL], fail_silently=True,
             )
+            _forget_email(request, job)
             request.session["last_application"] = {"ref": application.reference, "job": job.title, "name": application.full_name.split(" ")[0]}
             return redirect("careers:applied")
 
+    current = _first_step_with_errors(form, manual_error, edu, exp, prj) if request.method == "POST" else 2
     return render(request, "careers/apply.html", {
         "job": job, "form": form, "edu": edu, "exp": exp, "prj": prj, "manual_error": manual_error,
+        "email": email, "steps": apply_steps(current), "current_step": current,
     })
+
+
+def _first_step_with_errors(form, manual_error, *formsets):
+    """Reopens the form on the earliest step that still needs attention."""
+    for step, names in sorted(STEP_FIELDS.items()):
+        if any(name in form.errors for name in names):
+            return step
+        if step == 3 and (manual_error or any(fs.total_error_count() for fs in formsets)):
+            return step
+    return 5 if form.errors else 2
+
+
+def _remembered_email(request, job):
+    return (request.session.get(SESSION_KEY) or {}).get(job.slug, "")
+
+
+def _remember_email(request, job, email):
+    emails = request.session.get(SESSION_KEY) or {}
+    emails[job.slug] = email
+    request.session[SESSION_KEY] = emails
+
+
+def _forget_email(request, job):
+    emails = request.session.get(SESSION_KEY) or {}
+    if emails.pop(job.slug, None) is not None:
+        request.session[SESSION_KEY] = emails
 
 
 def applied(request):
     info = request.session.get("last_application")
-    return render(request, "careers/applied.html", {"info": info})
+    return render(request, "careers/applied.html", {"info": info, "steps": apply_steps(len(APPLY_STEPS) + 1)})

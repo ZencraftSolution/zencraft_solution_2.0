@@ -1,0 +1,13 @@
+{# Marks every step of an application. JS re-marks these as the applicant moves between steps 2 to 5. #}
+<ol class="steps" data-steps aria-label="Application progress">
+  {% for step in steps %}
+  <li class="step is-{{ step.state }}" data-step-marker="{{ step.number }}"{% if step.state == "current" %} aria-current="step"{% endif %}>
+    <span class="step__dot" aria-hidden="true">{% if step.state == "done" %}<i class="ph ph-check"></i>{% else %}{{ step.number }}{% endif %}</span>
+    <span class="step__text">
+      <strong>{{ step.title }}</strong>
+      <span class="step__hint">{{ step.hint }}</span>
+      <span class="sr-only" data-step-state>{% if step.state == "done" %}Completed{% elif step.state == "current" %}Current step{% else %}Not started{% endif %}</span>
+    </span>
+  </li>
+  {% endfor %}
+</ol>

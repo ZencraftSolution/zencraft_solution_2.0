@@ -4,7 +4,8 @@
 {% block content %}
 <section class="section">
   <div class="container container--narrow">
-    <div class="form-card">
+    {% include "careers/_apply_steps.html" %}
+    <div class="form-card mt-4">
       <div class="notice notice--success"><i class="ph ph-check-circle"></i><span>Your application arrived safely{% if info %} and a confirmation email is on its way{% endif %}.</span></div>
       <h1 class="h1 mt-3" data-split>{% if info %}Thank you, {{ info.name }}.{% else %}Thank you for applying.{% endif %}</h1>
       <p class="lead mt-2" data-hero-item>{% if info %}We have your application for <strong style="color:var(--ink)">{{ info.job }}</strong>. {% endif %}A member of the hiring team will review it within 5 working days.</p>

@@ -14,7 +14,9 @@
 
 <section class="section" style="padding-top:clamp(40px,5vw,64px)">
   <div class="container with-aside">
-    <form method="post" enctype="multipart/form-data" class="form-card" novalidate data-apply-form>
+    <div>
+      {% include "careers/_apply_steps.html" %}
+      <form method="post" enctype="multipart/form-data" class="form-card mt-4" novalidate data-apply-form data-start-step="{{ current_step }}" data-email-step="{% url 'careers:apply' job.slug %}">
       {% csrf_token %}
       {% include "partials/honeypot.html" %}
 
@@ -24,82 +26,98 @@
       </div>
       {% endif %}
 
-      <div class="form-section form-section--first">
-        <h2>How would you like to apply?</h2>
-        <div class="mode-switch" role="radiogroup" aria-label="Application method">
-          {% for radio in form.application_mode %}
-          <label class="tile">
-            {{ radio.tag }}
-            <span class="tile__body">
-              <i class="ph ph-{% if radio.data.value == 'cv' %}file-arrow-up{% else %}note-pencil{% endif %}"></i>
-              <strong>{% if radio.data.value == 'cv' %}Upload my CV{% else %}Fill in my CV manually{% endif %}</strong>
-              <span>{% if radio.data.value == 'cv' %}Attach a PDF or DOCX file you already have.{% else %}Add education, experience, projects and skills step by step.{% endif %}</span>
-            </span>
-          </label>
-          {% endfor %}
-        </div>
-      </div>
-
-      <div class="form-section">
-        <h2>About you</h2>
-        <div class="form-grid form-grid--2">
-          {% include "partials/field.html" with field=form.full_name %}
-          {% include "partials/field.html" with field=form.email %}
-          {% include "partials/field.html" with field=form.phone %}
-          {% include "partials/field.html" with field=form.current_location %}
-          {% include "partials/field.html" with field=form.years_experience %}
-          {% include "partials/field.html" with field=form.notice_period %}
-          {% include "partials/field.html" with field=form.expected_salary_npr %}
-          {% include "partials/field.html" with field=form.source %}
-        </div>
-      </div>
-
-      <div class="form-section" data-mode-panel="cv">
-        <h2>Your CV</h2>
-        {% include "partials/field.html" with field=form.cv %}
-      </div>
-
-      <div data-mode-panel="manual">
-        <div class="form-section">
-          <h2>Profile</h2>
-          <div class="form-grid">
-            {% include "partials/field.html" with field=form.headline %}
-            {% include "partials/field.html" with field=form.professional_summary %}
-            {% include "partials/field.html" with field=form.skills %}
+      <div data-step-panel="2">
+        <div class="form-section form-section--first">
+          <h2>Step 2 of 5: about you</h2>
+          <div class="form-grid form-grid--2">
+            {% include "partials/field.html" with field=form.full_name %}
+            {% include "partials/field.html" with field=form.email %}
+            {% include "partials/field.html" with field=form.phone %}
+            {% include "partials/field.html" with field=form.current_location %}
+            {% include "partials/field.html" with field=form.years_experience %}
+            {% include "partials/field.html" with field=form.notice_period %}
+            {% include "partials/field.html" with field=form.expected_salary_npr %}
+            {% include "partials/field.html" with field=form.source %}
           </div>
         </div>
-        <div class="form-section">
-          <h2>Work experience</h2>
-          <p class="muted" style="margin:-8px 0 16px;font-size:.92rem">Internships, freelance and part-time work all count. Add your most recent role first.</p>
-          {% include "careers/_formset.html" with formset=exp title="Experience" %}
+      </div>
+
+      <div data-step-panel="3">
+        <div class="form-section form-section--first">
+          <h2>Step 3 of 5: your experience</h2>
+          <div class="mode-switch" role="radiogroup" aria-label="Application method">
+            {% for radio in form.application_mode %}
+            <label class="tile">
+              {{ radio.tag }}
+              <span class="tile__body">
+                <i class="ph ph-{% if radio.data.value == 'cv' %}file-arrow-up{% else %}note-pencil{% endif %}"></i>
+                <strong>{% if radio.data.value == 'cv' %}Upload my CV{% else %}Fill in my CV manually{% endif %}</strong>
+                <span>{% if radio.data.value == 'cv' %}Attach a PDF or DOCX file you already have.{% else %}Add education, experience, projects and skills step by step.{% endif %}</span>
+              </span>
+            </label>
+            {% endfor %}
+          </div>
         </div>
-        <div class="form-section">
-          <h2>Education</h2>
-          {% include "careers/_formset.html" with formset=edu title="Education" %}
+
+        <div class="form-section" data-mode-panel="cv">
+          <h2>Your CV</h2>
+          {% include "partials/field.html" with field=form.cv %}
         </div>
-        <div class="form-section">
-          <h2>Projects</h2>
-          <p class="muted" style="margin:-8px 0 16px;font-size:.92rem">College projects, open source or side projects. Link to code or a demo if you can.</p>
-          {% include "careers/_formset.html" with formset=prj title="Project" %}
+
+        <div data-mode-panel="manual">
+          <div class="form-section">
+            <h2>Profile</h2>
+            <div class="form-grid">
+              {% include "partials/field.html" with field=form.headline %}
+              {% include "partials/field.html" with field=form.professional_summary %}
+              {% include "partials/field.html" with field=form.skills %}
+            </div>
+          </div>
+          <div class="form-section">
+            <h2>Work experience</h2>
+            <p class="muted" style="margin:-8px 0 16px;font-size:.92rem">Internships, freelance and part-time work all count. Add your most recent role first.</p>
+            {% include "careers/_formset.html" with formset=exp title="Experience" %}
+          </div>
+          <div class="form-section">
+            <h2>Education</h2>
+            {% include "careers/_formset.html" with formset=edu title="Education" %}
+          </div>
+          <div class="form-section">
+            <h2>Projects</h2>
+            <p class="muted" style="margin:-8px 0 16px;font-size:.92rem">College projects, open source or side projects. Link to code or a demo if you can.</p>
+            {% include "careers/_formset.html" with formset=prj title="Project" %}
+          </div>
         </div>
       </div>
 
-      <div class="form-section">
-        <h2>Links and cover letter</h2>
-        <div class="form-grid form-grid--2">
-          {% include "partials/field.html" with field=form.github_url %}
-          {% include "partials/field.html" with field=form.linkedin_url %}
-          {% include "partials/field.html" with field=form.portfolio_url span=True %}
-          {% include "partials/field.html" with field=form.cover_letter span=True %}
+      <div data-step-panel="4">
+        <div class="form-section form-section--first">
+          <h2>Step 4 of 5: links and cover letter</h2>
+          <div class="form-grid form-grid--2">
+            {% include "partials/field.html" with field=form.github_url %}
+            {% include "partials/field.html" with field=form.linkedin_url %}
+            {% include "partials/field.html" with field=form.portfolio_url span=True %}
+            {% include "partials/field.html" with field=form.cover_letter span=True %}
+          </div>
         </div>
       </div>
 
-      <div class="form-section">
-        <div class="notice" style="margin-bottom:18px"><i class="ph ph-lock-simple"></i><span>Your CV and personal details are stored privately and only visible to the hiring team for this role. Unsuccessful applications are deleted after 6 months. Read our <a class="text-link" href="{% url 'core:privacy' %}" target="_blank">privacy policy</a>.</span></div>
-        {% include "partials/field.html" with field=form.consent %}
-        <button class="btn btn--primary mt-3" type="submit" data-apply-submit>Submit application <i class="ph ph-paper-plane-tilt"></i></button>
+      <div data-step-panel="5">
+        <div class="form-section form-section--first">
+          <h2>Step 5 of 5: review and send</h2>
+          <ul class="review-list" data-review hidden></ul>
+          <div class="notice" style="margin-bottom:18px"><i class="ph ph-lock-simple"></i><span>Your CV and personal details are stored privately and only visible to the hiring team for this role. Unsuccessful applications are deleted after 6 months. Read our <a class="text-link" href="{% url 'core:privacy' %}" target="_blank">privacy policy</a>.</span></div>
+          {% include "partials/field.html" with field=form.consent %}
+        </div>
       </div>
-    </form>
+
+      <div class="step-nav" data-step-nav>
+        <a class="btn btn--ghost" href="{% url 'careers:apply' job.slug %}" data-step-back><i class="ph ph-arrow-left"></i> Back</a>
+        <button class="btn btn--primary" type="button" data-step-next hidden>Continue <i class="ph ph-arrow-right"></i></button>
+        <button class="btn btn--primary" type="submit" data-apply-submit>Submit application <i class="ph ph-paper-plane-tilt"></i></button>
+      </div>
+      </form>
+    </div>
 
     <aside class="aside-sticky">
       <div class="form-card">
@@ -109,6 +127,7 @@
           <li><span>Team</span><strong>{{ job.department.name }}</strong></li>
           <li><span>Level</span><strong>{{ job.get_experience_level_display }}</strong></li>
           <li><span>Location</span><strong>{{ job.get_work_mode_display }}</strong></li>
+          <li><span>Applying as</span><strong style="word-break:break-all">{{ email }}</strong></li>
         </ul>
         <a class="text-link mt-2" href="{{ job.get_absolute_url }}"><i class="ph ph-arrow-left"></i> Back to role details</a>
       </div>

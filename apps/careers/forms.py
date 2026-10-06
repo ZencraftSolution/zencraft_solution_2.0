@@ -1,13 +1,40 @@
-from datetime import timedelta
-
 from django import forms
 from django.forms import inlineformset_factory
-from django.utils import timezone
 
 from apps.core.forms import HoneypotMixin
 from apps.core.uploads import validate_document
 
 from .models import EducationEntry, ExperienceEntry, JobApplication, ProjectEntry
+
+DUPLICATE_MESSAGE = (
+    "This email address has already been used to apply for this role. "
+    "One application per role is enough: yours is with the hiring team and we will be in touch."
+)
+
+
+def already_applied(job, email):
+    """One application per email address per role, checked before anything else is typed."""
+    return bool(email) and JobApplication.objects.filter(job=job, email__iexact=email.strip()).exists()
+
+
+class ApplyEmailForm(HoneypotMixin, forms.Form):
+    """Step one. Asking for the email on its own catches a repeat applicant straight away."""
+
+    email = forms.EmailField(
+        label="Your email address",
+        help_text="Your application reference and every update go to this address.",
+    )
+
+    def __init__(self, *args, job=None, **kwargs):
+        self.job = job
+        super().__init__(*args, **kwargs)
+        self.fields["email"].widget.attrs.update({"autocomplete": "email", "autofocus": True, "placeholder": "you@example.com"})
+
+    def clean_email(self):
+        email = self.cleaned_data["email"].strip()
+        if already_applied(self.job, email):
+            raise forms.ValidationError(DUPLICATE_MESSAGE)
+        return email
 
 
 class JobApplicationForm(HoneypotMixin, forms.ModelForm):
@@ -49,16 +76,29 @@ class JobApplicationForm(HoneypotMixin, forms.ModelForm):
             "cover_letter": forms.Textarea(attrs={"rows": 6}),
         }
 
-    def __init__(self, *args, job=None, **kwargs):
+    def __init__(self, *args, job=None, locked_email="", **kwargs):
         self.job = job
+        self.locked_email = locked_email
         super().__init__(*args, **kwargs)
         self.fields["expected_salary_npr"].widget.attrs.update({"min": "0", "step": "1000"})
+        if locked_email:
+            # Confirmed in step one, so it is shown back but not editable here.
+            self.fields["email"].initial = locked_email
+            self.fields["email"].widget.attrs.update({"readonly": True, "tabindex": "-1"})
+            self.fields["email"].help_text = "Confirmed in step 1. Go back to that step to use a different address."
 
     def clean_cv(self):
         cv = self.cleaned_data.get("cv")
         if cv:
             validate_document(cv)
         return cv
+
+    def clean_email(self):
+        # The locked address wins, so editing the read-only field in the browser changes nothing.
+        email = (self.locked_email or self.cleaned_data["email"]).strip()
+        if already_applied(self.job, email):
+            raise forms.ValidationError(DUPLICATE_MESSAGE)
+        return email
 
     def clean(self):
         cleaned = super().clean()
@@ -69,13 +109,6 @@ class JobApplicationForm(HoneypotMixin, forms.ModelForm):
             for name in ("headline", "professional_summary", "skills"):
                 if not cleaned.get(name):
                     self.add_error(name, "This field is required when filling in your CV manually.")
-        email = cleaned.get("email")
-        if email and self.job:
-            recent = JobApplication.objects.filter(
-                job=self.job, email__iexact=email, created_at__gte=timezone.now() - timedelta(days=30)
-            ).exists()
-            if recent:
-                self.add_error("email", "You have already applied for this role in the last 30 days. We will be in touch.")
         return cleaned
 
 

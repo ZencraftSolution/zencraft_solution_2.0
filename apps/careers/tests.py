@@ -88,6 +88,7 @@ class CareersViewTests(TestCase):
     def test_closed_job_apply_returns_410(self):
         self.job.closing_date = timezone.localdate() - timedelta(days=1)
         self.job.save()
+        self.assertEqual(self.client.get(reverse("careers:apply_details", args=[self.job.slug])).status_code, 410)
         response = self.client.get(reverse("careers:apply", args=[self.job.slug]))
         self.assertEqual(response.status_code, 410)
         self.assertContains(response, "have closed", status_code=410)
@@ -110,20 +111,56 @@ class ApplicationFormTests(TestCase):
     def setUp(self):
         cache.clear()
         self.job = make_job()
-        self.url = reverse("careers:apply", args=[self.job.slug])
+        self.email_url = reverse("careers:apply", args=[self.job.slug])
+        self.url = reverse("careers:apply_details", args=[self.job.slug])
 
     def tearDown(self):
         for app in JobApplication.objects.exclude(cv=""):
             app.cv.delete(save=False)
 
-    def post(self, data):
-        return self.client.post(self.url, data)
+    def start(self, email="asmita@example.com", job=None):
+        """Step 1: confirm the email, which is what unlocks the rest of the form."""
+        url = reverse("careers:apply", args=[(job or self.job).slug])
+        return self.client.post(url, {"email": email})
 
-    def test_form_renders_both_paths(self):
+    def post(self, data, job=None):
+        target = reverse("careers:apply_details", args=[job.slug]) if job else self.url
+        if not self.client.session.get("apply_email", {}).get((job or self.job).slug):
+            self.start(data.get("email", "asmita@example.com"), job=job)
+        return self.client.post(target, data)
+
+    def test_email_step_comes_first_and_the_rest_is_locked_until_it_is_given(self):
+        first = self.client.get(self.email_url)
+        self.assertContains(first, "Step 1 of 5")
+        self.assertNotContains(first, "edu-TOTAL_FORMS")  # nothing else is asked for yet
+        self.assertRedirects(self.client.get(self.url), self.email_url)
+
+        self.assertRedirects(self.start(), self.url)
+        self.assertEqual(self.client.session["apply_email"][self.job.slug], "asmita@example.com")
+
+    def test_form_renders_both_paths_after_the_email_step(self):
+        self.start()
         response = self.client.get(self.url)
         self.assertContains(response, "Upload my CV")
         self.assertContains(response, "Fill in my CV manually")
         self.assertContains(response, "edu-TOTAL_FORMS")
+
+    def test_every_step_is_marked_through_to_the_confirmation(self):
+        self.assertContains(self.client.get(self.email_url), 'data-step-marker="5"')
+        self.start()
+        details = self.client.get(self.url).content.decode()
+        self.assertIn('class="step is-done" data-step-marker="1"', details)  # the email step is behind them
+        self.assertIn('class="step is-current" data-step-marker="2"', details)
+        for step in ["2", "3", "4", "5"]:
+            self.assertIn('data-step-panel="%s"' % step, details)
+        self.post(base_data(cv=pdf_upload()))
+        done = self.client.get(reverse("careers:applied")).content.decode()
+        self.assertEqual(done.count("step is-done"), 5)  # all five, once the application is in
+
+    def test_email_confirmed_in_step_one_is_used_even_if_the_field_is_edited(self):
+        self.start("asmita@example.com")
+        self.client.post(self.url, base_data(email="someone.else@example.com", cv=pdf_upload()))
+        self.assertEqual(JobApplication.objects.get().email, "asmita@example.com")
 
     def test_cv_upload_docx_accepted_and_stored_privately(self):
         mail.outbox.clear()
@@ -217,19 +254,29 @@ class ApplicationFormTests(TestCase):
         self.assertRedirects(self.post(data), reverse("careers:applied"))
         self.assertEqual(JobApplication.objects.get().experience.filter(is_current=True).count(), 1)
 
-    def test_duplicate_application_within_30_days_rejected(self):
+    def test_second_application_for_the_same_role_is_stopped_at_the_email_step(self):
         self.assertRedirects(self.post(base_data(cv=pdf_upload())), reverse("careers:applied"))
-        response = self.post(base_data(email="ASMITA@example.com", cv=pdf_upload()))
-        self.assertContains(response, "already applied for this role in the last 30 days")
+        response = self.client.post(self.email_url, {"email": "ASMITA@example.com"})  # case does not matter
+        self.assertContains(response, "already been used to apply for this role")
+        self.assertNotIn(self.job.slug, self.client.session.get("apply_email", {}))
         self.assertEqual(JobApplication.objects.count(), 1)
 
-    def test_reapplying_after_30_days_or_to_another_role_allowed(self):
+    def test_duplicate_is_still_refused_at_submit_and_sends_the_applicant_back(self):
+        self.start()  # email confirmed while no application existed yet
+        make_application(self.job, email="asmita@example.com", reference="ZA-DUPL")
+        response = self.client.post(self.url, base_data(cv=pdf_upload()))
+        self.assertRedirects(response, self.email_url, fetch_redirect_response=False)
+        self.assertContains(self.client.get(self.email_url), "already been used to apply for this role")
+        self.assertEqual(JobApplication.objects.count(), 1)
+
+    def test_time_does_not_reopen_a_role_but_other_roles_stay_open(self):
         self.assertRedirects(self.post(base_data(cv=pdf_upload())), reverse("careers:applied"))
         other = make_job(slug="frontend", title="Frontend")
-        self.assertRedirects(self.client.post(reverse("careers:apply", args=[other.slug]), base_data(cv=pdf_upload())), reverse("careers:applied"))
-        JobApplication.objects.filter(job=self.job).update(created_at=timezone.now() - timedelta(days=31))
-        self.assertRedirects(self.post(base_data(cv=pdf_upload())), reverse("careers:applied"))
-        self.assertEqual(JobApplication.objects.filter(job=self.job).count(), 2)
+        self.assertRedirects(self.post(base_data(cv=pdf_upload()), job=other), reverse("careers:applied"))
+        JobApplication.objects.filter(job=self.job).update(created_at=timezone.now() - timedelta(days=400))
+        self.assertContains(self.client.post(self.email_url, {"email": "asmita@example.com"}),
+                            "already been used to apply for this role")
+        self.assertEqual(JobApplication.objects.filter(job=self.job).count(), 1)
 
 
 @override_settings(CV_RETENTION_DAYS=180)
