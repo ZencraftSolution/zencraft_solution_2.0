@@ -1,5 +1,7 @@
 import io
 from datetime import timedelta
+from decimal import Decimal
+from unittest import mock
 
 from django.conf import settings
 from django.core import mail
@@ -10,6 +12,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.careers.models import JobApplication
+from apps.core.models import ScannedUpload
 from apps.core.testing import (
     NOOP_SCAN,
     PDF_BYTES,
@@ -19,6 +22,7 @@ from apps.core.testing import (
     make_job,
     pdf_upload,
 )
+from apps.core.uploads import ScannerUnavailable
 
 FORMSET_MGMT = {
     "edu-TOTAL_FORMS": "1", "edu-INITIAL_FORMS": "0", "edu-MIN_NUM_FORMS": "0", "edu-MAX_NUM_FORMS": "6",
@@ -325,19 +329,139 @@ class PurgeApplicationsTests(TestCase):
 
         out = io.StringIO()
         call_command("purge_applications", "--dry-run", stdout=out)
-        self.assertIn("1 applications would be purged", out.getvalue())
+        self.assertIn("1 applications and 0 inquiries would be purged", out.getvalue())
         self.assertIsNone(JobApplication.objects.get(pk=old_rejected.pk).purged_at)
 
         call_command("purge_applications", stdout=io.StringIO())
         old_rejected.refresh_from_db()
         self.assertIsNotNone(old_rejected.purged_at)
-        self.assertEqual(old_rejected.full_name, "Purged applicant")
+        self.assertNotIn("old@example.com", old_rejected.email)
         self.assertFalse(old_rejected.cv)
-        self.assertEqual((old_rejected.skills, old_rejected.cover_letter, old_rejected.email), ("", "", f"purged-{old_rejected.pk}@invalid.local"))
+        self.assertEqual((old_rejected.skills, old_rejected.cover_letter, old_rejected.email), ("", "", f"erased-{old_rejected.pk}@invalid.local"))
         self.assertFalse(old_rejected.education.exists() or old_rejected.notes.exists())
         import os
         self.assertFalse(os.path.exists(cv_path))
+        # The other two are untouched: one is too recent, one was hired.
         recent_rejected.refresh_from_db()
         old_hired.refresh_from_db()
-        self.assertIsNone(recent_rejected.purged_at)
-        self.assertIsNone(old_hired.purged_at)
+        self.assertEqual(recent_rejected.email, "new@example.com")
+        self.assertEqual(old_hired.email, "hired@example.com")
+
+    def test_the_row_survives_so_hiring_statistics_do_not_change(self):
+        job = make_job()
+        application = make_application(job, email="old@example.com", status="rejected")
+        JobApplication.objects.filter(pk=application.pk).update(updated_at=timezone.now() - timedelta(days=200))
+        before = JobApplication.objects.filter(job=job).count()
+        call_command("purge_applications", stdout=io.StringIO())
+        self.assertEqual(JobApplication.objects.filter(job=job).count(), before)
+        self.assertEqual(JobApplication.objects.get(pk=application.pk).job_id, job.pk)
+
+    def test_old_inquiries_that_never_became_projects_are_purged_too(self):
+        """The privacy policy promises 24 months, so something has to enforce it."""
+        from apps.estimator.models import ProjectInquiry
+
+        def make_inquiry(reference, status, days_old):
+            inquiry = ProjectInquiry.objects.create(
+                reference=reference, project_type_label="Web", timeline="standard", team_preference="unsure",
+                design_needs="existing", name="Lead", email=f"{reference}@example.com", phone="98", company="Co",
+                description="Please build us a thing", status=status, estimate_low_npr=1, estimate_high_npr=2,
+                estimate_weeks_low=1, estimate_weeks_high=2, exchange_rate=Decimal("134"),
+            )
+            ProjectInquiry.objects.filter(pk=inquiry.pk).update(created_at=timezone.now() - timedelta(days=days_old))
+            return inquiry
+
+        stale = make_inquiry("PI-OLD", "lost", 800)
+        won = make_inquiry("PI-WON", "won", 800)
+        recent = make_inquiry("PI-NEW", "lost", 10)
+
+        out = io.StringIO()
+        call_command("purge_applications", "--dry-run", stdout=out)
+        self.assertIn("1 inquiries would be purged", out.getvalue())
+
+        call_command("purge_applications", stdout=io.StringIO())
+        stale.refresh_from_db()
+        self.assertIsNotNone(stale.purged_at)
+        self.assertEqual(stale.name, "Purged lead")
+        self.assertEqual((stale.phone, stale.company, stale.description), ("", "", ""))
+        self.assertNotIn("PI-OLD@example.com", stale.email)
+        # A won lead is a client record, and a recent one is still live.
+        won.refresh_from_db()
+        recent.refresh_from_db()
+        self.assertIsNone(won.purged_at)
+        self.assertIsNone(recent.purged_at)
+
+    @override_settings(INQUIRY_RETENTION_DAYS=30)
+    def test_the_inquiry_window_is_configurable(self):
+        from apps.estimator.models import ProjectInquiry
+
+        inquiry = ProjectInquiry.objects.create(
+            reference="PI-CFG", project_type_label="Web", timeline="standard", team_preference="unsure",
+            design_needs="existing", name="Lead", email="cfg@example.com", status="lost",
+            estimate_low_npr=1, estimate_high_npr=2, estimate_weeks_low=1, estimate_weeks_high=2,
+            exchange_rate=Decimal("134"),
+        )
+        ProjectInquiry.objects.filter(pk=inquiry.pk).update(created_at=timezone.now() - timedelta(days=31))
+        call_command("purge_applications", stdout=io.StringIO())
+        inquiry.refresh_from_db()
+        self.assertIsNotNone(inquiry.purged_at)
+
+
+@override_settings(UPLOAD_SCAN_MODE="quarantine", UPLOAD_SCAN_HOOK=NOOP_SCAN)
+class QuarantinedApplicationTests(TestCase):
+    """Applying still works on a host where the web process cannot reach a virus scanner."""
+
+    def setUp(self):
+        cache.clear()
+        self.job = make_job()
+
+    def tearDown(self):
+        for app in JobApplication.objects.exclude(cv=""):
+            app.cv.delete(save=False)
+
+    def apply(self, email="asmita@example.com"):
+        self.client.post(reverse("careers:apply", args=[self.job.slug]), {"email": email})
+        return self.client.post(
+            reverse("careers:apply_details", args=[self.job.slug]), base_data(email=email, cv=pdf_upload())
+        )
+
+    def test_the_application_is_accepted_and_the_cv_is_held(self):
+        self.assertRedirects(self.apply(), reverse("careers:applied"))
+        application = JobApplication.objects.get()
+        record = ScannedUpload.objects.get(path=application.cv.name)
+        self.assertEqual(record.status, "pending")
+
+    def test_the_applicant_is_told_nothing_about_the_scanner(self):
+        """Their side of it is unchanged: the CV went in, and that is all they need to know."""
+        response = self.client.get(reverse("careers:applied"))
+        self.apply()
+        response = self.client.get(reverse("careers:applied"))
+        self.assertNotContains(response, "scan")
+        self.assertNotContains(response, "quarantine")
+
+
+@override_settings(UPLOAD_SCAN_MODE="strict")
+class ScannerUnavailableTests(TestCase):
+    """Strict mode with the scanner down: the applicant gets a way forward, not a dead end."""
+
+    def setUp(self):
+        cache.clear()
+        self.job = make_job()
+
+    def test_the_message_offers_the_manual_path(self):
+        unavailable = mock.Mock(side_effect=ScannerUnavailable("down"))
+        self.client.post(reverse("careers:apply", args=[self.job.slug]), {"email": "asmita@example.com"})
+        with mock.patch("apps.core.uploads.import_string", return_value=unavailable):
+            response = self.client.post(
+                reverse("careers:apply_details", args=[self.job.slug]), base_data(cv=pdf_upload())
+            )
+        self.assertContains(response, "could not check your CV for viruses")
+        self.assertContains(response, "Fill in my CV manually")
+        self.assertFalse(JobApplication.objects.exists())
+
+    def test_the_manual_path_is_unaffected_by_a_broken_scanner(self):
+        self.client.post(reverse("careers:apply", args=[self.job.slug]), {"email": "asmita@example.com"})
+        data = base_data("manual", **MANUAL_PROFILE, **{"exp-0-company": "Shop", "exp-0-title": "Cashier", "exp-0-start_date": "2024-01"})
+        with mock.patch("apps.core.uploads.import_string", return_value=mock.Mock(side_effect=ScannerUnavailable("down"))):
+            response = self.client.post(reverse("careers:apply_details", args=[self.job.slug]), data)
+        self.assertRedirects(response, reverse("careers:applied"))
+        self.assertEqual(JobApplication.objects.get().application_mode, "manual")

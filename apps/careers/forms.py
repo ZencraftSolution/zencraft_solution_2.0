@@ -6,7 +6,7 @@ from django.forms import inlineformset_factory
 from django.utils import timezone
 
 from apps.core.forms import HoneypotMixin
-from apps.core.uploads import validate_document
+from apps.core.uploads import ScannerUnavailable, validate_document
 
 from .models import EducationEntry, ExperienceEntry, JobApplication, ProjectEntry
 
@@ -108,7 +108,16 @@ class JobApplicationForm(HoneypotMixin, forms.ModelForm):
     def clean_cv(self):
         cv = self.cleaned_data.get("cv")
         if cv:
-            validate_document(cv)
+            try:
+                validate_document(cv)
+            except ScannerUnavailable as exc:
+                # Nothing the applicant did wrong, and nothing they can fix by retrying the same
+                # file, so send them to the path that does not need a scanner at all.
+                raise forms.ValidationError(
+                    "We could not check your CV for viruses just now, so we have not accepted it. "
+                    "Please try again in a few minutes, or choose \u201cFill in my CV manually\u201d above "
+                    "and tell us about your experience here instead. We review both the same way."
+                ) from exc
         return cv
 
     def clean_email(self):

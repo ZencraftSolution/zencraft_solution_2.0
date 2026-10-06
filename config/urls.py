@@ -4,6 +4,7 @@ from django.contrib import admin
 from django.contrib.sitemaps.views import sitemap
 from django.urls import include, path
 
+from apps.core import health as core_health
 from apps.core import views as core_views
 from apps.core.sitemaps import SITEMAPS
 from apps.core.throttle import throttle_login
@@ -29,6 +30,7 @@ urlpatterns = [
     path(DASH, include("apps.dashboard.urls")),
     path("sitemap.xml", sitemap, {"sitemaps": SITEMAPS}, name="sitemap"),
     path("robots.txt", core_views.robots_txt, name="robots"),
+    path("healthz/", core_health.healthz, name="healthz"),
     path("services/", include("apps.services.urls")),
     path("work/", include("apps.portfolio.urls")),
     path("pricing/", include("apps.commerce.urls")),

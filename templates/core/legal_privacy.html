@@ -1,5 +1,6 @@
 {% extends "core/legal_base.html" %}
 {% block title %}Privacy policy | {{ site.company_name }}{% endblock %}
+{% block meta_description %}What Zencraft Solution collects through this website, why, how long we keep it and how to ask for a copy or have it erased.{% endblock %}
 {% block legal_title %}Privacy policy{% endblock %}
 {% block legal_body %}
 <p>{{ site.company_name }} Pvt. Ltd. ("Zencraft", "we") respects your privacy. This policy explains what personal information we collect through this website, why we collect it, how long we keep it and the choices you have. It is written to meet the Individual Privacy Act, 2075 of Nepal and, for visitors from the European Union, the principles of the GDPR.</p>
@@ -7,22 +8,25 @@
 <ul>
   <li><strong>Contact and consultation forms:</strong> name, email, phone, company and your message.</li>
   <li><strong>Project estimator:</strong> your answers about the project, contact details and any requirements document you upload.</li>
-  <li><strong>Job applications:</strong> contact details, CV file or the CV details you enter manually, links, salary expectations and notice period.</li>
+  <li><strong>Job applications:</strong> contact details, CV file or the CV details you enter manually, education and work history, links, salary expectations and notice period.</li>
+  <li><strong>Newsletter:</strong> your email address, kept until you ask us to remove it.</li>
   <li><strong>Orders:</strong> billing details and payment status. Card and wallet credentials are handled by the payment provider and never stored by us.</li>
-  <li><strong>Usage data:</strong> pages visited and referring page, recorded without third-party tracking cookies.</li>
+  <li><strong>Usage data:</strong> the page visited, the referring page and a session identifier, recorded without third-party tracking cookies.</li>
+  <li><strong>Technical records:</strong> server logs, which include the IP address a request came from. They are also used to limit how often a form can be submitted and to lock out repeated failed sign-ins.</li>
 </ul>
 <h2>How we use it</h2>
 <p>We use your information only to respond to you, prepare estimates and proposals, assess job applications, deliver purchased services and improve this website. We do not sell personal information or share it with advertisers.</p>
 <h2>How we protect it</h2>
-<p>CVs and requirement documents are stored in private storage that is not reachable by a public link. Access is limited to staff who need it, requires authentication, and every access is recorded in an audit log. All traffic to this website is encrypted.</p>
+<p>CVs and requirement documents are stored in private storage that is not reachable by a public link. Uploaded files are checked for malware before anyone in the team can open them. Access is limited to staff who need it, requires authentication, and every access, export and erasure is recorded in an audit log. All traffic to this website is encrypted.</p>
 <h2>How long we keep it</h2>
+<p>When a record expires we erase the personal details in it and keep an anonymous row, so our own statistics about hiring and enquiries stay accurate. Nothing in that remaining row identifies you.</p>
 <ul>
-  <li>Unsuccessful job applications: deleted 6 months after the decision.</li>
+  <li>Unsuccessful job applications: personal details and the CV file are erased 6 months after the decision.</li>
   <li>Project inquiries that do not become projects: 24 months.</li>
   <li>Order and invoice records: as long as tax law requires, currently 6 years.</li>
 </ul>
 <h2>Your rights</h2>
-<p>You can ask to see, correct or delete the personal information we hold about you, or withdraw consent at any time, by writing to <a href="mailto:{{ site.email }}">{{ site.email }}</a>. We respond within 30 days.</p>
+<p>You can ask for a copy of the personal information we hold about you, have it corrected, have it erased, or withdraw consent at any time, by writing to <a href="mailto:{{ site.email }}">{{ site.email }}</a>. Tell us which email address you used so we can find the record. We respond within 30 days, and erasure is carried out straight away rather than waiting for the retention period above.</p>
 <h2>Contact</h2>
 <p>{{ site.company_name }} Pvt. Ltd., {{ site.address }}. Email <a href="mailto:{{ site.email }}">{{ site.email }}</a>.</p>
 {% endblock %}

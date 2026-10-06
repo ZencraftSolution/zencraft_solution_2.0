@@ -1,0 +1,192 @@
+# Render Blueprint for Zencraft Solution.
+#
+# Apply it from the Render dashboard: New > Blueprint, point it at this repository.
+# Everything marked `sync: false` is a secret you fill in once, in the Render dashboard; those
+# values are never committed here. Everything else is set from this file on every deploy.
+#
+# What the build command does, in order and for a reason:
+#   collectstatic     - WhiteNoise serves hashed static files; without this the site has no CSS.
+#   migrate           - schema and the data migrations that carry content changes.
+#   createcachetable  - the default cache is the database cache. Login lockouts and rate limits
+#                       live there, so skipping this makes every sign-in error.
+#   ensure_superuser  - creates the first admin account from DJANGO_SUPERUSER_*, and does nothing
+#                       on later deploys.
+
+databases:
+  - name: zencraft-db
+    databaseName: zencraft_db
+    user: zencraft
+    plan: basic-256mb
+    postgresMajorVersion: "16"
+
+services:
+  - type: web
+    name: zencraft-web
+    runtime: python
+    plan: starter
+    region: singapore          # closest Render region to Nepal
+    branch: main
+    healthCheckPath: /healthz/
+    buildCommand: |
+      pip install -r requirements.txt
+      python manage.py collectstatic --noinput
+      python manage.py migrate --noinput
+      python manage.py createcachetable
+      python manage.py ensure_superuser
+    # 2 workers x 4 threads suits a starter instance: the work is database and network bound, not
+    # CPU bound. The timeout is above the 10s EMAIL_TIMEOUT so a slow mail server loses the send,
+    # not the whole request.
+    startCommand: gunicorn config.wsgi:application --workers 2 --threads 4 --timeout 30 --access-logfile - --error-logfile -
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.7"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: zencraft-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: ALLOWED_HOSTS
+        sync: false            # zencraftsolution.com,www.zencraftsolution.com,zencraft-solution.onrender.com
+      - key: CSRF_TRUSTED_ORIGINS
+        sync: false            # https://zencraftsolution.com,https://www.zencraftsolution.com
+      - key: SITE_URL
+        sync: false            # https://zencraftsolution.com - used by canonical tags and the sitemap
+
+      # Render terminates TLS and adds exactly one X-Forwarded-For entry. Verify after the first
+      # deploy with the procedure in the README; a wrong value shares one lockout across everyone.
+      - key: TRUSTED_PROXY_COUNT
+        value: "1"
+      # Empty means the database cache, which createcachetable prepares above.
+      - key: CACHE_URL
+        value: ""
+
+      # Public media. Required: the container filesystem is wiped on every deploy.
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+
+      # Private files (CVs, requirement documents). Any S3-compatible bucket; Cloudflare R2 is the
+      # cheapest fit. Leave PRIVATE_STORAGE_BACKEND as "local" only if you mount a persistent disk
+      # at private_media/ and set PRIVATE_MEDIA_PERSISTENT=True as well.
+      - key: PRIVATE_STORAGE_BACKEND
+        value: s3
+      - key: PRIVATE_S3_BUCKET
+        sync: false
+      - key: PRIVATE_S3_REGION
+        sync: false            # "auto" for Cloudflare R2
+      - key: PRIVATE_S3_ENDPOINT_URL
+        sync: false            # https://<account>.r2.cloudflarestorage.com for R2; blank for AWS
+      - key: PRIVATE_S3_ACCESS_KEY
+        sync: false
+      - key: PRIVATE_S3_SECRET_KEY
+        sync: false
+
+      # A plain web service cannot run ClamAV, so uploads are held and scanned by the cron job
+      # below. Switch to "strict" only if you run a ClamAV service this one can reach.
+      - key: UPLOAD_SCAN_MODE
+        value: quarantine
+      - key: CLAMAV_HOST
+        sync: false            # the private ClamAV service's host, if you add one
+      - key: CLAMAV_PORT
+        value: "3310"
+
+      # Email. Without a real backend, order and application confirmations are silently dropped,
+      # and a deploy check refuses to start.
+      - key: EMAIL_URL
+        sync: false            # smtp+tls://apikey:SG.xxxx@smtp.sendgrid.net:587
+      - key: DEFAULT_FROM_EMAIL
+        sync: false            # Zencraft Solution <hello@zencraftsolution.com>
+      - key: INTERNAL_NOTIFY_EMAIL
+        sync: false
+
+      # Staff sign-in. Enrol every staff account at HQ > Security BEFORE setting 2FA to True.
+      - key: DASHBOARD_PATH
+        sync: false            # an obscure prefix of your choosing, e.g. "hq-7x2k/"
+      - key: STAFF_2FA_REQUIRED
+        value: "False"
+      - key: STAFF_SESSION_HOURS
+        value: "8"
+
+      # Content-Security-Policy. Deploy once with True, check the reports, then set it to False.
+      - key: CSP_REPORT_ONLY
+        value: "False"
+
+      - key: LOG_FORMAT
+        value: json
+      - key: SENTRY_DSN
+        sync: false            # optional; leave blank to run without error reporting
+      - key: SENTRY_ENVIRONMENT
+        value: production
+
+      # Payments. Use the live endpoints and keys once you have them.
+      - key: ESEWA_PRODUCT_CODE
+        sync: false
+      - key: ESEWA_SECRET_KEY
+        sync: false
+      - key: ESEWA_FORM_URL
+        value: https://epay.esewa.com.np/api/epay/main/v2/form
+      - key: KHALTI_SECRET_KEY
+        sync: false
+      - key: KHALTI_API_URL
+        value: https://khalti.com/api/v2/
+      - key: STRIPE_SECRET_KEY
+        sync: false
+
+      # First admin account, used once by ensure_superuser. Change the password after signing in.
+      - key: DJANGO_SUPERUSER_USERNAME
+        sync: false
+      - key: DJANGO_SUPERUSER_EMAIL
+        sync: false
+      - key: DJANGO_SUPERUSER_PASSWORD
+        sync: false
+
+  # Scans the files held by UPLOAD_SCAN_MODE=quarantine and releases the clean ones to the hiring
+  # team. Until this runs, an uploaded CV cannot be opened in the dashboard, which is the point.
+  # It needs ClamAV, so the build installs it and the start command runs the daemon alongside.
+  - type: cron
+    name: zencraft-scan-uploads
+    runtime: python
+    plan: starter
+    region: singapore
+    branch: main
+    schedule: "*/10 * * * *"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python manage.py scan_quarantined_uploads --retry-errors
+    envVars:
+      - fromGroup: zencraft-shared
+
+  # Enforces the retention periods the privacy policy promises: unsuccessful applications after
+  # CV_RETENTION_DAYS, inquiries that never became projects after INQUIRY_RETENTION_DAYS.
+  - type: cron
+    name: zencraft-purge
+    runtime: python
+    plan: starter
+    region: singapore
+    branch: main
+    schedule: "30 2 * * *"     # 02:30 UTC, which is 08:15 in Kathmandu
+    buildCommand: pip install -r requirements.txt
+    startCommand: python manage.py purge_applications
+    envVars:
+      - fromGroup: zencraft-shared
+
+# The cron jobs need the same database, storage and scanner settings as the web service. Create an
+# environment group called "zencraft-shared" in the Render dashboard holding at least:
+#   DATABASE_URL, SECRET_KEY, DEBUG, ALLOWED_HOSTS, SITE_URL, CACHE_URL,
+#   CLOUDINARY_*, PRIVATE_STORAGE_BACKEND, PRIVATE_S3_*, UPLOAD_SCAN_MODE, CLAMAV_HOST, EMAIL_URL
+# and add the web service to it too, so there is one place to change a value.
+envVarGroups:
+  - name: zencraft-shared
+    envVars:
+      - key: DEBUG
+        value: "False"
+      - key: UPLOAD_SCAN_MODE
+        value: quarantine
+      - key: LOG_FORMAT
+        value: json

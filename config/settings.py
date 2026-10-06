@@ -67,6 +67,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "apps.core.logging.RequestIDMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -159,19 +160,45 @@ STORAGES = {
     },
 }
 
-# CVs and requirement documents never live under MEDIA_ROOT, and are NOT covered by the
-# Cloudinary STORAGES entry above - PrivateStorage (apps/core/uploads.py) hardcodes this
-# local path directly. On Render this means CVs do not survive a redeploy or restart unless
-# a persistent disk is mounted at this path. They are served only through permission-checked
-# dashboard views.
+# CVs and requirement documents are never public and never go through the Cloudinary STORAGES
+# entry above. They are streamed by permission-checked dashboard views, never linked directly.
+#
+# PRIVATE_STORAGE_BACKEND picks where the bytes actually live:
+#   "local" - PRIVATE_MEDIA_ROOT on disk. Correct for development. On a host with an ephemeral
+#             disk, such as Render, this loses every CV on the next deploy, so a deploy check
+#             refuses it unless PRIVATE_MEDIA_PERSISTENT says a real disk is mounted there.
+#   "s3"    - any S3-compatible bucket (AWS, Cloudflare R2, Backblaze B2, DigitalOcean Spaces),
+#             private, with signed URLs that expire in minutes. Nothing hands those URLs to a
+#             browser; they exist so the application itself can read the object back.
 PRIVATE_MEDIA_ROOT = BASE_DIR / "private_media"
+PRIVATE_STORAGE_BACKEND = env("PRIVATE_STORAGE_BACKEND", default="local")
+PRIVATE_MEDIA_PERSISTENT = env.bool("PRIVATE_MEDIA_PERSISTENT", default=False)
+PRIVATE_S3 = {
+    "bucket_name": env("PRIVATE_S3_BUCKET", default=""),
+    "region_name": env("PRIVATE_S3_REGION", default=""),
+    "endpoint_url": env("PRIVATE_S3_ENDPOINT_URL", default="") or None,
+    "access_key": env("PRIVATE_S3_ACCESS_KEY", default=""),
+    "secret_key": env("PRIVATE_S3_SECRET_KEY", default=""),
+    "location": env("PRIVATE_S3_PREFIX", default="private"),
+    "querystring_expire": env.int("PRIVATE_S3_URL_SECONDS", default=300),
+}
 UPLOAD_MAX_BYTES = 5 * 1024 * 1024
 IMAGE_UPLOAD_MAX_BYTES = env.int("IMAGE_UPLOAD_MAX_BYTES", default=4 * 1024 * 1024)
-# Virus scanning for CVs and requirement documents. ClamAV is the default; the no-op scanner is
-# only allowed for local development with DEBUG=True.
+# Virus scanning for CVs and requirement documents.
+#   "strict"     - scan during the upload and refuse the file if the scanner is unreachable.
+#                  Needs a ClamAV daemon the web process can talk to.
+#   "quarantine" - accept and store the upload, but mark it unscanned and refuse to serve it to
+#                  staff until `manage.py scan_quarantined_uploads` has cleared it. For hosts
+#                  where the web service cannot run ClamAV, which includes a plain Render service.
+#   "off"        - no scanning at all. Local development only.
+UPLOAD_SCAN_MODE = env("UPLOAD_SCAN_MODE", default="off" if DEBUG else "strict")
+if UPLOAD_SCAN_MODE not in {"strict", "quarantine", "off"}:
+    raise ImproperlyConfigured(f"UPLOAD_SCAN_MODE must be strict, quarantine or off, not {UPLOAD_SCAN_MODE!r}.")
+if not DEBUG and UPLOAD_SCAN_MODE == "off":
+    raise ImproperlyConfigured("UPLOAD_SCAN_MODE=off is only allowed when DEBUG=True.")
 UPLOAD_SCAN_HOOK = env(
     "UPLOAD_SCAN_HOOK",
-    default="apps.core.uploads.noop_scan" if DEBUG else "apps.core.uploads.clamav_scan",
+    default="apps.core.uploads.noop_scan" if UPLOAD_SCAN_MODE == "off" else "apps.core.uploads.clamav_scan",
 )
 if not DEBUG and UPLOAD_SCAN_HOOK.endswith(".noop_scan"):
     raise ImproperlyConfigured("UPLOAD_SCAN_HOOK=noop_scan is only allowed when DEBUG=True. Configure ClamAV instead.")
@@ -180,6 +207,8 @@ CLAMAV_HOST = env("CLAMAV_HOST", default="127.0.0.1")
 CLAMAV_PORT = env.int("CLAMAV_PORT", default=3310)
 CLAMAV_TIMEOUT = env.int("CLAMAV_TIMEOUT", default=30)
 CV_RETENTION_DAYS = env.int("CV_RETENTION_DAYS", default=180)
+# Project inquiries that never became projects. The privacy policy promises 24 months.
+INQUIRY_RETENTION_DAYS = env.int("INQUIRY_RETENTION_DAYS", default=730)
 # How long one email address has to wait before applying for the same role again. A permanent
 # block would let anyone lock a real candidate out of a role for good by using their address.
 CAREERS_REAPPLY_DAYS = env.int("CAREERS_REAPPLY_DAYS", default=30)
@@ -205,6 +234,9 @@ CACHES = {"default": cache_config(env("CACHE_URL", default=""), debug=DEBUG)}
 EMAIL_BACKEND = env("EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")
 if env("EMAIL_URL", default=""):
     vars().update(env.email_url("EMAIL_URL"))
+# A hung SMTP server must not hold a web worker open while an applicant waits on a spinner.
+# Every send also goes through apps.core.mail, which logs a failure instead of swallowing it.
+EMAIL_TIMEOUT = env.int("EMAIL_TIMEOUT", default=10)
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="Zencraft Solution <hello@zencraftsolution.com>")
 INTERNAL_NOTIFY_EMAIL = env("INTERNAL_NOTIFY_EMAIL", default="team@zencraftsolution.com")
 
@@ -285,9 +317,34 @@ if not DEBUG:
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
 
+LOG_LEVEL = env("LOG_LEVEL", default="INFO")
+# Plain text is readable in a terminal; JSON is what a log search backend can actually query.
+LOG_FORMAT = env("LOG_FORMAT", default="text" if DEBUG else "json")
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
-    "handlers": {"console": {"class": "logging.StreamHandler"}},
-    "root": {"handlers": ["console"], "level": "INFO"},
+    "filters": {"request_id": {"()": "apps.core.logging.RequestIDFilter"}},
+    "formatters": {
+        "json": {"()": "apps.core.logging.JsonFormatter"},
+        "text": {"format": "%(levelname)s %(asctime)s %(name)s [%(request_id)s] %(message)s"},
+    },
+    "handlers": {
+        "console": {"class": "logging.StreamHandler", "formatter": LOG_FORMAT, "filters": ["request_id"]},
+    },
+    "root": {"handlers": ["console"], "level": LOG_LEVEL},
+    "loggers": {
+        # The access log is the host's job; this keeps Django's own 4xx/5xx warnings.
+        "django.server": {"handlers": ["console"], "level": "WARNING", "propagate": False},
+    },
 }
+
+# Error reporting. Off until SENTRY_DSN is set, and scrubbed of personal data when it is.
+SENTRY_DSN = env("SENTRY_DSN", default="")
+SENTRY_ENVIRONMENT = env("SENTRY_ENVIRONMENT", default="development" if DEBUG else "production")
+SENTRY_RELEASE = env("SENTRY_RELEASE", default="")
+SENTRY_TRACES_SAMPLE_RATE = env.float("SENTRY_TRACES_SAMPLE_RATE", default=0.0)
+if SENTRY_DSN:
+    from apps.core.observability import init_sentry
+
+    init_sentry(SENTRY_DSN, SENTRY_ENVIRONMENT, SENTRY_RELEASE, SENTRY_TRACES_SAMPLE_RATE)

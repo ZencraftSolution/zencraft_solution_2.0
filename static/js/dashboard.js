@@ -80,3 +80,14 @@
     });
   }
 })();
+
+/* Forms that cannot be undone ask first. The server does not rely on this; it is here so a
+   mis-click does not erase an applicant's record. */
+(function () {
+  "use strict";
+  document.querySelectorAll("form[data-confirm]").forEach(function (form) {
+    form.addEventListener("submit", function (event) {
+      if (!window.confirm(form.dataset.confirm)) event.preventDefault();
+    });
+  });
+})();

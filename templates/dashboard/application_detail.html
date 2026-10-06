@@ -10,8 +10,22 @@
   <div>
     {% if app.application_mode == "cv" and app.cv %}
     <div class="panel">
-      <div class="panel__title"><h2 class="h3" style="font-size:1rem">CV: {{ app.cv_original_name }}</h2><a class="btn btn--ghost btn--sm" href="{% url 'dashboard:application_cv' app.pk %}?download=1"><i class="ph ph-download-simple"></i> Download</a></div>
-      {% if app.cv_is_pdf %}
+      <div class="panel__title"><h2 class="h3" style="font-size:1rem">CV: {{ app.cv_original_name }}</h2>{% if not cv_scan or cv_scan.status == "clean" %}<a class="btn btn--ghost btn--sm" href="{% url 'dashboard:application_cv' app.pk %}?download=1"><i class="ph ph-download-simple"></i> Download</a>{% endif %}</div>
+      {% if cv_scan and cv_scan.status != "clean" %}
+      <div class="empty-state">
+        <i class="ph ph-shield-warning"></i>
+        {% if cv_scan.status == "infected" %}
+        <h3>Blocked by the virus scan</h3>
+        <p>The scanner reported <code class="mono">{{ cv_scan.signature|default:"a threat" }}</code>. This file cannot be opened or downloaded. Reply to the applicant and ask for a clean copy.</p>
+        {% elif cv_scan.status == "error" %}
+        <h3>The scan did not finish</h3>
+        <p>The file is held until a scan succeeds. It has been tried {{ cv_scan.attempts }} time{{ cv_scan.attempts|pluralize }}; the next scheduled run will try again.</p>
+        {% else %}
+        <h3>Waiting to be scanned</h3>
+        <p>Uploaded {{ cv_scan.created_at|timesince }} ago. It becomes available here as soon as the virus scan clears it, usually within a few minutes.</p>
+        {% endif %}
+      </div>
+      {% elif app.cv_is_pdf %}
       <iframe class="cv-frame" src="{% url 'dashboard:application_cv' app.pk %}" title="CV preview for {{ app.full_name }}"></iframe>
       {% else %}
       <div class="empty-state"><i class="ph ph-file-doc"></i><h3>DOCX files cannot be previewed in the browser</h3><p>Download the file to open it in Word or LibreOffice.</p></div>
@@ -71,7 +85,20 @@
         <button class="btn btn--primary btn--block" type="submit">Save</button>
       </form>
     </div>
-    <p class="muted mt-2" style="font-size:.8rem"><i class="ph ph-shield-check"></i> Views of this record and CV access are recorded in the audit log.</p>
+    <div class="panel">
+      <h2 class="panel__title">Data requests</h2>
+      {% if app.purged_at %}
+      <p class="muted" style="font-size:.9rem">The personal data on this application was erased {{ app.purged_at|date:"j M Y" }}. The role, dates and outcome are kept for hiring statistics.</p>
+      {% else %}
+      <p class="muted" style="font-size:.9rem">If this applicant asks what you hold on them, or asks you to delete it, answer it here.</p>
+      <a class="btn btn--ghost btn--block mt-2" href="{% url 'dashboard:application_export' app.pk %}"><i class="ph ph-download-simple"></i> Download their data (JSON)</a>
+      <form method="post" action="{% url 'dashboard:application_erase' app.pk %}" class="mt-2" data-confirm="Erase every personal detail on {{ app.reference }}? The CV is deleted and this cannot be undone.">
+        {% csrf_token %}
+        <button class="btn btn--ghost btn--block" type="submit" style="color:var(--danger,#b42318)"><i class="ph ph-trash"></i> Erase their personal data</button>
+      </form>
+      {% endif %}
+    </div>
+    <p class="muted mt-2" style="font-size:.8rem"><i class="ph ph-shield-check"></i> Views of this record, CV access, exports and erasures are recorded in the audit log.</p>
   </div>
 </div>
 {% endblock %}

@@ -6,7 +6,7 @@ import zipfile
 from pathlib import Path
 
 from django.conf import settings
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.core.files.storage import FileSystemStorage
 from django.utils.deconstruct import deconstructible
 from django.utils.module_loading import import_string
@@ -25,11 +25,48 @@ class PrivateStorage(FileSystemStorage):
         raise ValueError("Private files have no public URL.")
 
 
-private_storage = PrivateStorage()
+def _build_private_storage():
+    """Builds the configured private backend. Called once and cached by get_private_storage()."""
+    backend = getattr(settings, "PRIVATE_STORAGE_BACKEND", "local")
+    if backend == "local":
+        return PrivateStorage()
+    if backend == "s3":
+        from storages.backends.s3 import S3Storage
+
+        config = settings.PRIVATE_S3
+        missing = [k for k in ("bucket_name", "access_key", "secret_key") if not config.get(k)]
+        if missing:
+            raise ImproperlyConfigured(f"PRIVATE_STORAGE_BACKEND=s3 needs {', '.join(missing)}.")
+        return S3Storage(
+            bucket_name=config["bucket_name"],
+            region_name=config["region_name"] or None,
+            endpoint_url=config["endpoint_url"],
+            access_key=config["access_key"],
+            secret_key=config["secret_key"],
+            location=config["location"],
+            # Private objects, signed URLs that expire in minutes, and never overwrite: the
+            # upload path is already a UUID, so a collision would mean losing someone's CV.
+            default_acl="private",
+            querystring_auth=True,
+            querystring_expire=config["querystring_expire"],
+            file_overwrite=False,
+        )
+    raise ImproperlyConfigured(f"PRIVATE_STORAGE_BACKEND must be 'local' or 's3', not {backend!r}.")
+
+
+_private_storage_cache = {}
 
 
 def get_private_storage():
-    return private_storage
+    """The storage every private FileField uses. Cached per backend so tests can switch it."""
+    key = (
+        getattr(settings, "PRIVATE_STORAGE_BACKEND", "local"),
+        str(getattr(settings, "PRIVATE_MEDIA_ROOT", "")),
+    )
+    if key not in _private_storage_cache:
+        _private_storage_cache[key] = _build_private_storage()
+    return _private_storage_cache[key]
+
 
 
 @deconstructible
@@ -79,10 +116,48 @@ def validate_document(uploaded, allowed=("pdf", "docx"), max_bytes=None):
     detected = sniff_document_type(uploaded)
     if detected is None or detected != ext:
         raise ValidationError("This file does not look like a valid PDF or DOCX document.")
-    scan = import_string(settings.UPLOAD_SCAN_HOOK)
-    if not scan(uploaded):
-        raise ValidationError("The file could not be accepted by our security scan.")
+    if scan_mode() != "quarantine":
+        # In quarantine mode the file is scanned later, by scan_quarantined_uploads, and is not
+        # served to anyone until it has been. See quarantine() and upload_is_servable().
+        scan = import_string(settings.UPLOAD_SCAN_HOOK)
+        if not scan(uploaded):
+            raise ValidationError("The file could not be accepted by our security scan.")
     return detected
+
+
+def scan_mode():
+    return getattr(settings, "UPLOAD_SCAN_MODE", "strict")
+
+
+def quarantine(field_file):
+    """Marks a stored file as not yet scanned. No-op outside quarantine mode.
+
+    Called after the file has a storage path. Nothing reads the file here: the point is that the
+    web process does not need a scanner at all, which is what makes this mode usable on a host
+    where ClamAV cannot run next to the application.
+    """
+    from apps.core.models import ScannedUpload
+
+    if not field_file or scan_mode() != "quarantine":
+        return None
+    record, _ = ScannedUpload.objects.get_or_create(path=field_file.name, defaults={"status": "pending"})
+    return record
+
+
+def upload_is_servable(name):
+    """True when this stored file may be streamed to staff.
+
+    A file with no record was scanned during its upload (strict mode) and is fine. A file with a
+    record was taken in under quarantine and has to have been cleared since. Deciding per file
+    rather than per current mode means switching modes later cannot release a file that was never
+    looked at.
+    """
+    from apps.core.models import ScannedUpload
+
+    if not name:
+        return False
+    record = ScannedUpload.objects.filter(path=name).first()
+    return record is None or record.status == "clean"
 
 
 IMAGE_EXTENSIONS = ("jpg", "jpeg", "png", "webp")

@@ -2,13 +2,13 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.contrib import messages
-from django.core.mail import send_mail
 from django.db import transaction
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.views.decorators.http import require_POST
 
+from apps.core.mail import notify_internal, send_transactional_email
 from apps.core.models import SiteSettings
 from apps.core.utils import make_reference, rate_limit
 
@@ -204,5 +204,5 @@ def order_done(request, reference):
 
 def _send_order_emails(order):
     body = render_to_string("emails/order_ack.txt", {"order": order})
-    send_mail(f"Your Zencraft order {order.reference}", body, settings.DEFAULT_FROM_EMAIL, [order.email], fail_silently=True)
-    send_mail(f"New order {order.reference} ({order.get_payment_status_display()})", body, settings.DEFAULT_FROM_EMAIL, [settings.INTERNAL_NOTIFY_EMAIL], fail_silently=True)
+    send_transactional_email(f"Your Zencraft order {order.reference}", body, order.email, reference=order.reference)
+    notify_internal(f"New order {order.reference} ({order.get_payment_status_display()})", body, reference=order.reference)

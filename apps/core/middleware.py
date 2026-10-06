@@ -7,7 +7,7 @@ from .models import PageView
 
 logger = logging.getLogger(__name__)
 
-SKIP_PREFIXES = ("/static/", "/media/", "/favicon", "/robots.txt", "/sitemap.xml")
+SKIP_PREFIXES = ("/static/", "/media/", "/favicon", "/robots.txt", "/sitemap.xml", "/healthz")
 
 
 class ContentSecurityPolicyMiddleware:

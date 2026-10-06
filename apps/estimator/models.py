@@ -149,6 +149,7 @@ class ProjectInquiry(models.Model):
     internal_notes = models.TextField(blank=True)
     consent = models.BooleanField(default=False)
     source = models.CharField(max_length=40, default="estimator")
+    purged_at = models.DateTimeField(null=True, blank=True, help_text="When the personal details were erased under the retention policy.")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

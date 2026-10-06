@@ -66,6 +66,34 @@ class SiteSettings(models.Model):
         return obj
 
 
+class ScannedUpload(models.Model):
+    """One row per private file taken in under quarantine, and what a scanner made of it.
+
+    The row is the permission to serve the file. Until the status is "clean" the dashboard
+    refuses to stream it, so an unscanned file never reaches a member of staff's machine.
+    """
+
+    STATUS_CHOICES = [
+        ("pending", "Waiting to be scanned"),
+        ("clean", "Scanned, no threat found"),
+        ("infected", "Threat found, blocked"),
+        ("error", "Scan failed, blocked"),
+    ]
+
+    path = models.CharField(max_length=255, unique=True, help_text="Storage path of the private file.")
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="pending", db_index=True)
+    signature = models.CharField(max_length=255, blank=True, help_text="What the scanner reported, when it rejected the file.")
+    attempts = models.PositiveSmallIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    scanned_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.path} ({self.get_status_display()})"
+
+
 class AuditLog(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL)
     action = models.CharField(max_length=60)

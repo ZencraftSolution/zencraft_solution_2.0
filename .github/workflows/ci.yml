@@ -88,10 +88,18 @@ jobs:
       - name: Migrations are up to date
         run: python manage.py makemigrations --check --dry-run
 
-      - name: Deployment checklist (DEBUG=False)
+      - name: Deployment checklist (DEBUG=False, production-shaped environment)
         env:
           DEBUG: "False"
           ALLOWED_HOSTS: zencraftsolution.com
+          # The new zencraft.E00x checks refuse a deployment that would lose media, swallow email
+          # or share one lockout counter, so the check needs a production-shaped environment.
+          SITE_URL: https://zencraftsolution.com
+          CLOUDINARY_CLOUD_NAME: ci-placeholder
+          CLOUDINARY_API_KEY: ci-placeholder
+          CLOUDINARY_API_SECRET: ci-placeholder
+          EMAIL_BACKEND: django.core.mail.backends.smtp.EmailBackend
+          PRIVATE_MEDIA_PERSISTENT: "True"
         run: python manage.py check --deploy --fail-level WARNING
 
       - name: Test suite with coverage

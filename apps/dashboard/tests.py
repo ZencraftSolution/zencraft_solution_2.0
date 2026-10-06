@@ -19,8 +19,20 @@ from freezegun import freeze_time
 from apps.blog.models import BlogCategory
 from apps.careers.models import JobApplication
 from apps.commerce.models import Order
-from apps.core.models import AuditLog, NewsletterSubscriber, SiteSettings
-from apps.core.testing import PASSWORD, docx_bytes, image_upload, make_application, make_job, make_staff, make_user, release_file_response
+from apps.core.models import AuditLog, NewsletterSubscriber, ScannedUpload, SiteSettings
+from apps.core.testing import (
+    NOOP_SCAN,
+    PASSWORD,
+    docx_bytes,
+    image_upload,
+    make_application,
+    make_job,
+    make_staff,
+    make_user,
+    pdf_upload,
+    release_file_response,
+)
+from apps.core.uploads import get_private_storage, quarantine
 from apps.dashboard.crud import REGISTRY
 from apps.dashboard.mixins import SESSION_STARTED_KEY
 from apps.estimator.models import EstimatorConfig, ProjectInquiry
@@ -699,3 +711,136 @@ class ApiPermissionTests(DashboardTestCase):
         self.client.logout()
         response = Client().patch(self.url(lead), json.dumps({"status": "won"}), content_type="application/json")
         self.assertIn(response.status_code, (401, 403))
+
+
+@override_settings(UPLOAD_SCAN_MODE="quarantine", UPLOAD_SCAN_HOOK=NOOP_SCAN)
+class QuarantinedCvAccessTests(DashboardTestCase):
+    """An unscanned file must not reach a member of staff's machine."""
+
+    def setUp(self):
+        super().setUp()
+        self.application = make_application(make_job(), cv=pdf_upload(), cv_original_name="cv.pdf")
+        self.record = quarantine(self.application.cv)
+        self.url = reverse("dashboard:application_cv", args=[self.application.pk])
+        self.detail = reverse("dashboard:application_detail", args=[self.application.pk])
+
+    def tearDown(self):
+        for app in JobApplication.objects.exclude(cv=""):
+            app.cv.delete(save=False)
+
+    def test_a_pending_file_is_not_served(self):
+        self.assertEqual(self.client.get(self.url).status_code, 404)
+
+    def test_an_infected_file_is_never_served(self):
+        ScannedUpload.objects.filter(pk=self.record.pk).update(status="infected", signature="Eicar-Test-Signature")
+        self.assertEqual(self.client.get(self.url).status_code, 404)
+        page = self.client.get(self.detail)
+        self.assertContains(page, "Blocked by the virus scan")
+        self.assertContains(page, "Eicar-Test-Signature")
+        self.assertNotContains(page, f"{reverse('dashboard:application_cv', args=[self.application.pk])}?download=1")
+
+    def test_the_page_explains_the_wait_instead_of_showing_a_broken_frame(self):
+        page = self.client.get(self.detail)
+        self.assertContains(page, "Waiting to be scanned")
+        self.assertNotContains(page, "<iframe")
+
+    def test_a_cleared_file_is_served_normally(self):
+        ScannedUpload.objects.filter(pk=self.record.pk).update(status="clean")
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        release_file_response(response)
+        cv_download = f"{reverse('dashboard:application_cv', args=[self.application.pk])}?download=1"
+        self.assertContains(self.client.get(self.detail), cv_download)
+
+    def test_a_file_from_before_quarantine_is_still_reachable(self):
+        """No record means it was scanned during its own upload, under strict mode."""
+        ScannedUpload.objects.all().delete()
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        release_file_response(response)
+
+
+class ApplicantDataRequestTests(DashboardTestCase):
+    """Answering "what do you hold on me" and "please delete it" without a developer."""
+
+    def setUp(self):
+        super().setUp()
+        self.job = make_job()
+        self.app = make_application(
+            self.job, full_name="Asmita Gurung", email="asmita@example.com", phone="9800000000",
+            headline="Django developer", skills="Python, Django", cover_letter="Hello",
+            github_url="https://github.com/asmita", cv=pdf_upload(), cv_original_name="asmita-cv.pdf",
+        )
+        self.app.education.create(institution="TU", degree="BSc CSIT", end_year=2026)
+        self.app.experience.create(company="Shop", title="Intern", start_date="2025-06-01")
+        self.app.notes.create(author=self.staff, body="Internal note, not the applicant's data")
+        self.detail = reverse("dashboard:application_detail", args=[self.app.pk])
+
+    def tearDown(self):
+        for app in JobApplication.objects.exclude(cv=""):
+            app.cv.delete(save=False)
+
+    def export(self):
+        response = self.client.get(reverse("dashboard:application_export", args=[self.app.pk]))
+        return response, json.loads(response.content.decode())
+
+    def test_the_export_contains_everything_held_about_them(self):
+        response, data = self.export()
+        self.assertEqual(response["Content-Type"], "application/json")
+        self.assertIn(f"{self.app.reference}-data.json", response["Content-Disposition"])
+        self.assertEqual(data["about_you"]["full_name"], "Asmita Gurung")
+        self.assertEqual(data["about_you"]["email"], "asmita@example.com")
+        self.assertEqual(data["application"]["cv_filename"], "asmita-cv.pdf")
+        self.assertEqual(data["application"]["skills"], ["Python", "Django"])
+        self.assertEqual(data["education"][0]["institution"], "TU")
+        self.assertEqual(data["experience"][0]["company"], "Shop")
+        self.assertEqual(data["links"]["github"], "https://github.com/asmita")
+        self.assertTrue(data["consent"]["given_at"] is None or data["consent"]["given_at"])
+
+    def test_internal_hiring_notes_are_counted_but_not_handed_over(self):
+        """Our assessment of a candidate is our record, not a copy of their data."""
+        _, data = self.export()
+        self.assertEqual(data["notes_held"], 1)
+        self.assertNotIn("Internal note", json.dumps(data))
+
+    def test_the_export_is_audited(self):
+        self.export()
+        self.assertTrue(audit("exported applicant data", object_id=str(self.app.pk)).exists())
+
+    def test_erasing_removes_the_person_and_keeps_the_statistics(self):
+        cv_name = self.app.cv.name
+        response = self.client.post(reverse("dashboard:application_erase", args=[self.app.pk]))
+        self.assertRedirects(response, self.detail)
+        self.app.refresh_from_db()
+        self.assertEqual(self.app.phone, "")
+        self.assertEqual(self.app.cover_letter, "")
+        self.assertNotIn("Asmita", self.app.full_name)
+        self.assertNotIn("asmita@example.com", self.app.email)
+        self.assertFalse(self.app.cv)
+        self.assertEqual((self.app.education.count(), self.app.experience.count(), self.app.notes.count()), (0, 0, 0))
+        self.assertIsNotNone(self.app.purged_at)
+        # The row survives, so "applications this month" does not silently change.
+        self.assertEqual(self.app.job_id, self.job.pk)
+        self.assertTrue(JobApplication.objects.filter(pk=self.app.pk).exists())
+        self.assertFalse(get_private_storage().exists(cv_name))
+
+    def test_erasing_is_audited_and_cannot_be_repeated(self):
+        self.client.post(reverse("dashboard:application_erase", args=[self.app.pk]))
+        self.assertTrue(audit("erased applicant data", object_id=str(self.app.pk)).exists())
+        response = self.client.post(reverse("dashboard:application_erase", args=[self.app.pk]), follow=True)
+        self.assertContains(response, "already been erased")
+
+    def test_erasing_needs_a_post_so_a_link_cannot_trigger_it(self):
+        self.assertEqual(self.client.get(reverse("dashboard:application_erase", args=[self.app.pk])).status_code, 405)
+
+    def test_the_page_offers_both_actions_and_warns_before_erasing(self):
+        page = self.client.get(self.detail)
+        self.assertContains(page, "Download their data")
+        self.assertContains(page, "Erase their personal data")
+        self.assertContains(page, "cannot be undone")
+
+    def test_neither_is_available_to_anyone_but_staff(self):
+        self.client.logout()
+        for url in [reverse("dashboard:application_export", args=[self.app.pk]),
+                    reverse("dashboard:application_erase", args=[self.app.pk])]:
+            self.assertEqual(self.client.get(url).status_code, 302)

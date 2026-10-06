@@ -1,17 +1,15 @@
 import json
 
 from django import forms
-from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.core.mail import send_mail
 from django.http import JsonResponse
 from django.shortcuts import render
-from django.template.loader import render_to_string
 from django.urls import reverse
 from django.views.decorators.http import require_GET, require_POST
 
+from apps.core.mail import notify_internal, send_templated_email
 from apps.core.models import SiteSettings
-from apps.core.uploads import validate_document
+from apps.core.uploads import quarantine, validate_document
 from apps.core.utils import format_npr, format_usd, make_reference, npr_to_usd, rate_limit
 
 from . import engine
@@ -151,20 +149,20 @@ def submit_api(request):
         inquiry.document_name = data["document"].name[:255]
         inquiry.document = data["document"]
     inquiry.save()
+    quarantine(inquiry.document)  # no-op unless UPLOAD_SCAN_MODE=quarantine
 
     session_id = str(answers.get("session_id", ""))[:40]
     if session_id:
         EstimatorEvent.objects.get_or_create(session_id=session_id, step=8)
 
-    send_mail(
-        f"Your project estimate {inquiry.reference}",
-        render_to_string("emails/inquiry_ack.txt", {"inquiry": inquiry}),
-        settings.DEFAULT_FROM_EMAIL, [inquiry.email], fail_silently=True,
+    send_templated_email(
+        f"Your project estimate {inquiry.reference}", "emails/inquiry_ack.txt", {"inquiry": inquiry},
+        inquiry.email, reference=inquiry.reference,
     )
-    send_mail(
+    notify_internal(
         f"New qualified lead {inquiry.reference}: {inquiry.project_type_label}",
         f"{inquiry.name} ({inquiry.company}) {inquiry.email}\nRange: {format_npr(inquiry.estimate_low_npr)} to {format_npr(inquiry.estimate_high_npr)}",
-        settings.DEFAULT_FROM_EMAIL, [settings.INTERNAL_NOTIFY_EMAIL], fail_silently=True,
+        reference=inquiry.reference,
     )
     return JsonResponse({
         "ok": True,

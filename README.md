@@ -164,6 +164,110 @@ python manage.py test apps.core
 
 22 tests cover every public page, the nine service pages' depth, the estimator (including private document upload), both application paths and fake-file rejection, cart to paid order through the sandbox, dashboard access control, kanban status API, CV access audit logging, estimator configuration and login rate limiting.
 
+## Deploying to Render
+
+`render.yaml` describes the whole deployment: the web service, a PostgreSQL 16 database and two
+cron jobs. From the Render dashboard choose **New > Blueprint** and point it at this repository.
+Every value marked `sync: false` in that file is a secret you fill in once, in the dashboard.
+
+### The build command, and why each line is there
+
+```
+pip install -r requirements.txt
+python manage.py collectstatic --noinput   # WhiteNoise serves hashed files; without this there is no CSS
+python manage.py migrate --noinput         # schema, and the data migrations that carry content changes
+python manage.py createcachetable          # the default cache is the database; lockouts live there
+python manage.py ensure_superuser          # first admin only; a no-op afterwards
+```
+
+Leaving out `createcachetable` makes every sign-in and every form submission error, because the
+rate limiter cannot reach its table. Leaving out `migrate` makes the deploy fail outright.
+
+### Environment variables
+
+The site refuses to start a production deployment that is quietly broken: `manage.py check
+--deploy` fails with a `zencraft.E00x` code if media would be lost on redeploy, email would be
+printed instead of sent, lockout counters would reset, or `SITE_URL` points at localhost. That is
+deliberate, and the fix is always to set the variable below.
+
+| Variable | What it does | Example |
+| --- | --- | --- |
+| `SECRET_KEY` | Signs sessions and CSRF tokens. Render can generate it. | *(generated)* |
+| `DEBUG` | Must be `False` in production. | `False` |
+| `ALLOWED_HOSTS` | Hostnames this site answers to. | `zencraftsolution.com,www.zencraftsolution.com,zencraft-solution.onrender.com` |
+| `CSRF_TRUSTED_ORIGINS` | Origins allowed to post forms. | `https://zencraftsolution.com,https://www.zencraftsolution.com` |
+| `SITE_URL` | Canonical tags, sitemap, emails, payment returns. **Must be https and not localhost.** | `https://zencraftsolution.com` |
+| `DATABASE_URL` | From the Render database. | *(linked)* |
+| `TRUSTED_PROXY_COUNT` | How many proxies append to `X-Forwarded-For`. **`1` on Render.** | `1` |
+| `CACHE_URL` | Empty uses the database cache. Set to `redis://…` once you add Redis. | *(empty)* |
+| `DASHBOARD_PATH` | Where the staff dashboard is mounted. Pick something unguessable. | `hq-7x2k/` |
+| `CLOUDINARY_CLOUD_NAME` / `_API_KEY` / `_API_SECRET` | Public images. **Required**: the container disk is wiped on every deploy. | `zencraft` |
+| `PRIVATE_STORAGE_BACKEND` | Where CVs live: `s3` or `local`. | `s3` |
+| `PRIVATE_S3_BUCKET` | Bucket for CVs and requirement documents. | `zencraft-private` |
+| `PRIVATE_S3_REGION` | Region, or `auto` for Cloudflare R2. | `auto` |
+| `PRIVATE_S3_ENDPOINT_URL` | Blank for AWS; the account endpoint for R2 or Spaces. | `https://abc123.r2.cloudflarestorage.com` |
+| `PRIVATE_S3_ACCESS_KEY` / `_SECRET_KEY` | Credentials for that bucket. | |
+| `PRIVATE_MEDIA_PERSISTENT` | Only with `PRIVATE_STORAGE_BACKEND=local`, and only if a real disk is mounted. | `False` |
+| `UPLOAD_SCAN_MODE` | `quarantine` on a plain web service, `strict` if ClamAV is reachable. | `quarantine` |
+| `CLAMAV_HOST` / `CLAMAV_PORT` | The ClamAV daemon, for whichever service does the scanning. | `clamav:3310` |
+| `EMAIL_URL` | SMTP connection. Without it, nothing is sent. | `smtp+tls://apikey:SG.xxx@smtp.sendgrid.net:587` |
+| `DEFAULT_FROM_EMAIL` | The From address on every message. | `Zencraft Solution <hello@zencraftsolution.com>` |
+| `INTERNAL_NOTIFY_EMAIL` | Where new leads and applications are announced. | `team@zencraftsolution.com` |
+| `EMAIL_TIMEOUT` | Seconds before a slow mail server is given up on. | `10` |
+| `STAFF_SESSION_HOURS` | How long a staff session lasts after signing in. | `8` |
+| `STAFF_2FA_REQUIRED` | Enrol everyone at **HQ > Security** first, then set this. | `False` |
+| `CSP_REPORT_ONLY` | `True` reports violations without blocking. Use it for one deploy, then turn it off. | `False` |
+| `CSP_REPORT_URI` | Optional endpoint collecting those reports. | |
+| `CAREERS_REAPPLY_DAYS` | How long before the same address may apply for a role again. | `30` |
+| `CV_RETENTION_DAYS` | Unsuccessful applications are erased after this. | `180` |
+| `INQUIRY_RETENTION_DAYS` | Inquiries that never became projects are erased after this. | `730` |
+| `LOG_FORMAT` | `json` in production, `text` locally. | `json` |
+| `SENTRY_DSN` | Optional error reporting, scrubbed of personal data. | |
+| `ESEWA_*`, `KHALTI_*`, `STRIPE_SECRET_KEY` | Live payment credentials. | |
+| `DJANGO_SUPERUSER_*` | The first admin account. Change the password after signing in. | |
+
+### Health check
+
+Set Render's **Health Check Path** to `/healthz/`. It checks the database and the cache and
+returns `{"status": "ok"}` with a 200, or 503 naming the failing component. It does nothing
+heavier on purpose: a health check that calls a payment gateway takes your site offline whenever
+that gateway has a bad minute.
+
+### Scheduled jobs
+
+| Job | Schedule | Why it matters |
+| --- | --- | --- |
+| `scan_quarantined_uploads --retry-errors` | every 10 minutes | Releases uploaded CVs to the hiring team. **Until it runs, a CV cannot be opened.** |
+| `purge_applications` | daily | Enforces the retention periods the privacy policy promises. |
+
+The scanning job needs ClamAV on whichever service runs it. On Render, add
+`apt-get install -y clamav clamav-daemon && freshclam` to that service's build, or run ClamAV as a
+separate private service and point `CLAMAV_HOST` at it.
+
+### Moving CVs to object storage
+
+Existing CVs are on the container disk and will not be there after the next deploy. With the
+`PRIVATE_S3_*` variables set and the old disk still mounted:
+
+```
+python manage.py migrate_private_files --dry-run   # see what would move
+python manage.py migrate_private_files             # copy, without deleting anything
+python manage.py migrate_private_files --verify    # confirm every file arrived
+```
+
+Only then set `PRIVATE_STORAGE_BACKEND=s3` permanently and remove the disk.
+
+### Why email is sent during the request, and not from a queue
+
+Sending is wrapped by `apps/core/mail.py`, which never raises and always logs, and
+`EMAIL_TIMEOUT` is 10 seconds against a 30 second gunicorn timeout. The worst case is that a
+visitor waits a few extra seconds and the failure appears in the log with its reference, rather
+than the submission being lost. At this volume a worker process, its queue and its own failure
+modes would cost more than they save. Virus scanning, which really is slow and really can fail,
+is already off the request path via `UPLOAD_SCAN_MODE=quarantine`.
+
+Revisit this if the site starts sending in bulk, or if a provider's API replaces SMTP.
+
 ## Deployment checklist
 
 1. `DEBUG=False`, a long random `SECRET_KEY`, real `ALLOWED_HOSTS` and `CSRF_TRUSTED_ORIGINS`.

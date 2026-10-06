@@ -1,4 +1,5 @@
 import csv
+import json
 import mimetypes
 from datetime import timedelta
 
@@ -17,9 +18,11 @@ from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.views.decorators.http import require_POST
 
 from apps.careers.models import ApplicationNote, JobApplication, JobOpening
+from apps.careers.privacy import erase_application, export_application
 from apps.commerce.models import Order
-from apps.core.models import AuditLog, ConsultationBooking, ContactSubmission, PageView, SiteSettings
+from apps.core.models import AuditLog, ConsultationBooking, ContactSubmission, PageView, ScannedUpload, SiteSettings
 from apps.core.throttle import throttle_login
+from apps.core.uploads import upload_is_servable
 from apps.core.utils import log_action
 from apps.estimator.models import EstimatorConfig, EstimatorEvent, LeadNote, ProjectInquiry
 
@@ -256,7 +259,37 @@ def application_detail(request, pk):
                 return redirect("dashboard:application_detail", pk=pk)
     return render(request, "dashboard/application_detail.html", {
         "app": app, "form": form, "note_form": note_form, "notes": app.notes.select_related("author"),
+        "cv_scan": ScannedUpload.objects.filter(path=app.cv.name).first() if app.cv else None,
     })
+
+
+@staff_required
+def application_export(request, pk):
+    """Everything held about one applicant, as a JSON file, for a subject access request."""
+    app = get_object_or_404(JobApplication.objects.select_related("job"), pk=pk)
+    log_action(request, "exported applicant data", app)
+    payload = json.dumps(export_application(app), indent=2, ensure_ascii=False)
+    response = HttpResponse(payload, content_type="application/json")
+    response["Content-Disposition"] = f'attachment; filename="{app.reference}-data.json"'
+    response["Cache-Control"] = "no-store"
+    return response
+
+
+# staff_required first, so a signed-out visitor is sent to the login page rather than being told
+# which methods this endpoint accepts.
+@staff_required
+@require_POST
+def application_erase(request, pk):
+    """Erases one applicant's personal data on request, keeping the row for hiring statistics."""
+    app = get_object_or_404(JobApplication.objects.select_related("job"), pk=pk)
+    if app.purged_at:
+        messages.info(request, "This application has already been erased.")
+        return redirect("dashboard:application_detail", pk=pk)
+    reference = app.reference
+    erase_application(app)
+    log_action(request, "erased applicant data", app, detail=f"on request, {reference}")
+    messages.success(request, f"The personal data on {reference} has been erased. The role and outcome are kept.")
+    return redirect("dashboard:application_detail", pk=pk)
 
 
 @xframe_options_sameorigin  # framed by dashboard/application_detail.html for in-browser PDF preview
@@ -271,6 +304,10 @@ def application_cv(request, pk):
 
 
 def _private_file_response(field_file, filename, inline):
+    if not upload_is_servable(field_file.name):
+        # Taken in under quarantine and not cleared yet, or found to be infected. Either way it
+        # does not go anywhere near a member of staff's machine.
+        raise Http404("This file has not been released by the virus scan yet.")
     try:
         handle = field_file.open("rb")
     except FileNotFoundError:

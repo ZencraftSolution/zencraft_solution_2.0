@@ -1,10 +1,9 @@
-from django.conf import settings
-from django.core.mail import send_mail
 from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
-from django.template.loader import render_to_string
 from django.utils import timezone
 
+from apps.core.mail import notify_internal, send_templated_email
+from apps.core.uploads import quarantine
 from apps.core.utils import make_reference, rate_limit
 from apps.portfolio.models import GalleryImage
 
@@ -188,19 +187,20 @@ def apply_details(request, slug):
                 else:
                     application.cv = ""
                 application.save()
+                quarantine(application.cv)  # no-op unless UPLOAD_SCAN_MODE=quarantine
                 if application.application_mode == "manual":
                     for formset in (edu, exp, prj):
                         formset.instance = application
                         formset.save()
-            send_mail(
+            send_templated_email(
                 f"We received your application for {job.title}",
-                render_to_string("emails/application_ack.txt", {"application": application, "job": job}),
-                settings.DEFAULT_FROM_EMAIL, [application.email], fail_silently=True,
+                "emails/application_ack.txt", {"application": application, "job": job},
+                application.email, reference=application.reference,
             )
-            send_mail(
+            notify_internal(
                 f"New application: {application.full_name} for {job.title}",
                 f"{application.full_name} <{application.email}>, {application.years_experience} years, {application.get_application_mode_display()}",
-                settings.DEFAULT_FROM_EMAIL, [settings.INTERNAL_NOTIFY_EMAIL], fail_silently=True,
+                reference=application.reference,
             )
             _forget_email(request, job)
             request.session["last_application"] = {"ref": application.reference, "job": job.title, "name": application.full_name.split(" ")[0]}

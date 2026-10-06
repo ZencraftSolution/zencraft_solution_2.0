@@ -1,15 +1,14 @@
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector
-from django.core.mail import send_mail
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
-from django.template.loader import render_to_string
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from apps.blog.models import BlogPost
 from apps.commerce.models import EngagementModel
+from apps.core.mail import notify_internal, send_templated_email
 from apps.portfolio.models import CaseStudy, TeamMember, Testimonial
 from apps.services.models import Industry, Service, Technology
 
@@ -105,19 +104,14 @@ def contact(request):
     form = ContactForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         submission = form.save()
-        send_mail(
+        notify_internal(
             f"New contact message: {submission.subject}",
             f"From {submission.name} <{submission.email}>\nCompany: {submission.company}\n\n{submission.message}",
-            settings.DEFAULT_FROM_EMAIL,
-            [settings.INTERNAL_NOTIFY_EMAIL],
-            fail_silently=True,
+            reference=f"contact #{submission.pk}",
         )
-        send_mail(
-            "We received your message",
-            render_to_string("emails/contact_ack.txt", {"submission": submission}),
-            settings.DEFAULT_FROM_EMAIL,
-            [submission.email],
-            fail_silently=True,
+        send_templated_email(
+            "We received your message", "emails/contact_ack.txt", {"submission": submission},
+            submission.email, reference=f"contact #{submission.pk}",
         )
         messages.success(request, "Thanks. Your message is with our team and you will hear back within one working day.")
         return redirect("core:contact")
@@ -129,19 +123,14 @@ def consultation(request):
     form = ConsultationForm(request.POST or None, initial={"topic": request.GET.get("topic", "")})
     if request.method == "POST" and form.is_valid():
         booking = form.save()
-        send_mail(
-            "Consultation request received",
-            render_to_string("emails/consultation_ack.txt", {"booking": booking}),
-            settings.DEFAULT_FROM_EMAIL,
-            [booking.email],
-            fail_silently=True,
+        send_templated_email(
+            "Consultation request received", "emails/consultation_ack.txt", {"booking": booking},
+            booking.email, reference=f"consultation #{booking.pk}",
         )
-        send_mail(
+        notify_internal(
             f"New consultation request from {booking.name}",
             f"{booking.get_topic_display()} on {booking.preferred_date} ({booking.get_preferred_slot_display()})\n{booking.email} {booking.phone}\n\n{booking.message}",
-            settings.DEFAULT_FROM_EMAIL,
-            [settings.INTERNAL_NOTIFY_EMAIL],
-            fail_silently=True,
+            reference=f"consultation #{booking.pk}",
         )
         return render(request, "core/consultation_done.html", {"booking": booking})
     return render(request, "core/consultation.html", {"form": form})

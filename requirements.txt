@@ -31,5 +31,10 @@ nh3==0.3.7
 # Optional TOTP two-factor authentication for staff (STAFF_2FA_REQUIRED).
 django-otp==1.7.3
 qrcode==8.2
+# Private object storage for CVs (PRIVATE_STORAGE_BACKEND=s3). Any S3-compatible bucket.
+django-storages==1.14.6
+boto3==1.43.108
+# Optional error reporting, started only when SENTRY_DSN is set.
+sentry-sdk==2.71.0
 # Only used when CACHE_URL points at Redis; the database cache needs nothing extra.
 redis==8.1.0
