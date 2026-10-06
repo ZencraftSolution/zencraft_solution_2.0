@@ -58,3 +58,47 @@ class BlogTests(TestCase):
         self.assertEqual(self.post.reading_minutes, 3)  # 450 words / 220 wpm, rounded up
         self.assertEqual(self.post.tag_list, ["postgres", "caching"])
         self.assertEqual(str(self.post), self.post.title)
+
+
+class BodySanitisingTests(TestCase):
+    """The blog body is the one field printed with |safe, so it is cleaned on the way in."""
+
+    def make(self, body, slug="xss"):
+        return BlogPost.objects.create(
+            title="Post", slug=slug, excerpt="x", body=body,
+            hero_image_url="https://example.com/h.jpg", is_published=True,
+        )
+
+    def test_a_script_tag_does_not_survive_a_save(self):
+        post = self.make("<p>Real content</p><script>alert('xss')</script>")
+        self.assertEqual(post.body, "<p>Real content</p>")
+        self.assertNotContains(self.client.get(post.get_absolute_url()), "alert(")
+
+    def test_event_handler_attributes_are_stripped(self):
+        post = self.make('<img src="/x.png" onerror="alert(1)"><p onclick="steal()">text</p>', slug="handlers")
+        self.assertNotIn("onerror", post.body)
+        self.assertNotIn("onclick", post.body)
+        self.assertIn('<img src="/x.png">', post.body)
+        page = self.client.get(post.get_absolute_url()).content.decode()
+        self.assertNotIn("onerror", page)
+        self.assertNotIn("steal()", page)
+
+    def test_javascript_urls_and_frames_are_removed(self):
+        post = self.make('<a href="javascript:alert(1)">click</a><iframe src="https://evil.test"></iframe>', slug="jsurl")
+        self.assertNotIn("javascript:", post.body)
+        self.assertNotIn("<iframe", post.body)
+
+    def test_the_markup_an_article_actually_uses_is_kept(self):
+        body = (
+            '<h2>Heading</h2><p>Text with <strong>bold</strong> and a '
+            '<a href="https://example.com">link</a>.</p><ul><li>one</li></ul>'
+            '<pre><code class="language-python">x = 1</code></pre>'
+        )
+        post = self.make(body, slug="kept")
+        for fragment in ["<h2>Heading</h2>", "<strong>bold</strong>", "<li>one</li>", 'class="language-python"']:
+            self.assertIn(fragment, post.body)
+        self.assertIn('rel="noopener noreferrer"', post.body)  # added to outbound links
+
+    def test_reading_time_is_still_calculated_after_cleaning(self):
+        post = self.make("<p>" + " ".join(["word"] * 440) + "</p><script>x</script>", slug="reading")
+        self.assertEqual(post.reading_minutes, 2)

@@ -138,6 +138,17 @@ class ApplicationFormTests(TestCase):
         self.assertRedirects(self.start(), self.url)
         self.assertEqual(self.client.session["apply_email"][self.job.slug], "asmita@example.com")
 
+    def test_step_one_never_reveals_whether_an_address_has_applied(self):
+        """Otherwise the form is an oracle for "has this person applied for this job?"."""
+        self.assertRedirects(self.post(base_data(cv=pdf_upload())), reverse("careers:applied"))
+        applied = self.client.post(self.email_url, {"email": "asmita@example.com"})
+        fresh = self.client.post(self.email_url, {"email": "nobody@example.com"})
+        self.assertRedirects(applied, self.url)  # identical treatment...
+        self.assertRedirects(fresh, self.url)
+        for response in [self.client.get(self.email_url), self.client.get(self.url)]:
+            self.assertNotContains(response, "within the last")
+            self.assertNotContains(response, "already have an application")
+
     def test_form_renders_both_paths_after_the_email_step(self):
         self.start()
         response = self.client.get(self.url)
@@ -254,29 +265,49 @@ class ApplicationFormTests(TestCase):
         self.assertRedirects(self.post(data), reverse("careers:applied"))
         self.assertEqual(JobApplication.objects.get().experience.filter(is_current=True).count(), 1)
 
-    def test_second_application_for_the_same_role_is_stopped_at_the_email_step(self):
+    def test_a_repeat_application_is_refused_at_the_end_not_at_the_start(self):
         self.assertRedirects(self.post(base_data(cv=pdf_upload())), reverse("careers:applied"))
-        response = self.client.post(self.email_url, {"email": "ASMITA@example.com"})  # case does not matter
-        self.assertContains(response, "already been used to apply for this role")
-        self.assertNotIn(self.job.slug, self.client.session.get("apply_email", {}))
+        self.assertRedirects(self.client.post(self.email_url, {"email": "ASMITA@example.com"}), self.url)
+        response = self.client.post(self.url, base_data(cv=pdf_upload()))  # case does not matter
+        self.assertContains(response, "within the last 30 days")
         self.assertEqual(JobApplication.objects.count(), 1)
 
-    def test_duplicate_is_still_refused_at_submit_and_sends_the_applicant_back(self):
-        self.start()  # email confirmed while no application existed yet
-        make_application(self.job, email="asmita@example.com", reference="ZA-DUPL")
-        response = self.client.post(self.url, base_data(cv=pdf_upload()))
-        self.assertRedirects(response, self.email_url, fetch_redirect_response=False)
-        self.assertContains(self.client.get(self.email_url), "already been used to apply for this role")
-        self.assertEqual(JobApplication.objects.count(), 1)
+    def test_the_block_expires_so_nobody_can_be_shut_out_of_a_role_for_good(self):
+        self.assertRedirects(self.post(base_data(cv=pdf_upload())), reverse("careers:applied"))
+        JobApplication.objects.filter(job=self.job).update(created_at=timezone.now() - timedelta(days=31))
+        self.assertRedirects(self.post(base_data(cv=pdf_upload())), reverse("careers:applied"))
+        self.assertEqual(JobApplication.objects.filter(job=self.job).count(), 2)
 
-    def test_time_does_not_reopen_a_role_but_other_roles_stay_open(self):
+    @override_settings(CAREERS_REAPPLY_DAYS=7)
+    def test_the_window_is_configurable(self):
+        self.assertRedirects(self.post(base_data(cv=pdf_upload())), reverse("careers:applied"))
+        JobApplication.objects.filter(job=self.job).update(created_at=timezone.now() - timedelta(days=8))
+        self.assertRedirects(self.post(base_data(cv=pdf_upload())), reverse("careers:applied"))
+        self.assertContains(self.post(base_data(cv=pdf_upload())), "within the last 7 days")
+        self.assertEqual(JobApplication.objects.filter(job=self.job).count(), 2)
+
+    def test_another_role_is_never_blocked(self):
         self.assertRedirects(self.post(base_data(cv=pdf_upload())), reverse("careers:applied"))
         other = make_job(slug="frontend", title="Frontend")
         self.assertRedirects(self.post(base_data(cv=pdf_upload()), job=other), reverse("careers:applied"))
-        JobApplication.objects.filter(job=self.job).update(created_at=timezone.now() - timedelta(days=400))
-        self.assertContains(self.client.post(self.email_url, {"email": "asmita@example.com"}),
-                            "already been used to apply for this role")
-        self.assertEqual(JobApplication.objects.filter(job=self.job).count(), 1)
+        self.assertEqual(JobApplication.objects.count(), 2)
+
+    def test_a_double_submit_cannot_slip_two_applications_through(self):
+        """The check runs inside the transaction, behind a lock on the role."""
+        self.start()
+        self.assertRedirects(self.client.post(self.url, base_data(cv=pdf_upload())), reverse("careers:applied"))
+        # The browser resends the same form, for example by pressing back and submitting again.
+        self.start()
+        again = self.client.post(self.url, base_data(cv=pdf_upload()))
+        self.assertContains(again, "within the last 30 days")
+        self.assertEqual(JobApplication.objects.count(), 1)
+
+    def test_the_duplicate_is_shown_on_the_step_that_holds_the_address(self):
+        make_application(self.job, email="asmita@example.com", reference="ZA-DUPL")
+        self.start()
+        response = self.client.post(self.url, base_data(cv=pdf_upload()))
+        self.assertEqual(response.context["current_step"], 2)
+        self.assertContains(response, "within the last 30 days")
 
 
 @override_settings(CV_RETENTION_DAYS=180)

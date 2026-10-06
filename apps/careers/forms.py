@@ -1,24 +1,45 @@
+from datetime import timedelta
+
 from django import forms
+from django.conf import settings
 from django.forms import inlineformset_factory
+from django.utils import timezone
 
 from apps.core.forms import HoneypotMixin
 from apps.core.uploads import validate_document
 
 from .models import EducationEntry, ExperienceEntry, JobApplication, ProjectEntry
 
-DUPLICATE_MESSAGE = (
-    "This email address has already been used to apply for this role. "
-    "One application per role is enough: yours is with the hiring team and we will be in touch."
-)
+
+def duplicate_message():
+    days = settings.CAREERS_REAPPLY_DAYS
+    return (
+        f"We already have an application for this role from this email address within the last {days} days. "
+        f"You can apply again after that, or write to us if you need to update the one we have."
+    )
 
 
-def already_applied(job, email):
-    """One application per email address per role, checked before anything else is typed."""
-    return bool(email) and JobApplication.objects.filter(job=job, email__iexact=email.strip()).exists()
+def recent_application(job, email):
+    """The application that blocks a new one, if there is one.
+
+    Deliberately a rolling window rather than a permanent block: with a permanent block anyone
+    could type a real candidate's address into step 1 of a role and shut them out of it for good.
+    """
+    cleaned = (email or "").strip()
+    if not cleaned:
+        return None
+    cutoff = timezone.now() - timedelta(days=settings.CAREERS_REAPPLY_DAYS)
+    return JobApplication.objects.filter(job=job, email__iexact=cleaned, created_at__gte=cutoff).first()
 
 
 class ApplyEmailForm(HoneypotMixin, forms.Form):
-    """Step one. Asking for the email on its own catches a repeat applicant straight away."""
+    """Step one: the address we reply to.
+
+    It deliberately does NOT check whether that address has applied before. Doing so would turn
+    an open form into an oracle for "has this person applied for this job?", which is exactly the
+    sort of question an employer, a recruiter or a nosy colleague should not be able to ask.
+    The duplicate rule is enforced at the end instead, after the form has been filled in.
+    """
 
     email = forms.EmailField(
         label="Your email address",
@@ -31,10 +52,7 @@ class ApplyEmailForm(HoneypotMixin, forms.Form):
         self.fields["email"].widget.attrs.update({"autocomplete": "email", "autofocus": True, "placeholder": "you@example.com"})
 
     def clean_email(self):
-        email = self.cleaned_data["email"].strip()
-        if already_applied(self.job, email):
-            raise forms.ValidationError(DUPLICATE_MESSAGE)
-        return email
+        return self.cleaned_data["email"].strip()
 
 
 class JobApplicationForm(HoneypotMixin, forms.ModelForm):
@@ -96,8 +114,8 @@ class JobApplicationForm(HoneypotMixin, forms.ModelForm):
     def clean_email(self):
         # The locked address wins, so editing the read-only field in the browser changes nothing.
         email = (self.locked_email or self.cleaned_data["email"]).strip()
-        if already_applied(self.job, email):
-            raise forms.ValidationError(DUPLICATE_MESSAGE)
+        if recent_application(self.job, email):
+            raise forms.ValidationError(duplicate_message())
         return email
 
     def clean(self):

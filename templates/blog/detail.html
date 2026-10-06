@@ -7,7 +7,7 @@
 {% block og_image %}{{ post.hero_image_url }}{% endblock %}
 
 {% block json_ld %}
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"{{ post.title|escapejs }}","description":"{{ post.excerpt|escapejs }}","image":"{{ post.hero_image_url }}","datePublished":"{{ post.published_at|date:'c' }}","author":{"@type":"Person","name":"{{ post.author.name|default:site.company_name|escapejs }}"},"publisher":{"@type":"Organization","name":"{{ site.company_name|escapejs }}"},"mainEntityOfPage":"{{ SITE_URL }}{{ request.path }}"}</script>
+<script type="application/ld+json" nonce="{{ request.csp_nonce }}">{"@context":"https://schema.org","@type":"BlogPosting","headline":"{{ post.title|escapejs }}","description":"{{ post.excerpt|escapejs }}","image":"{{ post.hero_image_url }}","datePublished":"{{ post.published_at|date:'c' }}","author":{"@type":"Person","name":"{{ post.author.name|default:site.company_name|escapejs }}"},"publisher":{"@type":"Organization","name":"{{ site.company_name|escapejs }}"},"mainEntityOfPage":"{{ SITE_URL }}{{ request.path }}"}</script>
 {% endblock %}
 
 {% block content %}

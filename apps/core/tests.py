@@ -7,9 +7,10 @@ from datetime import timedelta
 from decimal import Decimal
 from unittest import mock
 
+from django.conf import settings
 from django.core import mail
 from django.core.cache import cache
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.http import HttpResponse
@@ -121,6 +122,42 @@ class ClientIpTests(TestCase):
             self.assertEqual(client_ip(request), "2.2.2.2")
         with override_settings(TRUSTED_PROXY_COUNT=5):
             self.assertEqual(client_ip(request), "10.0.0.1")
+
+    def test_a_spoofed_header_cannot_change_the_address_we_key_on(self):
+        """One proxy, as on Render: only the entry that proxy appended counts."""
+        with override_settings(TRUSTED_PROXY_COUNT=1):
+            for spoof in ["9.9.9.9", "9.9.9.9, 8.8.8.8", "not-an-ip", "", "::1"]:
+                request = RequestFactory().get("/", REMOTE_ADDR="10.0.0.1", HTTP_X_FORWARDED_FOR=f"{spoof}, 203.0.113.7")
+                self.assertEqual(client_ip(request), "203.0.113.7", spoof)
+
+    def test_junk_in_the_trusted_position_falls_back_to_the_socket_address(self):
+        with override_settings(TRUSTED_PROXY_COUNT=1):
+            request = RequestFactory().get("/", REMOTE_ADDR="10.0.0.1", HTTP_X_FORWARDED_FOR="203.0.113.7, unknown")
+            self.assertEqual(client_ip(request), "10.0.0.1")
+
+    def test_ports_and_ipv6_are_normalised(self):
+        with override_settings(TRUSTED_PROXY_COUNT=1):
+            cases = {
+                "203.0.113.7:51324": "203.0.113.7",
+                "[2001:db8::1]:443": "2001:db8::1",
+                "2001:db8::1": "2001:db8::1",
+            }
+            for raw, expected in cases.items():
+                request = RequestFactory().get("/", REMOTE_ADDR="10.0.0.1", HTTP_X_FORWARDED_FOR=raw)
+                self.assertEqual(client_ip(request), expected, raw)
+
+    def test_rate_limiting_is_per_visitor_behind_one_proxy(self):
+        cache.clear()
+        with override_settings(TRUSTED_PROXY_COUNT=1):
+            first = self.client.post("/contact/", {}, HTTP_X_FORWARDED_FOR="203.0.113.7")
+            self.assertNotEqual(first.status_code, 429)
+            # A different visitor through the same proxy must not inherit the first one's count.
+            for _ in range(8):
+                self.client.post("/contact/", {}, HTTP_X_FORWARDED_FOR="203.0.113.7")
+            blocked = self.client.post("/contact/", {}, HTTP_X_FORWARDED_FOR="203.0.113.7")
+            other = self.client.post("/contact/", {}, HTTP_X_FORWARDED_FOR="198.51.100.4")
+            self.assertEqual(blocked.status_code, 429)
+            self.assertNotEqual(other.status_code, 429)
 
     def test_log_action_for_anonymous_request(self):
         request = RequestFactory().post("/somewhere/")
@@ -277,6 +314,131 @@ class FooterSocialLinkTests(TestCase):
         self.assertEqual(page.count('class="social"'), 3)
 
 
+class OpenRedirectTests(TestCase):
+    """A form that returns the visitor to the Referer must not return them off-site."""
+
+    def setUp(self):
+        cache.clear()
+
+    def test_newsletter_returns_to_our_own_page(self):
+        response = self.client.post(reverse("core:newsletter"), {"email": "reader@example.com"}, HTTP_REFERER="/about/")
+        self.assertEqual(response["Location"], "/about/")
+
+    def test_an_external_referer_is_ignored(self):
+        for hostile in ["https://evil.example/phish", "//evil.example/phish", "http://testserver.evil.example/"]:
+            response = self.client.post(
+                reverse("core:newsletter"), {"email": f"r{len(hostile)}@example.com"}, HTTP_REFERER=hostile
+            )
+            self.assertEqual(response["Location"], reverse("core:home"), hostile)
+
+    def test_safe_referer_helper(self):
+        from apps.core.utils import safe_referer
+
+        request = RequestFactory().post("/newsletter/", HTTP_REFERER="https://evil.example/")
+        self.assertEqual(safe_referer(request, "/fallback/"), "/fallback/")
+        request = RequestFactory().post("/newsletter/", HTTP_REFERER="/work/")
+        self.assertEqual(safe_referer(request, "/fallback/"), "/work/")
+        self.assertEqual(safe_referer(RequestFactory().post("/newsletter/"), "/fallback/"), "/fallback/")
+
+
+class ContentSecurityPolicyTests(TestCase):
+    """Scripts are allow-listed by nonce, so injected markup cannot execute."""
+
+    def directives(self, response, header="Content-Security-Policy"):
+        return {
+            part.split(" ")[0]: part.split(" ")[1:]
+            for part in (p.strip() for p in response[header].split(";"))
+            if part
+        }
+
+    def test_policy_is_sent_on_public_and_dashboard_pages(self):
+        for url in ["/", "/legal/privacy/", reverse("dashboard:login")]:
+            response = self.client.get(url)
+            self.assertIn("Content-Security-Policy", response, url)
+            directives = self.directives(response)
+            self.assertEqual(directives["object-src"], ["'none'"])
+            self.assertEqual(directives["frame-ancestors"], ["'none'"])
+            self.assertEqual(directives["base-uri"], ["'self'"])
+            self.assertEqual(directives["default-src"], ["'self'"])
+
+    def test_scripts_need_a_nonce_rather_than_unsafe_inline(self):
+        response = self.client.get("/")
+        script_src = self.directives(response)["script-src"]
+        self.assertNotIn("'unsafe-inline'", script_src)
+        self.assertNotIn("'unsafe-eval'", script_src)
+        self.assertEqual(len([s for s in script_src if s.startswith("'nonce-")]), 1)
+
+    def test_the_nonce_in_the_header_is_the_one_the_page_uses(self):
+        response = self.client.get("/")
+        nonce = next(s for s in self.directives(response)["script-src"] if s.startswith("'nonce-"))[7:-1]
+        html = response.content.decode()
+        self.assertIn(f'nonce="{nonce}"', html)
+        # Every executable inline script carries it; JSON data blocks are not executed.
+        executable = re.findall(r"<script(?![^>]*(?:src=|type=\"application/json\"))[^>]*>", html)
+        self.assertTrue(executable)
+        for tag in executable:
+            self.assertIn(f'nonce="{nonce}"', tag)
+
+    def test_a_fresh_nonce_per_request(self):
+        first = self.directives(self.client.get("/"))["script-src"]
+        second = self.directives(self.client.get("/"))["script-src"]
+        self.assertNotEqual(first, second)
+
+    def test_payment_redirect_hosts_are_the_only_extra_form_targets(self):
+        form_action = self.directives(self.client.get("/"))["form-action"]
+        self.assertEqual(form_action[0], "'self'")
+        self.assertIn("https://epay.esewa.com.np", form_action)
+        self.assertNotIn("*", form_action)
+
+    @override_settings(CSP_REPORT_ONLY=True)
+    def test_report_only_mode_can_be_switched_on_for_a_safe_rollout(self):
+        # The middleware reads the flag when it is built, so rebuild it the way Django would.
+        from apps.core.middleware import ContentSecurityPolicyMiddleware
+
+        middleware = ContentSecurityPolicyMiddleware(lambda request: HttpResponse("ok"))
+        response = middleware(RequestFactory().get("/"))
+        self.assertIn("Content-Security-Policy-Report-Only", response)
+        self.assertNotIn("Content-Security-Policy", response)
+
+    @override_settings(CSP_REPORT_URI="https://example.report/csp")
+    def test_a_report_endpoint_is_appended_when_configured(self):
+        from apps.core.middleware import ContentSecurityPolicyMiddleware
+
+        middleware = ContentSecurityPolicyMiddleware(lambda request: HttpResponse("ok"))
+        response = middleware(RequestFactory().get("/"))
+        self.assertTrue(response["Content-Security-Policy"].endswith("report-uri https://example.report/csp"))
+
+
+class SettingsHelperTests(TestCase):
+    """The two settings helpers that would silently misconfigure the site if they drifted."""
+
+    def test_dashboard_path_is_normalised_however_it_is_written(self):
+        from config.settings import normalise_url_prefix
+
+        for raw in ["zen", "zen/", "/zen/", "  /zen  ", "//zen//"]:
+            self.assertEqual(normalise_url_prefix(raw), "zen/", raw)
+        self.assertEqual(normalise_url_prefix("hq/admin"), "hq/admin/")
+        for empty in ["", "   ", "/", None]:
+            with self.assertRaises(ImproperlyConfigured):
+                normalise_url_prefix(empty)
+
+    def test_the_running_dashboard_path_has_that_shape(self):
+        self.assertFalse(settings.DASHBOARD_PATH.startswith("/"))
+        self.assertTrue(settings.DASHBOARD_PATH.endswith("/"))
+        self.assertEqual(self.client.get(f"/{settings.DASHBOARD_PATH}").status_code, 302)  # to the login page
+
+    def test_production_never_falls_back_to_a_per_worker_cache(self):
+        from config.settings import cache_config
+
+        self.assertEqual(cache_config("", debug=True)["BACKEND"], "django.core.cache.backends.locmem.LocMemCache")
+        # Lockout counters have to be shared between gunicorn workers and survive a restart.
+        self.assertEqual(cache_config("", debug=False)["BACKEND"], "django.core.cache.backends.db.DatabaseCache")
+        for url in ["redis://127.0.0.1:6379/1", "rediss://cache.example.com:6380/0"]:
+            config = cache_config(url, debug=False)
+            self.assertEqual(config["BACKEND"], "django.core.cache.backends.redis.RedisCache")
+            self.assertEqual(config["LOCATION"], url)
+
+
 class ErrorPageTests(TestCase):
     def test_404_terminal_page(self):
         response = self.client.get("/definitely/missing/")
@@ -294,10 +456,16 @@ class ErrorPageTests(TestCase):
 
 
 class SitemapRobotsTests(TestCase):
-    def test_robots(self):
+    def test_robots_never_names_the_dashboard_path(self):
         body = self.client.get("/robots.txt").content.decode()
-        self.assertIn("Disallow: /hq/", body)
-        self.assertRegex(body, r"Sitemap: http://testserver/sitemap\.xml")
+        self.assertNotIn(settings.DASHBOARD_PATH, body)  # robots.txt is public; the path is a secret
+        self.assertNotIn("hq", body)
+        self.assertIn("Disallow: /pricing/store/checkout/", body)
+        self.assertIn(f"Sitemap: {settings.SITE_URL.rstrip('/')}/sitemap.xml", body)
+
+    def test_the_dashboard_is_kept_out_of_search_by_its_header_instead(self):
+        response = self.client.get(reverse("dashboard:login"))
+        self.assertEqual(response["X-Robots-Tag"], "noindex, nofollow")
 
     def test_sitemap_lists_public_content_only(self):
         from apps.services.models import ServiceCategory

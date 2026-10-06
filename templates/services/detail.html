@@ -7,7 +7,7 @@
 {% block og_image %}{{ service.hero_image_url }}{% endblock %}
 
 {% block json_ld %}
-<script type="application/ld+json">{
+<script type="application/ld+json" nonce="{{ request.csp_nonce }}">{
   "@context": "https://schema.org",
   "@graph": [
     {"@type": "Service", "name": "{{ service.name|escapejs }}", "description": "{{ service.summary|escapejs }}", "serviceType": "{{ service.name|escapejs }}",

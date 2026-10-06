@@ -1,8 +1,42 @@
+import logging
+import secrets
+
 from django.conf import settings
 
 from .models import PageView
 
+logger = logging.getLogger(__name__)
+
 SKIP_PREFIXES = ("/static/", "/media/", "/favicon", "/robots.txt", "/sitemap.xml")
+
+
+class ContentSecurityPolicyMiddleware:
+    """Builds a per-request CSP with a fresh nonce for the few inline scripts the site needs.
+
+    Templates write nonce="{{ request.csp_nonce }}". Anything injected into a page, for example
+    through a compromised staff account, has no nonce and is refused by the browser.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+        self.header = (
+            "Content-Security-Policy-Report-Only" if settings.CSP_REPORT_ONLY else "Content-Security-Policy"
+        )
+
+    def __call__(self, request):
+        request.csp_nonce = secrets.token_urlsafe(16)
+        response = self.get_response(request)
+        response.setdefault(self.header, self.policy(request.csp_nonce))
+        return response
+
+    def policy(self, nonce):
+        parts = []
+        for directive, sources in settings.CSP_DIRECTIVES.items():
+            rendered = [source.replace("{nonce}", f"'nonce-{nonce}'") for source in sources]
+            parts.append(" ".join([directive, *rendered]).strip())
+        if settings.CSP_REPORT_URI:
+            parts.append(f"report-uri {settings.CSP_REPORT_URI}")
+        return "; ".join(parts)
 
 
 class SecurityHeadersMiddleware:
@@ -45,5 +79,5 @@ class PageViewMiddleware:
                     session_key=(request.session.session_key or "")[:64],
                 )
             except Exception:  # analytics must never break a page
-                pass
+                logger.warning("Could not record a page view for %s", path, exc_info=True)
         return response

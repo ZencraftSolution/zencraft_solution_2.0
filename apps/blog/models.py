@@ -5,6 +5,8 @@ from django.db import models
 from django.urls import reverse
 from django.utils import timezone
 
+from apps.core.html import sanitise_html
+
 
 class BlogCategory(models.Model):
     name = models.CharField(max_length=80)
@@ -26,7 +28,7 @@ class BlogPost(models.Model):
     category = models.ForeignKey(BlogCategory, on_delete=models.SET_NULL, null=True, related_name="posts")
     tags = models.CharField(max_length=200, blank=True, help_text="Comma separated")
     excerpt = models.CharField(max_length=300)
-    body = models.TextField(help_text="HTML content written by staff")
+    body = models.TextField(help_text="HTML content written by staff. Scripts and event handlers are stripped on save.")
     hero_image_url = models.URLField()
     reading_minutes = models.PositiveSmallIntegerField(default=1, editable=False)
     is_published = models.BooleanField(default=True)
@@ -41,6 +43,9 @@ class BlogPost(models.Model):
         return self.title
 
     def save(self, *args, **kwargs):
+        # Cleaned here rather than in a form, so the admin, the dashboard, the seed command and
+        # any future import all go through it.
+        self.body = sanitise_html(self.body)
         words = len(re.sub(r"<[^>]+>", " ", self.body).split())
         self.reading_minutes = max(1, math.ceil(words / 220))
         super().save(*args, **kwargs)

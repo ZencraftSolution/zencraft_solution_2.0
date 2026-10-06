@@ -29,8 +29,12 @@ def _http_json(url, data=None, headers=None, form=False, method="POST"):
         else:
             body = json.dumps(data).encode()
             headers.setdefault("Content-Type", "application/json")
-    req = urllib.request.Request(url, data=body, headers=headers, method=method)
-    with urllib.request.urlopen(req, timeout=20) as resp:
+    # The URL comes from settings, not from a request, but a mistyped environment variable
+    # should fail loudly rather than let urllib open a file:// or ftp:// URL on the server.
+    if not url.startswith("https://"):
+        raise ValueError(f"Refusing to call a payment endpoint that is not https: {url!r}")
+    req = urllib.request.Request(url, data=body, headers=headers, method=method)  # noqa: S310  # nosec B310 - scheme checked above
+    with urllib.request.urlopen(req, timeout=20) as resp:  # noqa: S310  # nosec B310
         return json.loads(resp.read().decode())
 
 

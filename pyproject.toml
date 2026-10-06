@@ -4,12 +4,17 @@ target-version = "py310"
 extend-exclude = ["*/migrations/*", ".claude", "staticfiles", "media", "private_media"]
 
 [tool.ruff.lint]
-# pyflakes, the error-class pycodestyle rules, import sorting, bugbear and Django-specific checks
-select = ["E4", "E7", "E9", "F", "W", "I", "B", "DJ"]
+# pyflakes, the error-class pycodestyle rules, import sorting, bugbear, Django checks,
+# and S: the bandit security rules.
+select = ["E4", "E7", "E9", "F", "W", "I", "B", "DJ", "S"]
 
 [tool.ruff.lint.per-file-ignores]
 # Tests assert on attribute access for side effects (e.g. `f.url` raising) and build long fixture literals.
-"**/tests.py" = ["B018", "E501"]
+# S101: assert is how tests are written. S105/S106: fixture passwords are not real credentials.
+# S311: test data uses the standard random module, never for anything security related.
+# S603: the deploy-check test runs this interpreter with a fixed argument list.
+"**/tests.py" = ["B018", "E501", "S101", "S105", "S106", "S311", "S603"]
+"apps/core/testing.py" = ["S105", "S106", "S311"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["apps", "config"]

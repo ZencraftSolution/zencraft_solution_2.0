@@ -15,7 +15,7 @@ from apps.services.models import Industry, Service, Technology
 
 from .forms import ConsultationForm, ContactForm, NewsletterForm
 from .models import NewsletterSubscriber
-from .utils import rate_limit
+from .utils import rate_limit, safe_referer
 
 
 def _unsplash(photo_id, w, h, q=75):
@@ -162,7 +162,7 @@ def newsletter_subscribe(request):
         if wants_json:
             return JsonResponse({"ok": False, "message": "Please enter a valid email address."}, status=400)
         messages.error(request, "Please enter a valid email address.")
-    return redirect(request.META.get("HTTP_REFERER") or "core:home")
+    return redirect(safe_referer(request, reverse("core:home")))
 
 
 def search(request):
@@ -194,12 +194,14 @@ def legal(request, page):
 
 
 def robots_txt(request):
+    # The dashboard path is deliberately absent: robots.txt is public, and listing the path
+    # would hand it to anyone. Those pages already send X-Robots-Tag: noindex, nofollow.
     lines = [
         "User-agent: *",
-        f"Disallow: /{settings.DASHBOARD_PATH}",
         "Disallow: /pricing/store/cart/",
         "Disallow: /pricing/store/checkout/",
-        f"Sitemap: {request.build_absolute_uri('/sitemap.xml')}",
+        "Disallow: /search/",
+        f"Sitemap: {settings.SITE_URL.rstrip('/')}/sitemap.xml",
     ]
     return HttpResponse("\n".join(lines), content_type="text/plain")
 

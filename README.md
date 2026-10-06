@@ -102,9 +102,50 @@ Or, with Docker, run `docker run -d --name clamav -p 3310:3310 clamav/clamav:sta
 
 Check it end to end with the harmless EICAR test string. Uploading a `.pdf` whose content starts with `%PDF-` followed by the EICAR string should be rejected with "The file could not be accepted by our security scan."
 
-## Login lockout and proxies
+## Login lockout, proxies and the shared cache
 
-The HQ dashboard login and the Django admin login share one IP-keyed lockout (`LOGIN_MAX_FAILURES`, default 5, over `LOGIN_LOCKOUT_SECONDS`, default 900). Behind nginx or another reverse proxy, set `TRUSTED_PROXY_COUNT=1` so the real client IP is read from `X-Forwarded-For`. Leave it at `0` when Django is exposed directly, otherwise attackers could spoof the header to dodge the lockout.
+Login lockouts (5 failures, 15 minutes) and every rate limit are keyed by the visitor's IP
+address and stored in the cache, so both have to be configured correctly or they protect nothing.
+
+### TRUSTED_PROXY_COUNT
+
+Each reverse proxy in front of Django appends the address it received the request from to
+`X-Forwarded-For`. Entries further left are whatever the client sent, so they cannot be trusted.
+`TRUSTED_PROXY_COUNT` says how many entries to count from the right.
+
+| Deployment | Value |
+| --- | --- |
+| `manage.py runserver`, or gunicorn exposed directly | `0` |
+| **Render** | `1` |
+| nginx or another single proxy in front of gunicorn | `1` |
+| CDN (Cloudflare, Fastly) in front of Render | `2` |
+
+**Verify it after the first deploy** rather than assuming:
+
+1. Find your own public address at <https://ifconfig.me>.
+2. Sign in to the staff dashboard from that network, then open **Audit log**.
+3. Compare the IP recorded against your real one.
+   - They match: the value is right.
+   - A private address (`10.x.x.x`, `172.16-31.x.x`) or Render's load balancer: the value is
+     **too low**, so every visitor is sharing one address. Increase it by one and redeploy.
+   - An address you do not recognise that changes when you change the `X-Forwarded-For` header
+     by hand: the value is **too high** and visitors can spoof it. Decrease it.
+
+### CACHE_URL
+
+`LocMemCache` lives inside one gunicorn worker and is wiped on restart, so an attacker could
+reset a lockout by retrying until another worker answered. It is therefore used only when
+`DEBUG=True`.
+
+- **Leave `CACHE_URL` empty in production** and the database cache is used. The build command
+  must run `python manage.py createcachetable`.
+- **Set `CACHE_URL=redis://...`** (or `rediss://` for TLS) once you add a Redis instance. This is
+  faster and is the better choice as soon as traffic grows.
+
+A deploy check refuses to start a production deployment that is still on LocMem.
+
+The HQ dashboard login and the Django admin login share one IP-keyed lockout
+(`LOGIN_MAX_FAILURES`, default 5, over `LOGIN_LOCKOUT_SECONDS`, default 900).
 
 ## Front end and motion
 

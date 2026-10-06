@@ -8,6 +8,34 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 env = environ.Env(DEBUG=(bool, False))
 environ.Env.read_env(BASE_DIR / ".env")
 
+
+def normalise_url_prefix(value, name="DASHBOARD_PATH"):
+    """Accepts "zen", "zen/" or "/zen/" and always returns "zen/".
+
+    Every mount point and every prefix comparison assumes this exact shape, so a stray
+    slash in the environment would otherwise silently unmount the staff dashboard.
+    """
+    cleaned = (value or "").strip().strip("/")
+    if not cleaned:
+        raise ImproperlyConfigured(f"{name} must not be empty: it is the mount point for the staff dashboard.")
+    return f"{cleaned}/"
+
+
+def cache_config(url="", debug=False):
+    """Picks the cache backend. Login lockouts and rate limits live here, so it has to be shared.
+
+    LocMemCache is per worker process and is wiped on restart, which would let an attacker
+    reset a lockout simply by landing on another gunicorn worker. It is therefore only used
+    for local development; production falls back to the database cache when no CACHE_URL is set.
+    """
+    if url:
+        if url.startswith(("redis://", "rediss://", "unix://")):
+            return {"BACKEND": "django.core.cache.backends.redis.RedisCache", "LOCATION": url}
+        return env.cache_url_config(url)
+    if debug:
+        return {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "zencraft"}
+    return {"BACKEND": "django.core.cache.backends.db.DatabaseCache", "LOCATION": "zencraft_cache"}
+
 SECRET_KEY = env("SECRET_KEY")
 DEBUG = env("DEBUG")
 ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
@@ -25,6 +53,8 @@ INSTALLED_APPS = [
     "django.contrib.postgres",
     "django.contrib.sitemaps",
     "rest_framework",
+    "django_otp",
+    "django_otp.plugins.otp_totp",
     "apps.accounts",
     "apps.core",
     "apps.services",
@@ -43,8 +73,11 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    # Adds request.user.is_verified(); the staff gate enforces it when STAFF_2FA_REQUIRED is on.
+    "django_otp.middleware.OTPMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "apps.core.middleware.ContentSecurityPolicyMiddleware",
     "apps.core.middleware.SecurityHeadersMiddleware",
     "apps.core.middleware.PageViewMiddleware",
 ]
@@ -147,18 +180,27 @@ CLAMAV_HOST = env("CLAMAV_HOST", default="127.0.0.1")
 CLAMAV_PORT = env.int("CLAMAV_PORT", default=3310)
 CLAMAV_TIMEOUT = env.int("CLAMAV_TIMEOUT", default=30)
 CV_RETENTION_DAYS = env.int("CV_RETENTION_DAYS", default=180)
+# How long one email address has to wait before applying for the same role again. A permanent
+# block would let anyone lock a real candidate out of a role for good by using their address.
+CAREERS_REAPPLY_DAYS = env.int("CAREERS_REAPPLY_DAYS", default=30)
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-DASHBOARD_PATH = env("DASHBOARD_PATH", default="hq/")
+DASHBOARD_PATH = normalise_url_prefix(env("DASHBOARD_PATH", default="hq/"))
 LOGIN_MAX_FAILURES = env.int("LOGIN_MAX_FAILURES", default=5)
 LOGIN_LOCKOUT_SECONDS = env.int("LOGIN_LOCKOUT_SECONDS", default=15 * 60)
 # Number of reverse proxies in front of Django that append to X-Forwarded-For. 0 = ignore the header.
 TRUSTED_PROXY_COUNT = env.int("TRUSTED_PROXY_COUNT", default=0)
+# Staff sessions expire a fixed time after signing in, however active the person has been.
+# Applied by the staff gate only, so a visitor's cart is not thrown away with it.
+STAFF_SESSION_HOURS = env.int("STAFF_SESSION_HOURS", default=8)
+# Turn on once every staff account has enrolled a TOTP app; until then they would lock themselves out.
+STAFF_2FA_REQUIRED = env.bool("STAFF_2FA_REQUIRED", default=False)
+OTP_TOTP_ISSUER = env("OTP_TOTP_ISSUER", default="Zencraft Solution")
 LOGIN_URL = "dashboard:login"
 LOGIN_REDIRECT_URL = "dashboard:overview"
 
-CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "zencraft"}}
+CACHES = {"default": cache_config(env("CACHE_URL", default=""), debug=DEBUG)}
 
 EMAIL_BACKEND = env("EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")
 if env("EMAIL_URL", default=""):
@@ -180,6 +222,51 @@ PAYMENTS = {
     "KHALTI_API_URL": env("KHALTI_API_URL", default="https://dev.khalti.com/api/v2/"),
     "STRIPE_SECRET_KEY": env("STRIPE_SECRET_KEY", default=""),
 }
+
+# Content-Security-Policy. Scripts are allow-listed by nonce, so no 'unsafe-inline' for scripts:
+# an injected <script> has no nonce and will not run. Styles still need 'unsafe-inline' because the
+# templates use style="..." attributes throughout; that is a far smaller risk than script injection.
+CSP_REPORT_ONLY = env.bool("CSP_REPORT_ONLY", default=False)
+CSP_REPORT_URI = env("CSP_REPORT_URI", default="")
+# Hosts the payment step posts a form to. Redirect-based gateways (Khalti, Stripe) are not covered
+# by form-action, but are listed so switching one to a POST form does not silently break checkout.
+CSP_PAYMENT_HOSTS = [
+    "https://epay.esewa.com.np",
+    "https://rc-epay.esewa.com.np",
+    "https://khalti.com",
+    "https://*.khalti.com",
+    "https://checkout.stripe.com",
+]
+CSP_DIRECTIVES = {
+    "default-src": ["'self'"],
+    # jsdelivr: GSAP. cdnjs: highlight.js on case study pages.
+    "script-src": ["'self'", "{nonce}", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"],
+    "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdn.jsdelivr.net"],
+    "font-src": ["'self'", "https://fonts.gstatic.com", "https://cdn.jsdelivr.net", "data:"],
+    "img-src": [
+        "'self'",
+        "data:",
+        "blob:",
+        "https://res.cloudinary.com",
+        "https://images.unsplash.com",
+        "https://picsum.photos",
+        "https://fastly.picsum.photos",
+        "https://cdn.jsdelivr.net",
+        "https://cdn.simpleicons.org",
+    ],
+    "connect-src": ["'self'"],
+    "media-src": ["'self'"],
+    "worker-src": ["'self'", "blob:"],
+    "manifest-src": ["'self'"],
+    # The staff CV preview frames a same-origin view; nothing else is framed.
+    "frame-src": ["'self'"],
+    "object-src": ["'none'"],
+    "base-uri": ["'self'"],
+    "frame-ancestors": ["'none'"],
+    "form-action": ["'self'", *CSP_PAYMENT_HOSTS],
+}
+if not DEBUG:
+    CSP_DIRECTIVES["upgrade-insecure-requests"] = []
 
 SESSION_COOKIE_HTTPONLY = True
 CSRF_COOKIE_HTTPONLY = False

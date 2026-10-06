@@ -4,7 +4,7 @@
 {% block cta_band %}{% endblock %}
 
 {% block json_ld %}
-<script type="application/ld+json">{
+<script type="application/ld+json" nonce="{{ request.csp_nonce }}">{
   "@context": "https://schema.org/",
   "@type": "JobPosting",
   "title": "{{ job.title|escapejs }}",

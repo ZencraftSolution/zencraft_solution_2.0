@@ -35,6 +35,7 @@
     {% endfor %}
     {% endfor %}
     <p class="dash-nav-title">System</p>
+    <a class="dash-link {% if request.resolver_match.url_name == 'security' %}is-active{% endif %}" href="{% url 'dashboard:security' %}"><i class="ph ph-shield-check"></i>Security</a>
     {% if request.user.is_superuser %}<a class="dash-link" href="{% url 'admin:index' %}"><i class="ph ph-database"></i>Django admin</a>{% endif %}
     <a class="dash-link" href="{% url 'core:home' %}" target="_blank" rel="noopener"><i class="ph ph-arrow-square-out"></i>View website</a>
   </nav>

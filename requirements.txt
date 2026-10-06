@@ -26,3 +26,10 @@ idna==3.15
 certifi==2025.10.5
 charset-normalizer==3.4.4
 six==1.17.0
+# HTML sanitising for staff-authored blog bodies, which are rendered unescaped.
+nh3==0.3.7
+# Optional TOTP two-factor authentication for staff (STAFF_2FA_REQUIRED).
+django-otp==1.7.3
+qrcode==8.2
+# Only used when CACHE_URL points at Redis; the database cache needs nothing extra.
+redis==8.1.0

@@ -1,5 +1,4 @@
 from django.conf import settings
-from django.contrib import messages
 from django.core.mail import send_mail
 from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
@@ -10,13 +9,13 @@ from apps.core.utils import make_reference, rate_limit
 from apps.portfolio.models import GalleryImage
 
 from .forms import (
-    DUPLICATE_MESSAGE,
     ApplyEmailForm,
     EducationFormSet,
     ExperienceFormSet,
     JobApplicationForm,
     ProjectFormSet,
-    already_applied,
+    duplicate_message,
+    recent_application,
 )
 from .models import Department, JobApplication, JobOpening
 
@@ -125,7 +124,11 @@ def job_detail(request, slug):
 
 @rate_limit("apply_email", limit=10, window=1800)
 def apply(request, slug):
-    """Step 1. The email on its own, so a repeat applicant hears about it before filling anything in."""
+    """Step 1: the address we reply to.
+
+    It accepts any valid address. Telling someone here that an address had already applied would
+    let anyone test addresses against a role, so the duplicate rule runs at the end instead.
+    """
     job = get_object_or_404(JobOpening, slug=slug, is_active=True)
     if not job.is_open:
         return render(request, "careers/closed.html", {"job": job}, status=410)
@@ -147,11 +150,6 @@ def apply_details(request, slug):
 
     email = _remembered_email(request, job)
     if not email:
-        return redirect("careers:apply", slug=job.slug)
-    if already_applied(job, email):
-        # The address was used for this role between the two steps.
-        _forget_email(request, job)
-        messages.error(request, DUPLICATE_MESSAGE)
         return redirect("careers:apply", slug=job.slug)
 
     data = request.POST or None
@@ -175,6 +173,12 @@ def apply_details(request, slug):
                     manual_error = "Add at least one education or work experience entry."
         if form_ok and sets_ok:
             with transaction.atomic():
+                # Locking the role serialises applications for it, so two submits racing each
+                # other cannot both pass the duplicate check and both be saved.
+                JobOpening.objects.select_for_update().filter(pk=job.pk).first()
+                if recent_application(job, email):
+                    form.add_error("email", duplicate_message())
+                    return _render_apply(request, job, email, form, edu, exp, prj, manual_error)
                 application = form.save(commit=False)
                 application.job = job
                 application.reference = make_reference("ZA")
@@ -202,7 +206,11 @@ def apply_details(request, slug):
             request.session["last_application"] = {"ref": application.reference, "job": job.title, "name": application.full_name.split(" ")[0]}
             return redirect("careers:applied")
 
-    current = _first_step_with_errors(form, manual_error, edu, exp, prj) if request.method == "POST" else 2
+    return _render_apply(request, job, email, form, edu, exp, prj, manual_error, posted=request.method == "POST")
+
+
+def _render_apply(request, job, email, form, edu, exp, prj, manual_error, posted=True):
+    current = _first_step_with_errors(form, manual_error, edu, exp, prj) if posted else 2
     return render(request, "careers/apply.html", {
         "job": job, "form": form, "edu": edu, "exp": exp, "prj": prj, "manual_error": manual_error,
         "email": email, "steps": apply_steps(current), "current_step": current,

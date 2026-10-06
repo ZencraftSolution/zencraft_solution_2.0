@@ -27,8 +27,11 @@ jobs:
       - name: Install pinned dependencies
         run: pip install -r requirements-dev.txt
 
-      - name: Ruff
+      - name: Ruff (includes the bandit security rules, select = S)
         run: ruff check .
+
+      - name: Bandit
+        run: bandit -r apps config -ll
 
       - name: pip-audit (runtime and dev dependencies)
         run: |

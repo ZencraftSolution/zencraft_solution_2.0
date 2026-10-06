@@ -81,14 +81,17 @@ def pad2(value):
 
 @register.simple_tag
 def json_ld(data):
+    """Renders a structured-data block. Not executable, and not a place user input reaches."""
+    # json.dumps escapes the content and "</" is broken up, so the payload cannot close the tag
+    # early. The data comes from our own models, never from a request.
     payload = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
-    return mark_safe(f'<script type="application/ld+json">{payload}</script>')
+    return mark_safe(f'<script type="application/ld+json">{payload}</script>')  # noqa: S308  # nosec B308 B703 - escaped above
 
 
 @register.simple_tag
 def network_svg(seed=7, nodes=34, width=640, height=520):
     """Static fallback for the WebGL hero: a deterministic node network in thin blue lines."""
-    rng = random.Random(seed)
+    rng = random.Random(seed)  # noqa: S311 - decorative geometry, deterministic on purpose
     pts = [(rng.uniform(40, width - 40), rng.uniform(40, height - 40)) for _ in range(nodes)]
     edges = []
     for i, (x1, y1) in enumerate(pts):
@@ -100,7 +103,7 @@ def network_svg(seed=7, nodes=34, width=640, height=520):
         f'<line x1="{pts[i][0]:.1f}" y1="{pts[i][1]:.1f}" x2="{pts[j][0]:.1f}" y2="{pts[j][1]:.1f}"/>' for i, j in edges
     )
     node_markup = "".join(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{3 if k % 5 else 5}"/>' for k, (x, y) in enumerate(pts))
-    return mark_safe(
+    return mark_safe(  # noqa: S308  # nosec B308 B703 - every value here is a float this function generated
         f'<svg class="hero-fallback" viewBox="0 0 {width} {height}" role="img" aria-label="Diagram of connected systems">'
         f'<g class="hero-fallback__edges">{line_markup}</g><g class="hero-fallback__nodes">{node_markup}</g></svg>'
     )

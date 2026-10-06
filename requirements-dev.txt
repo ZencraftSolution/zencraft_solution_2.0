@@ -10,3 +10,5 @@ python-dateutil==2.9.0.post0
 six==1.17.0
 ruff==0.16.7
 pip-audit==2.10.1
+# Second opinion on the security rules ruff already runs as select = "S".
+bandit==1.9.4

@@ -1,12 +1,15 @@
 from django.urls import path
 
-from . import api, crud, views
+from . import api, crud, two_factor, views
 
 app_name = "dashboard"
 
 urlpatterns = [
     path("login/", views.DashboardLoginView.as_view(), name="login"),
     path("logout/", views.dashboard_logout, name="logout"),
+    path("verify/", two_factor.two_factor, name="two_factor"),
+    path("security/", two_factor.security, name="security"),
+    path("security/disable/", two_factor.disable_two_factor, name="two_factor_disable"),
     path("", views.overview, name="overview"),
     path("leads/", views.leads_board, name="leads"),
     path("leads/<int:pk>/", views.lead_detail, name="lead_detail"),

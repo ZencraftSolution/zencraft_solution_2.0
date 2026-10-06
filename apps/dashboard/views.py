@@ -10,6 +10,7 @@ from django.db.models import Count, Q, Sum
 from django.db.models.functions import TruncDate
 from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.clickjacking import xframe_options_sameorigin
@@ -23,7 +24,21 @@ from apps.core.utils import log_action
 from apps.estimator.models import EstimatorConfig, EstimatorEvent, LeadNote, ProjectInquiry
 
 from .forms import ApplicationUpdateForm, EstimatorConfigForm, LeadUpdateForm, NoteForm, OrderUpdateForm, SiteSettingsForm
-from .mixins import staff_required
+from .mixins import SESSION_STARTED_KEY, needs_second_factor, staff_required
+
+# A cell a spreadsheet would treat as a formula rather than as text. Applicant-supplied values
+# end up in these exports, so "=HYPERLINK(...)" in a name field must not run when staff open it.
+CSV_FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+
+
+def csv_cell(value):
+    text = "" if value is None else str(value)
+    return f"'{text}" if text.startswith(CSV_FORMULA_PREFIXES) else text
+
+
+def write_csv_row(writer, values):
+    writer.writerow([csv_cell(value) for value in values])
+
 
 ESTIMATOR_STEPS = ["Project type", "Scope", "Platforms", "Timeline and team", "Design", "Contact details", "Estimate shown", "Lead submitted"]
 
@@ -44,9 +59,17 @@ class DashboardLoginView(LoginView):
         if not user.is_staff:
             form.add_error(None, "Please enter a correct username and password.")
             return self.form_invalid(form)
+        # django.contrib.auth.login() cycles the session key for us, so a session fixed before
+        # sign-in cannot be reused afterwards. Stamp the start for the staff session timeout.
         response = super().form_valid(form)
+        self.request.session[SESSION_STARTED_KEY] = timezone.now().timestamp()
         log_action(self.request, "signed in", user)
         return response
+
+    def get_success_url(self):
+        if needs_second_factor(self.request):
+            return reverse("dashboard:two_factor")
+        return super().get_success_url()
 
 
 @require_POST
@@ -206,9 +229,9 @@ def applications_export(request):
     writer = csv.writer(response)
     writer.writerow(["Reference", "Name", "Email", "Phone", "Role", "Mode", "Years", "Location", "Notice", "Expected salary", "Status", "Rating", "Applied"])
     for a in qs:
-        writer.writerow([a.reference, a.full_name, a.email, a.phone, a.job.title, a.get_application_mode_display(), a.years_experience,
-                         a.current_location, a.get_notice_period_display(), a.expected_salary_npr or "", a.get_status_display(), a.rating or "",
-                         timezone.localtime(a.created_at).strftime("%Y-%m-%d")])
+        write_csv_row(writer, [a.reference, a.full_name, a.email, a.phone, a.job.title, a.get_application_mode_display(), a.years_experience,
+                               a.current_location, a.get_notice_period_display(), a.expected_salary_npr or "", a.get_status_display(), a.rating or "",
+                               timezone.localtime(a.created_at).strftime("%Y-%m-%d")])
     return response
 
 
@@ -372,5 +395,5 @@ def newsletter_export(request):
     writer = csv.writer(response)
     writer.writerow(["Email", "Active", "Subscribed"])
     for s in NewsletterSubscriber.objects.all():
-        writer.writerow([s.email, s.is_active, timezone.localtime(s.created_at).strftime("%Y-%m-%d")])
+        write_csv_row(writer, [s.email, s.is_active, timezone.localtime(s.created_at).strftime("%Y-%m-%d")])
     return response

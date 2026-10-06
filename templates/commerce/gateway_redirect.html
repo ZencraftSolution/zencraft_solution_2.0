@@ -12,5 +12,5 @@
     </form>
   </div>
 </section>
-<script>document.getElementById("gateway-form").submit();</script>
+<script nonce="{{ request.csp_nonce }}">document.getElementById("gateway-form").submit();</script>
 {% endblock %}

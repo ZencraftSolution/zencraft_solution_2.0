@@ -4,7 +4,7 @@
 {% block meta_description %}{{ product.summary }}{% endblock %}
 
 {% block json_ld %}
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"Product","name":"{{ product|escapejs }}","description":"{{ product.summary|escapejs }}","brand":{"@type":"Brand","name":"{{ site.company_name|escapejs }}"},"offers":{"@type":"Offer","priceCurrency":"NPR","price":"{{ product.price_npr|floatformat:0 }}","availability":"https://schema.org/InStock","url":"{{ SITE_URL }}{{ request.path }}"}}</script>
+<script type="application/ld+json" nonce="{{ request.csp_nonce }}">{"@context":"https://schema.org","@type":"Product","name":"{{ product|escapejs }}","description":"{{ product.summary|escapejs }}","brand":{"@type":"Brand","name":"{{ site.company_name|escapejs }}"},"offers":{"@type":"Offer","priceCurrency":"NPR","price":"{{ product.price_npr|floatformat:0 }}","availability":"https://schema.org/InStock","url":"{{ SITE_URL }}{{ request.path }}"}}</script>
 {% endblock %}
 
 {% block content %}

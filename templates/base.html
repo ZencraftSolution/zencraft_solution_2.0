@@ -27,7 +27,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/fill/style.css">
   <link rel="stylesheet" href="{% static 'css/main.css' %}">
 
-  <script>
+  <script nonce="{{ request.csp_nonce }}">
     (function () {
       var d = document.documentElement;
       try { if (localStorage.getItem("zc-currency") === "usd") d.setAttribute("data-currency", "usd"); } catch (e) {}
@@ -59,7 +59,7 @@
     })();
   </script>
 
-  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"{{ site.company_name|escapejs }}","url":"{{ SITE_URL }}","logo":"{{ SITE_URL }}{% static 'img/favicon-192.png' %}","email":"{{ site.email }}","telephone":"{{ site.phone|escapejs }}","address":{"@type":"PostalAddress","streetAddress":"{{ site.address|escapejs }}","addressCountry":"NP"}}</script>
+  <script type="application/ld+json" nonce="{{ request.csp_nonce }}">{"@context":"https://schema.org","@type":"Organization","name":"{{ site.company_name|escapejs }}","url":"{{ SITE_URL }}","logo":"{{ SITE_URL }}{% static 'img/favicon-192.png' %}","email":"{{ site.email }}","telephone":"{{ site.phone|escapejs }}","address":{"@type":"PostalAddress","streetAddress":"{{ site.address|escapejs }}","addressCountry":"NP"}}</script>
   {% block json_ld %}{% endblock %}
   {% block extra_head %}{% endblock %}
 </head>
