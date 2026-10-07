@@ -107,6 +107,41 @@ def check_cache_backend(app_configs, **kwargs):
     return []
 
 
+@register(Tags.caches, deploy=True)
+def check_cache_is_usable(app_configs, **kwargs):
+    """The cache must actually answer, not just be configured.
+
+    The database cache needs a table that `createcachetable` creates as a separate build step.
+    Configured but missing, everything looks right until the first write, which on one deploy
+    was `cache.clear()` at the end of seeding and took the whole build down with it.
+    """
+    if not _production():
+        return []
+    from django.core.cache import cache
+
+    probe = "zencraft-deploy-check"
+    try:
+        cache.set(probe, "ok", 5)
+        value = cache.get(probe)
+        cache.delete(probe)
+    except Exception as exc:  # a missing table, an unreachable Redis, a bad URL: all fatal here
+        return [Error(
+            f"The cache is configured but not usable: {exc.__class__.__name__}: {exc}",
+            hint=(
+                "With the database cache, add `python manage.py createcachetable` to the build "
+                "command, before any command that touches the cache."
+            ),
+            id="zencraft.E009",
+        )]
+    if value != "ok":
+        return [Error(
+            "The cache accepted a write but did not return it.",
+            hint="Check CACHE_URL and that the backend is reachable.",
+            id="zencraft.E010",
+        )]
+    return []
+
+
 @register(Tags.security, deploy=True)
 def check_upload_scanning(app_configs, **kwargs):
     """Quarantine mode is a deliberate choice, not something to drift into unnoticed."""

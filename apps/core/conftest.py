@@ -50,6 +50,18 @@ def browser_type_launch_args(browser_type_launch_args):
 
 
 @pytest.fixture(autouse=True)
+def patient(page):
+    """Playwright's 30 second default is not enough on a slow machine.
+
+    Closing a browser context alone takes about 25 seconds on the Windows laptop this was
+    written on, and under that load navigations began timing out. The failures looked like
+    layout faults and were not, which is worse than a slow test.
+    """
+    page.set_default_timeout(60_000)
+    page.set_default_navigation_timeout(60_000)
+
+
+@pytest.fixture(autouse=True)
 def offline(page, live_server):
     """Answers every request to another host with a harmless stub.
 
@@ -59,25 +71,24 @@ def offline(page, live_server):
     """
 
     def handle(route, request):
-        if request.url.startswith(live_server.url):
-            route.continue_()
-            return
         content_type, body = STUBS.get(request.resource_type, ("text/plain", b""))
         route.fulfill(status=200, content_type=content_type, body=body)
 
-    page.route("**/*", handle)
+    # Matched by predicate so only external URLs cross into Python. Routing "**/*" sends every
+    # local request through this callback too, which made each test's teardown take half a
+    # minute while Playwright drained the queue.
+    page.route(lambda url: not url.startswith(live_server.url), handle)
     yield
-    page.unroute("**/*", handle)
 
 
 @pytest.fixture
 def site(live_server, transactional_db):
     """The base URL of a running server with content in it.
 
-    Seeded per test, not once per session: live_server runs the application in another thread,
-    so pytest-django gives these tests transactional behaviour and flushes the database between
-    them. Seeding once would leave every test after the first looking at an empty site, which
-    fails in ways that look like browser faults and are not.
+    Seeded per test. live_server answers from another thread, so it only sees committed data,
+    and pytest-django therefore gives these tests transactional behaviour and flushes between
+    them. Seeding once at session scope was tried and does not survive that flush: every test
+    after the first then looks at an empty site and fails in ways that look like browser faults.
     """
     call_command("seed_zencraft", verbosity=0)
     # The navigation menu is cached for two minutes. A list cached before the seed would make

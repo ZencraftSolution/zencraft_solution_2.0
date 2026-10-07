@@ -36,8 +36,24 @@ class Command(BaseCommand):
         self.seed_careers()
         self.seed_blog()
         self.seed_admin()
-        cache.clear()
+        self.clear_cache()
         self.stdout.write(self.style.SUCCESS("Zencraft seed data loaded."))
+
+    def clear_cache(self):
+        """Drops cached navigation and site settings so the new content shows immediately.
+
+        Best effort on purpose. With the database cache, the table is created by a separate
+        `createcachetable` step, and if that has not run yet this raises. Failing the whole seed
+        over a cache that is already empty would turn a missing build step into a failed deploy,
+        which is exactly what it did once.
+        """
+        try:
+            cache.clear()
+        except Exception as exc:
+            self.stdout.write(self.style.WARNING(
+                f"  could not clear the cache ({exc.__class__.__name__}). "
+                "Run `manage.py createcachetable` in the build, before this command."
+            ))
 
     def seed_technologies(self):
         for order, (name, slug, category, logo, prof, years) in enumerate(S.TECHNOLOGIES):

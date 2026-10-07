@@ -51,7 +51,10 @@ class NoHorizontalScrollTests:
     @pytest.mark.parametrize("name,path", PAGES.items(), ids=list(PAGES))
     def test_the_page_does_not_scroll_sideways_on_a_phone(self, page, site, name, path):
         page.set_viewport_size({"width": WIDTHS["phone"], "height": 812})
-        page.goto(f"{site}{path}", wait_until="load")
+        response = page.goto(f"{site}{path}", wait_until="load")
+        # Without this, a page whose content failed to seed would 404, lay out narrowly and
+        # pass. The test would be measuring the error page.
+        assert response.status == 200, f"{path} returned {response.status}"
         page.wait_for_timeout(400)
         result = overflow(page)
         assert result["over"] == 0, f"{path} is {result['over']}px too wide: {result['culprits']}"
