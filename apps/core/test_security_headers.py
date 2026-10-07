@@ -106,7 +106,7 @@ class CookieSecurityTests(TestCase):
 
     def test_a_session_handed_out_in_production_carries_the_secure_flag(self):
         client = Client(headers={"host": "zencraftsolution.com"})
-        client.post("/pricing/store/cart/add/1/", {"quantity": 1}, secure=True)
+        client.get("/contact/", secure=True)  # any page that starts a session
         cookie = client.cookies.get("sessionid")
         if cookie is not None:  # only set once something goes into the session
             self.assertTrue(cookie["secure"])

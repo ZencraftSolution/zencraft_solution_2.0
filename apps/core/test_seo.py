@@ -179,9 +179,20 @@ class NoindexTests(TestCase):
     def test_search_results_are_not_indexed(self):
         self.assert_noindex(reverse("core:search") + "?q=django")
 
+    @override_settings(STORE_ENABLED=True)
     def test_the_cart_and_checkout_are_not_indexed(self):
         self.assert_noindex(reverse("commerce:cart"))
         self.assert_noindex(reverse("commerce:checkout"))
+
+    def test_the_closed_shop_is_gone_rather_than_hidden(self):
+        """With STORE_ENABLED off these answer 404, so nothing can index or link to them."""
+        for name in ["commerce:pricing", "commerce:store", "commerce:cart", "commerce:checkout"]:
+            self.assertEqual(self.client.get(reverse(name)).status_code, 404, name)
+
+    @override_settings(STORE_ENABLED=True)
+    def test_turning_the_shop_back_on_needs_no_code_change(self):
+        for name in ["commerce:pricing", "commerce:store"]:
+            self.assertEqual(self.client.get(reverse(name)).status_code, 200, name)
 
     def test_the_application_steps_and_thank_you_pages_are_not_indexed(self):
         from apps.careers.models import JobOpening
@@ -336,6 +347,7 @@ class StructuredDataTests(TestCase):
         job.save(update_fields=["show_salary"])
         self.assertNotIn("baseSalary", self.of_type(job.get_absolute_url(), "JobPosting"))
 
+    @override_settings(STORE_ENABLED=True)
     def test_a_store_product_publishes_its_price_as_an_offer(self):
         from apps.commerce.models import ProductizedService
 
@@ -445,7 +457,7 @@ class FrontEndPerformanceTests(TestCase):
 
     def test_every_image_declares_its_size(self):
         """Without width and height the page reflows as images arrive, which is measured as CLS."""
-        for path in ["/", "/work/", "/insights/", "/careers/", "/pricing/"]:
+        for path in ["/", "/work/", "/insights/", "/careers/", "/about/"]:
             for image in seo.parse(self.head(path)).images:
                 with self.subTest(path=path, src=image.get("src", "")[:60]):
                     self.assertIn("width", image)
@@ -482,7 +494,7 @@ class TemplateHygieneTests(TestCase):
     """Django's {# #} comment only works on one line; a multi-line one is printed to the page."""
 
     def test_no_template_comment_reaches_the_browser(self):
-        for path in ["/", "/work/", "/insights/", "/careers/", "/pricing/", "/contact/", "/about/"]:
+        for path in ["/", "/work/", "/insights/", "/careers/", "/contact/", "/about/"]:
             html = self.client.get(path).content.decode()
             with self.subTest(path=path):
                 self.assertNotIn("{#", html)

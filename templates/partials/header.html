@@ -26,7 +26,6 @@
       </div>
       <a class="nav__link {% active '/services/industries/' %}" href="{% url 'services:industries' %}">Industries</a>
       <a class="nav__link {% active '/work/' %}" href="{% url 'portfolio:list' %}">Work</a>
-      <a class="nav__link {% active '/pricing/' %}" href="{% url 'commerce:pricing' %}">Pricing</a>
       <a class="nav__link {% active '/about/' %}" href="{% url 'core:about' %}">About</a>
       <a class="nav__link {% active '/careers/' %}" href="{% url 'careers:landing' %}">Careers</a>
       <a class="nav__link {% active '/insights/' %}" href="{% url 'blog:list' %}">Insights</a>
@@ -37,11 +36,7 @@
         <button type="button" data-currency="npr" aria-pressed="true">NPR</button>
         <button type="button" data-currency="usd" aria-pressed="false">USD</button>
       </div>
-      <a class="icon-btn" href="{% url 'commerce:cart' %}" aria-label="Cart, {{ cart_count }} items">
-        <i class="ph ph-shopping-cart-simple" aria-hidden="true"></i>
-        {% if cart_count %}<span class="icon-btn__badge">{{ cart_count }}</span>{% endif %}
-      </a>
-      <a class="btn btn--primary btn--sm header-cta" href="{% url 'estimator:start' %}">Get an estimate</a>
+            <a class="btn btn--primary btn--sm header-cta" href="{% url 'estimator:start' %}">Get an estimate</a>
       <button class="icon-btn menu-toggle" type="button" aria-expanded="false" aria-controls="mobile-menu" aria-label="Open menu" data-menu-toggle>
         <i class="ph ph-list" aria-hidden="true"></i>
       </button>
@@ -72,8 +67,6 @@
       <ul class="mobile-menu__list">
         <li><a href="{% url 'services:industries' %}"><i class="ph ph-buildings" aria-hidden="true"></i><span><strong>Industries</strong></span><i class="ph ph-caret-right mobile-menu__chevron" aria-hidden="true"></i></a></li>
         <li><a href="{% url 'portfolio:list' %}"><i class="ph ph-folder-open" aria-hidden="true"></i><span><strong>Work</strong></span><i class="ph ph-caret-right mobile-menu__chevron" aria-hidden="true"></i></a></li>
-        <li><a href="{% url 'commerce:pricing' %}"><i class="ph ph-tag" aria-hidden="true"></i><span><strong>Pricing</strong></span><i class="ph ph-caret-right mobile-menu__chevron" aria-hidden="true"></i></a></li>
-        <li><a href="{% url 'commerce:store' %}"><i class="ph ph-shopping-bag-open" aria-hidden="true"></i><span><strong>Store</strong></span><i class="ph ph-caret-right mobile-menu__chevron" aria-hidden="true"></i></a></li>
         <li><a href="{% url 'careers:landing' %}"><i class="ph ph-briefcase" aria-hidden="true"></i><span><strong>Careers</strong></span><i class="ph ph-caret-right mobile-menu__chevron" aria-hidden="true"></i></a></li>
         <li><a href="{% url 'blog:list' %}"><i class="ph ph-article" aria-hidden="true"></i><span><strong>Insights</strong></span><i class="ph ph-caret-right mobile-menu__chevron" aria-hidden="true"></i></a></li>
         <li><a href="{% url 'core:about' %}"><i class="ph ph-users-three" aria-hidden="true"></i><span><strong>About</strong></span><i class="ph ph-caret-right mobile-menu__chevron" aria-hidden="true"></i></a></li>

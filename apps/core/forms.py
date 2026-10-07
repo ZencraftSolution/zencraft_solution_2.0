@@ -1,7 +1,7 @@
 from django import forms
 from django.utils import timezone
 
-from .models import ConsultationBooking, ContactSubmission, NewsletterSubscriber
+from .models import ConsultationBooking, ContactSubmission, Feedback, NewsletterSubscriber
 
 
 class HoneypotMixin(forms.Form):
@@ -25,6 +25,34 @@ class ContactForm(HoneypotMixin, forms.ModelForm):
         model = ContactSubmission
         fields = ["name", "email", "phone", "company", "subject", "message", "consent"]
         widgets = {"message": forms.Textarea(attrs={"rows": 5})}
+
+
+class FeedbackForm(HoneypotMixin, forms.ModelForm):
+    """Short on purpose. Every extra field is a reason not to bother."""
+
+    may_publish = forms.BooleanField(
+        required=False,
+        label="You may quote this on the website, with my name and company.",
+    )
+
+    class Meta:
+        model = Feedback
+        fields = ["name", "email", "company", "rating", "message", "may_publish"]
+        labels = {
+            "email": "Email (only if you would like a reply)",
+            "rating": "How was it?",
+            "message": "What would you tell someone else about working with us?",
+        }
+        widgets = {
+            "rating": forms.RadioSelect,
+            "message": forms.Textarea(attrs={"rows": 4, "placeholder": "What went well, and what could be better?"}),
+        }
+
+    def clean_message(self):
+        message = self.cleaned_data["message"].strip()
+        if len(message) < 10:
+            raise forms.ValidationError("A sentence or two is enough, but we need a little more than this.")
+        return message
 
 
 class ConsultationForm(HoneypotMixin, forms.ModelForm):

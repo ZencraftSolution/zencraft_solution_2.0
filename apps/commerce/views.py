@@ -8,6 +8,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.views.decorators.http import require_POST
 
+from apps.commerce.gating import store_only
 from apps.core.mail import notify_internal, send_transactional_email
 from apps.core.models import SiteSettings
 from apps.core.utils import make_reference, rate_limit
@@ -18,6 +19,7 @@ from .models import EngagementModel, FixedPriceRange, Order, OrderItem, Payment,
 from .payments import GATEWAYS, get_gateway
 
 
+@store_only
 def pricing(request):
     return render(request, "commerce/pricing.html", {
         "engagement_models": EngagementModel.objects.all(),
@@ -27,6 +29,7 @@ def pricing(request):
     })
 
 
+@store_only
 def store(request):
     products = ProductizedService.objects.filter(is_active=True)
     groups = []
@@ -37,6 +40,7 @@ def store(request):
     return render(request, "commerce/store.html", {"groups": groups})
 
 
+@store_only
 def product_detail(request, slug):
     product = get_object_or_404(ProductizedService, slug=slug, is_active=True)
     siblings = ProductizedService.objects.filter(category=product.category, is_active=True).exclude(pk=product.pk)
@@ -44,6 +48,7 @@ def product_detail(request, slug):
 
 
 @require_POST
+@store_only
 def cart_add(request, pk):
     product = get_object_or_404(ProductizedService, pk=pk, is_active=True)
     try:
@@ -56,6 +61,7 @@ def cart_add(request, pk):
 
 
 @require_POST
+@store_only
 def cart_update(request):
     cart = Cart(request)
     for key, value in request.POST.items():
@@ -69,12 +75,14 @@ def cart_update(request):
     return redirect("commerce:cart")
 
 
+@store_only
 def cart_detail(request):
     cart = Cart(request)
     return render(request, "commerce/cart.html", {"lines": cart.lines(), "totals": cart.totals()})
 
 
 @rate_limit("checkout", limit=8, window=900)
+@store_only
 def checkout(request):
     cart = Cart(request)
     lines = cart.lines()
@@ -113,6 +121,7 @@ def _session_order(request, reference):
     return get_object_or_404(Order.objects.prefetch_related("items"), reference=reference)
 
 
+@store_only
 def payment_select(request, reference):
     order = _session_order(request, reference)
     if order.payment_status == "paid":
@@ -122,6 +131,7 @@ def payment_select(request, reference):
 
 
 @require_POST
+@store_only
 def payment_start(request, reference, gateway):
     order = _session_order(request, reference)
     gw = get_gateway(gateway)
@@ -148,6 +158,7 @@ def payment_start(request, reference, gateway):
     return redirect("commerce:payment", reference=reference)
 
 
+@store_only
 def simulate(request, gateway, reference):
     if not settings.DEBUG:
         raise Http404
@@ -158,6 +169,7 @@ def simulate(request, gateway, reference):
     return render(request, "commerce/simulate.html", {"order": order, "gateway": gw})
 
 
+@store_only
 def payment_callback(request, gateway, reference, outcome):
     order = _session_order(request, reference)
     gw = get_gateway(gateway)
@@ -197,6 +209,7 @@ def payment_callback(request, gateway, reference, outcome):
     return redirect("commerce:payment", reference=reference)
 
 
+@store_only
 def order_done(request, reference):
     order = _session_order(request, reference)
     return render(request, "commerce/order_done.html", {"order": order})

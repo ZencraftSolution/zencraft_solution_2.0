@@ -18,4 +18,5 @@ def site(request):
         "nav_services": nav_services,
         "cart_count": sum(int(q) for q in cart.values()) if cart else 0,
         "SITE_URL": settings.SITE_URL,
+        "store_enabled": settings.STORE_ENABLED,
     }

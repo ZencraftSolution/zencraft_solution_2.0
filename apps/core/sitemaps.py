@@ -5,6 +5,7 @@ its budget on those pages rather than re-reading the rest. Nothing noindex appea
 in the sitemap that asks not to be indexed is a contradiction Search Console reports as an error.
 """
 
+from django.conf import settings
 from django.contrib.sitemaps import Sitemap
 from django.db.models import Max
 from django.urls import reverse
@@ -23,12 +24,14 @@ class StaticSitemap(Sitemap):
     # search and the application steps are deliberately absent: they are all noindex.
     PAGES = [
         "core:home", "services:list", "services:industries", "services:technologies", "portfolio:list",
-        "commerce:pricing", "commerce:store", "estimator:start", "careers:landing", "careers:jobs",
+        "estimator:start", "careers:landing", "careers:jobs",
         "blog:list", "core:about", "core:contact", "core:consultation", "core:privacy", "core:terms", "core:cookies",
     ]
+    # Offered only while the shop is open; closed, these answer 404.
+    STORE_PAGES = ["commerce:pricing", "commerce:store"]
 
     def items(self):
-        return self.PAGES
+        return self.PAGES + (self.STORE_PAGES if settings.STORE_ENABLED else [])
 
     def location(self, item):
         return reverse(item)

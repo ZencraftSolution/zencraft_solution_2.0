@@ -10,6 +10,7 @@ urlpatterns = [
     path("contact/", views.contact, name="contact"),
     path("book-consultation/", views.consultation, name="consultation"),
     path("newsletter/", views.newsletter_subscribe, name="newsletter"),
+    path("feedback/", views.feedback, name="feedback"),
     path("search/", views.search, name="search"),
     path("legal/privacy/", views.legal, {"page": "privacy"}, name="privacy"),
     path("legal/terms/", views.legal, {"page": "terms"}, name="terms"),

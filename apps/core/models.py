@@ -17,6 +17,10 @@ class SiteSettings(models.Model):
     secondary_email = models.EmailField(blank=True, default="", help_text="Shown in the footer in place of the main email. Leave empty to use the main email.")
     phone = models.CharField(max_length=40, default="+977 9857055518")
     secondary_phone = models.CharField(max_length=40, blank=True, default="", help_text="Shown in the footer in place of the main phone number. Leave empty to use the main number.")
+    international_phone = models.CharField(
+        max_length=40, blank=True, default="+358 414808204",
+        help_text="A second number shown in the footer alongside the main one. Leave empty to hide it.",
+    )
     whatsapp = models.CharField(max_length=40, blank=True, default="+977 9857055518")
     address = models.CharField(max_length=255, default="Tilottama Municipality-3, Rupandehi, Nepal")
     office_hours = models.CharField(max_length=120, default="Sun to Fri, 9:30 to 18:00 NPT")
@@ -149,6 +153,36 @@ class ContactSubmission(models.Model):
 
     def __str__(self):
         return f"{self.name}: {self.subject}"
+
+
+class Feedback(models.Model):
+    """What a visitor thought of the site or of working with us, left from the home page.
+
+    Separate from ContactSubmission on purpose: a contact message is a question waiting for an
+    answer, and feedback is an opinion. Mixing them means the unanswered questions get lost.
+    Nothing here is published automatically; a testimonial only goes on the site when somebody
+    copies it across deliberately.
+    """
+
+    RATING_CHOICES = [(5, "Very good"), (4, "Good"), (3, "Fair"), (2, "Poor"), (1, "Very poor")]
+
+    name = models.CharField(max_length=120)
+    email = models.EmailField(blank=True, help_text="Optional. Only needed if they want a reply.")
+    company = models.CharField(max_length=160, blank=True)
+    rating = models.PositiveSmallIntegerField(choices=RATING_CHOICES, default=5)
+    message = models.TextField()
+    may_publish = models.BooleanField(
+        default=False, help_text="The visitor agreed this may be shown on the site as a testimonial.",
+    )
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name_plural = "Feedback"
+
+    def __str__(self):
+        return f"{self.name} ({self.get_rating_display()})"
 
 
 class NewsletterSubscriber(models.Model):

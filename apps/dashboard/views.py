@@ -20,7 +20,7 @@ from django.views.decorators.http import require_POST
 from apps.careers.models import ApplicationNote, JobApplication, JobOpening
 from apps.careers.privacy import erase_application, export_application
 from apps.commerce.models import Order
-from apps.core.models import AuditLog, ConsultationBooking, ContactSubmission, PageView, ScannedUpload, SiteSettings
+from apps.core.models import AuditLog, ConsultationBooking, ContactSubmission, Feedback, PageView, ScannedUpload, SiteSettings
 from apps.core.throttle import throttle_login
 from apps.core.uploads import upload_is_servable
 from apps.core.utils import log_action
@@ -99,6 +99,7 @@ def overview(request):
         "revenue_npr": paid.aggregate(total=Sum("total_npr"))["total"] or 0,
         "paid_orders": paid.count(),
         "unread_contacts": ContactSubmission.objects.filter(is_read=False).count(),
+        "unread_feedback": Feedback.objects.filter(is_read=False).count(),
         "recent_leads": leads.select_related("assigned_to")[:6],
         "recent_applications": JobApplication.objects.select_related("job")[:6],
         "views_14": _daily_views(14),

@@ -11,8 +11,9 @@
     <div class="kpi__value">{{ value }}</div><div class="kpi__label">{{ label }}</div>
   {% if link %}</a>{% else %}</div>{% endif %}
   {% endfor %}
-  <a class="kpi" href="{% url 'dashboard:orders' %}"><div class="kpi__value" style="font-size:1.4rem">{{ revenue_npr|npr }}</div><div class="kpi__label">Paid store revenue ({{ paid_orders }} orders)</div></a>
+  {% if store_enabled or paid_orders %}<a class="kpi" href="{% url 'dashboard:orders' %}"><div class="kpi__value" style="font-size:1.4rem">{{ revenue_npr|npr }}</div><div class="kpi__label">Paid store revenue ({{ paid_orders }} orders)</div></a>{% endif %}
   <a class="kpi" href="{% url 'dashboard:crud_list' 'contacts' %}"><div class="kpi__value">{{ unread_contacts }}</div><div class="kpi__label">Unread contact messages</div></a>
+  <a class="kpi" href="{% url 'dashboard:crud_list' 'feedback' %}"><div class="kpi__value">{{ unread_feedback }}</div><div class="kpi__label">Unread feedback</div></a>
 </div>
 
 <div class="panel">

@@ -12,7 +12,7 @@ from apps.core.mail import notify_internal, send_templated_email
 from apps.portfolio.models import CaseStudy, TeamMember, Testimonial
 from apps.services.models import Industry, Service, Technology
 
-from .forms import ConsultationForm, ContactForm, NewsletterForm
+from .forms import ConsultationForm, ContactForm, FeedbackForm, NewsletterForm
 from .models import NewsletterSubscriber
 from .utils import rate_limit, safe_referer
 
@@ -78,6 +78,7 @@ def home(request):
         "industries": Industry.objects.all()[:7],
         "technologies": technologies,
         "engagement_models": EngagementModel.objects.all()[:4],
+        "feedback_form": FeedbackForm(),
         "posts": BlogPost.objects.filter(is_published=True).select_related("category")[:3],
         "process": [
             ("Discover", "Workshops with your stakeholders to map goals, users, risks and the first release."),
@@ -154,6 +155,25 @@ def newsletter_subscribe(request):
     return redirect(safe_referer(request, reverse("core:home")))
 
 
+@rate_limit("feedback", limit=5, window=900)
+def feedback(request):
+    """Takes feedback from the home page and sends the visitor back to where they were."""
+    form = FeedbackForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        entry = form.save()
+        notify_internal(
+            f"New feedback from {entry.name} ({entry.get_rating_display()})",
+            f"{entry.name} <{entry.email or 'no email given'}>, {entry.company or 'no company'}\n"
+            f"Rating: {entry.get_rating_display()}\n"
+            f"May publish: {'yes' if entry.may_publish else 'no'}\n\n{entry.message}",
+            reference=f"feedback #{entry.pk}",
+        )
+        messages.success(request, "Thank you. Your feedback is with the team.")
+    elif request.method == "POST":
+        messages.error(request, "Please check the highlighted fields and send it again.")
+    return redirect(safe_referer(request, reverse("core:home")) + "#feedback")
+
+
 def search(request):
     q = request.GET.get("q", "").strip()
     posts = cases = services = []
@@ -187,8 +207,7 @@ def robots_txt(request):
     # would hand it to anyone. Those pages already send X-Robots-Tag: noindex, nofollow.
     lines = [
         "User-agent: *",
-        "Disallow: /pricing/store/cart/",
-        "Disallow: /pricing/store/checkout/",
+        *(["Disallow: /pricing/store/cart/", "Disallow: /pricing/store/checkout/"] if settings.STORE_ENABLED else []),
         "Disallow: /search/",
         f"Sitemap: {settings.SITE_URL.rstrip('/')}/sitemap.xml",
     ]

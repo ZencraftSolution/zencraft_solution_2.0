@@ -29,7 +29,7 @@ from apps.blog.models import BlogPost
 from apps.careers.models import JobApplication, JobOpening
 from apps.core import uploads
 from apps.core.mail import send_templated_email, send_transactional_email
-from apps.core.models import ConsultationBooking, ContactSubmission, NewsletterSubscriber, PageView, ScannedUpload, SiteSettings
+from apps.core.models import ConsultationBooking, ContactSubmission, Feedback, NewsletterSubscriber, PageView, ScannedUpload, SiteSettings
 from apps.core.testing import CLAMAV_SCAN, NOOP_SCAN, docx_bytes, make_application, make_job, make_product, pdf_upload
 from apps.core.uploads import get_private_storage
 from apps.core.utils import client_ip, format_npr, format_usd, log_action, make_reference, npr_to_usd, rate_limit
@@ -284,6 +284,7 @@ class MiddlewareAndContextTests(TestCase):
         dash = self.client.get(reverse("dashboard:login"))
         self.assertEqual((dash["X-Robots-Tag"], dash["Cache-Control"]), ("noindex, nofollow", "no-store"))
 
+    @override_settings(STORE_ENABLED=True)
     def test_cart_count_and_site_settings_cache(self):
         product = make_product()
         self.client.post(reverse("commerce:cart_add", args=[product.pk]), {"quantity": 3})
@@ -468,7 +469,7 @@ class SitemapRobotsTests(TestCase):
         body = self.client.get("/robots.txt").content.decode()
         self.assertNotIn(settings.DASHBOARD_PATH, body)  # robots.txt is public; the path is a secret
         self.assertNotIn("hq", body)
-        self.assertIn("Disallow: /pricing/store/checkout/", body)
+        self.assertIn("Disallow: /search/", body)
         self.assertIn(f"Sitemap: {settings.SITE_URL.rstrip('/')}/sitemap.xml", body)
 
     def test_the_dashboard_is_kept_out_of_search_by_its_header_instead(self):
@@ -1139,3 +1140,73 @@ class SeededSiteSmokeTests(TestCase):
         empty = self.client.get(reverse("core:search") + "?q=zzzxqvnonexistent")
         self.assertContains(empty, "Nothing found")
         self.assertTrue(re.search(r"\d+ results?", empty.content.decode()))
+
+
+class FeedbackTests(TestCase):
+    """The form on the home page, and what reaches the team."""
+
+    URL = reverse("core:feedback")
+    VALID = {
+        "name": "Asmita Gurung", "email": "asmita@example.com", "company": "Example Ltd",
+        "rating": "5", "message": "They shipped on time and explained the trade-offs clearly.",
+    }
+
+    def setUp(self):
+        cache.clear()
+        mail.outbox.clear()
+
+    def test_the_form_is_on_the_home_page(self):
+        response = self.client.get("/")
+        self.assertContains(response, 'id="feedback"')
+        self.assertContains(response, "Tell us how we are doing")
+        self.assertContains(response, self.URL)
+
+    def test_feedback_is_stored_and_the_visitor_is_thanked(self):
+        response = self.client.post(self.URL, self.VALID, HTTP_REFERER="/", follow=True)
+        entry = Feedback.objects.get()
+        self.assertEqual((entry.name, entry.rating, entry.company), ("Asmita Gurung", 5, "Example Ltd"))
+        self.assertFalse(entry.is_read)
+        self.assertContains(response, "Thank you")
+
+    def test_the_team_is_told(self):
+        self.client.post(self.URL, self.VALID, HTTP_REFERER="/")
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("Asmita Gurung", mail.outbox[0].subject)
+        self.assertIn("Very good", mail.outbox[0].subject)
+        self.assertIn("shipped on time", mail.outbox[0].body)
+
+    def test_nothing_is_published_unless_the_visitor_says_so(self):
+        self.client.post(self.URL, self.VALID, HTTP_REFERER="/")
+        self.assertFalse(Feedback.objects.get().may_publish)
+
+        Feedback.objects.all().delete()
+        self.client.post(self.URL, {**self.VALID, "may_publish": "on"}, HTTP_REFERER="/")
+        self.assertTrue(Feedback.objects.get().may_publish)
+
+    def test_the_email_address_is_optional(self):
+        self.client.post(self.URL, {**self.VALID, "email": ""}, HTTP_REFERER="/")
+        self.assertEqual(Feedback.objects.get().email, "")
+
+    def test_a_message_of_two_words_is_refused(self):
+        response = self.client.post(self.URL, {**self.VALID, "message": "ok"}, HTTP_REFERER="/", follow=True)
+        self.assertFalse(Feedback.objects.exists())
+        self.assertContains(response, "check the highlighted fields")
+
+    def test_the_honeypot_catches_a_bot(self):
+        self.client.post(self.URL, {**self.VALID, "website": "http://spam.test"}, HTTP_REFERER="/")
+        self.assertFalse(Feedback.objects.exists())
+
+    def test_it_is_rate_limited(self):
+        for _ in range(5):
+            self.client.post(self.URL, self.VALID, HTTP_REFERER="/")
+        response = self.client.post(self.URL, self.VALID, HTTP_REFERER="/")
+        self.assertEqual(response.status_code, 429)
+
+    def test_a_hostile_referer_does_not_become_a_redirect(self):
+        response = self.client.post(self.URL, self.VALID, HTTP_REFERER="https://evil.example/")
+        self.assertTrue(response["Location"].startswith("/"))
+
+    def test_feedback_never_appears_on_the_public_site_by_itself(self):
+        """Even approved, it is a record for the team until somebody copies it across."""
+        self.client.post(self.URL, {**self.VALID, "may_publish": "on"}, HTTP_REFERER="/")
+        self.assertNotContains(self.client.get("/"), "shipped on time")

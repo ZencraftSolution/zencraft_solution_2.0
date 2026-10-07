@@ -41,7 +41,10 @@ def esewa_callback_data(order, payment, **overrides):
     return base64.b64encode(json.dumps(data).encode()).decode()
 
 
+@override_settings(STORE_ENABLED=True)
 class CommerceTestCase(TestCase):
+    """Base for the shop tests. STORE_ENABLED is off by default, so they say so explicitly."""
+
     def setUp(self):
         cache.clear()
         self.product = make_product()

@@ -249,6 +249,12 @@ REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
 }
 
+# The public shop: pricing page, store, cart, checkout and the payment pages. Off means those
+# URLs answer 404 and nothing links to them; the orders already taken, the dashboard screens that
+# manage them and the payment code all stay. Turn it on when the rate card and the prices are
+# real and the bank details on the order page are yours.
+STORE_ENABLED = env.bool("STORE_ENABLED", default=False)
+
 PAYMENTS = {
     "ESEWA_PRODUCT_CODE": env("ESEWA_PRODUCT_CODE", default="EPAYTEST"),
     "ESEWA_SECRET_KEY": env("ESEWA_SECRET_KEY", default=""),

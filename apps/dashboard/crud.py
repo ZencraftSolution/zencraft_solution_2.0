@@ -11,7 +11,7 @@ from django.urls import reverse
 from apps.blog.models import BlogCategory, BlogPost
 from apps.careers.models import Department, JobOpening
 from apps.commerce.models import EngagementModel, FixedPriceRange, ProductizedService, RoleRate
-from apps.core.models import ConsultationBooking, ContactSubmission, NewsletterSubscriber
+from apps.core.models import ConsultationBooking, ContactSubmission, Feedback, NewsletterSubscriber
 from apps.core.utils import log_action
 from apps.estimator.models import FeatureOption, ProjectType
 from apps.portfolio.models import CaseStudy, CaseStudyImage, GalleryImage, TeamMember, Testimonial
@@ -43,6 +43,7 @@ REGISTRY = {
     "features": dict(model=FeatureOption, group="Estimator", title="Feature options", columns=["label", "key", "hours", "is_active"], search=["label"]),
     "consultations": dict(model=ConsultationBooking, group="Inbox", title="Consultation bookings", columns=["name", "company", "topic", "preferred_date", "preferred_slot", "status"], search=["name", "company", "email"]),
     "contacts": dict(model=ContactSubmission, group="Inbox", title="Contact messages", columns=["name", "subject", "email", "is_read", "created_at"], search=["name", "email", "subject", "message"]),
+    "feedback": dict(model=Feedback, group="Inbox", title="Feedback", columns=["name", "rating", "company", "may_publish", "is_read", "created_at"], search=["name", "email", "company", "message"]),
     "newsletter": dict(model=NewsletterSubscriber, group="Inbox", title="Newsletter subscribers", columns=["email", "is_active", "created_at"], search=["email"]),
 }
 
