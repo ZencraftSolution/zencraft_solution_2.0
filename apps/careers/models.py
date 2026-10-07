@@ -3,6 +3,7 @@ from django.db import models
 from django.urls import reverse
 from django.utils import timezone
 
+from apps.core.fields import URLField
 from apps.core.uploads import RandomisedPath, get_private_storage
 
 
@@ -117,9 +118,9 @@ class JobApplication(models.Model):
     cv = models.FileField(upload_to=RandomisedPath("cvs"), storage=get_private_storage, blank=True)
     cv_original_name = models.CharField(max_length=255, blank=True)
     cover_letter = models.TextField(blank=True)
-    portfolio_url = models.URLField(blank=True)
-    github_url = models.URLField(blank=True)
-    linkedin_url = models.URLField(blank=True)
+    portfolio_url = URLField(blank=True)
+    github_url = URLField(blank=True)
+    linkedin_url = URLField(blank=True)
     expected_salary_npr = models.DecimalField(max_digits=10, decimal_places=0, null=True, blank=True)
     notice_period = models.CharField(max_length=12, choices=NOTICE_CHOICES)
     source = models.CharField(max_length=12, choices=SOURCE_CHOICES, default="website")
@@ -187,7 +188,7 @@ class ExperienceEntry(models.Model):
 class ProjectEntry(models.Model):
     application = models.ForeignKey(JobApplication, on_delete=models.CASCADE, related_name="projects")
     name = models.CharField(max_length=160)
-    url = models.URLField(blank=True)
+    url = URLField(blank=True)
     tech_used = models.CharField(max_length=200, blank=True)
     description = models.TextField(blank=True)
 

@@ -32,3 +32,11 @@ htmlcov/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Browser test artefacts
+test-results/
+playwright-report/
+.playwright/
+
+# Load test output
+loadtest/results*.csv

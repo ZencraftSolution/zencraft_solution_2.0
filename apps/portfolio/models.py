@@ -4,6 +4,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.urls import reverse
 
+from apps.core.fields import URLField
 from apps.core.uploads import RandomisedPath, validate_image_upload
 
 
@@ -22,7 +23,7 @@ class CaseStudy(models.Model):
     architecture_note = models.TextField(blank=True)
     code_language = models.CharField(max_length=30, blank=True, default="python")
     code_snippet = models.TextField(blank=True)
-    cover_image_url = models.URLField()
+    cover_image_url = URLField()
     duration = models.CharField(max_length=60)
     team_size = models.PositiveSmallIntegerField(default=4)
     year = models.PositiveSmallIntegerField(default=2025)
@@ -49,7 +50,7 @@ class CaseStudy(models.Model):
 
 class CaseStudyImage(models.Model):
     case_study = models.ForeignKey(CaseStudy, on_delete=models.CASCADE, related_name="images")
-    image_url = models.URLField()
+    image_url = URLField()
     caption = models.CharField(max_length=160, blank=True)
     order = models.PositiveIntegerField(default=0)
 
@@ -65,7 +66,7 @@ class Testimonial(models.Model):
     client_name = models.CharField(max_length=120)
     company = models.CharField(max_length=120)
     role = models.CharField(max_length=120)
-    photo_url = models.URLField(blank=True)
+    photo_url = URLField(blank=True)
     rating = models.PositiveSmallIntegerField(default=5)
     content = models.TextField()
     case_study = models.ForeignKey(CaseStudy, on_delete=models.SET_NULL, null=True, blank=True, related_name="testimonials")
@@ -88,9 +89,9 @@ class TeamMember(models.Model):
         "Photo upload", upload_to=RandomisedPath("team"), blank=True, validators=[validate_image_upload],
         help_text="JPG, PNG or WebP, up to 4 MB. Used instead of the photo URL when set.",
     )
-    photo_url = models.URLField(blank=True, help_text="Link to a hosted image, used when no photo is uploaded.")
-    linkedin_url = models.URLField(blank=True)
-    github_url = models.URLField(blank=True)
+    photo_url = URLField(blank=True, help_text="Link to a hosted image, used when no photo is uploaded.")
+    linkedin_url = URLField(blank=True)
+    github_url = URLField(blank=True)
     is_leadership = models.BooleanField(default=False)
     order = models.PositiveIntegerField(default=0)
 
@@ -112,7 +113,7 @@ class TeamMember(models.Model):
 
 class GalleryImage(models.Model):
     CATEGORY_CHOICES = [("office", "Office"), ("team", "Team"), ("events", "Events"), ("projects", "Projects")]
-    image_url = models.URLField()
+    image_url = URLField()
     caption = models.CharField(max_length=160, blank=True)
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default="office")
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)

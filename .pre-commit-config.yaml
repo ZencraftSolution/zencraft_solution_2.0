@@ -1,0 +1,52 @@
+# Checks that run before a commit is made, so the obvious things never reach CI.
+#
+#   pip install pre-commit
+#   pre-commit install                 # from then on it runs on every commit
+#   pre-commit run --all-files         # the first time, to see where you stand
+#
+# Keep this in step with .github/workflows/ci.yml: anything here should also run there, because
+# a hook can be skipped with --no-verify and CI cannot.
+
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.7
+    hooks:
+      # Linting, including the bandit security rules (select = "S" in pyproject.toml).
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+        exclude: \.(svg|woff2?)$
+      - id: check-yaml
+      - id: check-toml
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-case-conflict        # a file that collides on Windows and macOS
+      - id: check-added-large-files
+        args: [--maxkb=600]            # the Phosphor font files are the largest legitimate ones
+      - id: detect-private-key
+      - id: mixed-line-ending
+        args: [--fix=lf]
+
+  # A credential committed by accident is public the moment it is pushed, and stays in the
+  # history afterwards. This is the cheapest place to catch one.
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.0
+    hooks:
+      - id: gitleaks
+
+  - repo: local
+    hooks:
+      # Models and migrations drifting apart is the single most common cause of a broken deploy
+      # on this project, and it costs a second to check.
+      - id: django-migrations-are-up-to-date
+        name: migrations are up to date
+        entry: python manage.py makemigrations --check --dry-run
+        language: system
+        pass_filenames: false
+        files: ^apps/.*/models\.py$

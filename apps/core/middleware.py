@@ -34,6 +34,9 @@ class ContentSecurityPolicyMiddleware:
         for directive, sources in settings.CSP_DIRECTIVES.items():
             rendered = [source.replace("{nonce}", f"'nonce-{nonce}'") for source in sources]
             parts.append(" ".join([directive, *rendered]).strip())
+        if not settings.DEBUG:
+            # Anything that slips through as http is fetched over https instead of being blocked.
+            parts.append("upgrade-insecure-requests")
         if settings.CSP_REPORT_URI:
             parts.append(f"report-uri {settings.CSP_REPORT_URI}")
         return "; ".join(parts)

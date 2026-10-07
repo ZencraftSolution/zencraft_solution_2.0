@@ -103,11 +103,16 @@ def release_file_response(response):
         closer()
 
 
-def image_upload(name="photo.png", size=(40, 40), fmt="PNG", color=(31, 79, 216)):
-    """A genuine image file, so ImageField's Pillow validation passes."""
+def image_bytes(size=(40, 40), fmt="PNG", color=(31, 79, 216)):
+    """The bytes of a genuine image, for a browser test that has to write one to disk."""
     from PIL import Image
 
     buf = io.BytesIO()
     Image.new("RGB", size, color).save(buf, format=fmt)
+    return buf.getvalue()
+
+
+def image_upload(name="photo.png", size=(40, 40), fmt="PNG", color=(31, 79, 216)):
+    """A genuine image file, so ImageField's Pillow validation passes."""
     content_type = "image/png" if fmt == "PNG" else f"image/{fmt.lower()}"
-    return SimpleUploadedFile(name, buf.getvalue(), content_type=content_type)
+    return SimpleUploadedFile(name, image_bytes(size, fmt, color), content_type=content_type)

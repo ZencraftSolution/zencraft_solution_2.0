@@ -1055,6 +1055,10 @@ class DeployCheckSmokeTests(TestCase):
 
         env = {**os.environ, **self.PRODUCTION_ENV}
         env.pop("UPLOAD_SCAN_HOOK", None)  # must default to ClamAV in production
+        # Set by apps/core/conftest.py so Playwright's sync API can touch the ORM. It is a test
+        # harness setting, and Django's own deploy check rightly refuses it in a deployment, so
+        # it must not travel into the subprocess that simulates one.
+        env.pop("DJANGO_ALLOW_ASYNC_UNSAFE", None)
         return subprocess.run([sys.executable, "-c", code], cwd=settings.BASE_DIR, env=env, capture_output=True, text=True, timeout=300)
 
     def test_check_deploy_reports_zero_issues(self):

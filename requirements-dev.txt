@@ -12,3 +12,10 @@ ruff==0.16.7
 pip-audit==2.10.1
 # Second opinion on the security rules ruff already runs as select = "S".
 bandit==1.9.4
+# Browser, accessibility and layout tests.
+pytest-playwright==0.9.0
+axe-playwright-python==0.1.8
+# Pre-commit hooks; see .pre-commit-config.yaml.
+pre-commit==4.6.2
+# Load testing; see loadtest/README.md. Not run in CI.
+locust==2.46.7

@@ -3,6 +3,8 @@ from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.urls import reverse
 
+from apps.core.fields import URLField
+
 
 class FAQ(models.Model):
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
@@ -48,7 +50,7 @@ class Technology(models.Model):
     name = models.CharField(max_length=80)
     slug = models.SlugField(unique=True)
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
-    logo_url = models.URLField(help_text="Simple Icons or Devicon SVG URL")
+    logo_url = URLField(help_text="Simple Icons or Devicon SVG URL")
     proficiency = models.PositiveSmallIntegerField(default=4, help_text="1 to 5")
     years_used = models.PositiveSmallIntegerField(default=3)
     order = models.PositiveIntegerField(default=0)
@@ -69,7 +71,7 @@ class Industry(models.Model):
     description = models.TextField()
     challenges = models.TextField(help_text="One challenge per line")
     solutions = models.TextField(help_text="One solution per line")
-    image_url = models.URLField()
+    image_url = URLField()
     # Optional overrides for what a search result shows. Left empty, one is built from the
     # content above, trimmed to the length Google actually displays.
     seo_title = models.CharField(max_length=60, blank=True, help_text="Overrides the search-result title.")
@@ -105,7 +107,7 @@ class Service(models.Model):
     outcome_headline = models.CharField(max_length=160, help_text="Hero headline framed as a business outcome")
     summary = models.CharField(max_length=260)
     intro = models.TextField()
-    hero_image_url = models.URLField()
+    hero_image_url = URLField()
     deliverables = models.JSONField(default=list, blank=True, help_text='List of {"title": "...", "text": "..."}')
     technologies = models.ManyToManyField(Technology, blank=True, related_name="services")
     industries = models.ManyToManyField(Industry, blank=True, related_name="services")

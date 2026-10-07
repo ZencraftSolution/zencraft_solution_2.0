@@ -5,6 +5,7 @@ from django.db import models
 from django.urls import reverse
 from django.utils import timezone
 
+from apps.core.fields import URLField
 from apps.core.html import sanitise_html
 
 
@@ -29,7 +30,7 @@ class BlogPost(models.Model):
     tags = models.CharField(max_length=200, blank=True, help_text="Comma separated")
     excerpt = models.CharField(max_length=300)
     body = models.TextField(help_text="HTML content written by staff. Scripts and event handlers are stripped on save.")
-    hero_image_url = models.URLField()
+    hero_image_url = URLField()
     reading_minutes = models.PositiveSmallIntegerField(default=1, editable=False)
     is_published = models.BooleanField(default=True)
     published_at = models.DateTimeField(default=timezone.now)

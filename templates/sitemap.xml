@@ -1,5 +1,5 @@
-{# Overrides Django's default so case studies and articles can offer their image to image search.
-   The image namespace is harmless on entries that have no image. #}
+{% comment %}Overrides Django's default so case studies and articles can offer their image to image search.
+   The image namespace is harmless on entries that have no image.{% endcomment %}
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
 {% spaceless %}

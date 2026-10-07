@@ -449,3 +449,227 @@ class GatewayVerifyTests(TestCase):
         p = self.payment("esewa")
         data = esewa_callback_data(self.order, p, product_code="OTHER-MERCHANT")
         self.assertFalse(get_gateway("esewa").verify(self.order, p, self.request(data=data)).success)
+
+
+@override_settings(PAYMENTS=ALL_KEYS)
+class GatewayMalformedInputTests(TestCase):
+    """The branches a forged or broken provider response takes.
+
+    Each of these was reachable and untested: a payload that is valid JSON but not an object,
+    an amount that is not a number, a provider that returns something unexpected. None of them
+    should ever mark an order paid, and none of them should raise a 500 at the customer.
+    """
+
+    def setUp(self):
+        self.factory = RequestFactory()
+        self.order = Order.objects.create(
+            reference="ZC-MALFORMED", customer_name="A", email="a@example.com", phone="1",
+            subtotal_npr=Decimal("60000"), vat_npr=Decimal("7800"), total_npr=Decimal("67800"),
+            exchange_rate=Decimal("134.25"), total_usd=Decimal("505.03"),
+        )
+
+    def payment(self, gateway, transaction_id=""):
+        return Payment.objects.create(
+            order=self.order, gateway=gateway, amount=self.order.total_npr, transaction_id=transaction_id
+        )
+
+    def request(self, **params):
+        return self.factory.get("/callback/", params)
+
+    def esewa_payload(self, **overrides):
+        """A correctly signed payload, then broken in one specific way."""
+        data = {
+            "transaction_code": "000AWEO", "status": "COMPLETE",
+            "total_amount": to_decimal_str(self.order.total_npr),
+            "transaction_uuid": f"{self.order.reference}-{self.payment_obj.pk}", "product_code": "EPAYTEST",
+            "signed_field_names": "transaction_code,status,total_amount,transaction_uuid,product_code,signed_field_names",
+        }
+        data.update(overrides)
+        names = data["signed_field_names"].split(",")
+        data["signature"] = esewa_sign(",".join(f"{n}={data[n]}" for n in names))
+        return base64.b64encode(json.dumps(data).encode()).decode()
+
+    def test_esewa_payload_that_is_valid_json_but_not_an_object(self):
+        """json.loads succeeds on a list, and everything after it assumed a dict."""
+        payment = self.payment("esewa")
+        for payload in [["not", "a", "dict"], "a bare string", 42, None]:
+            encoded = base64.b64encode(json.dumps(payload).encode()).decode()
+            result = get_gateway("esewa").verify(self.order, payment, self.request(data=encoded))
+            self.assertFalse(result.success, payload)
+            self.assertEqual(result.raw["error"], "undecodable")
+
+    def test_esewa_amount_that_is_not_a_number(self):
+        """A signed but non-numeric amount must be refused, not raise InvalidOperation."""
+        self.payment_obj = self.payment("esewa")
+        for amount in ["not-a-number", "", "1.2.3", "NaN-ish"]:
+            payload = self.esewa_payload(total_amount=amount)
+            result = get_gateway("esewa").verify(self.order, self.payment_obj, self.request(data=payload))
+            self.assertFalse(result.success, amount)
+
+    def test_esewa_amount_with_thousands_separators_is_still_compared_correctly(self):
+        """eSewa sends "67,800.0". Stripping the comma is the difference between paid and not."""
+        self.payment_obj = self.payment("esewa")
+        payload = self.esewa_payload(total_amount="67,800.0")
+        self.assertTrue(get_gateway("esewa").verify(self.order, self.payment_obj, self.request(data=payload)).success)
+
+    def test_khalti_amount_that_is_not_an_integer(self):
+        payment = self.payment("khalti", transaction_id="pidx-123")
+        self.assertTrue(get_gateway("khalti").is_configured())  # or the test proves nothing
+        for amount in ["not-a-number", None, {"nested": 1}, []]:
+            lookup = {"pidx": "pidx-123", "status": "Completed", "total_amount": amount, "transaction_id": "txn"}
+            with mock.patch(HTTP, return_value=lookup):
+                result = get_gateway("khalti").verify(self.order, payment, self.request(pidx="pidx-123"))
+            self.assertFalse(result.success, amount)
+            self.assertEqual(result.raw, lookup, amount)  # it did reach the amount comparison
+
+    def test_khalti_correct_amount_is_accepted(self):
+        payment = self.payment("khalti", transaction_id="pidx-123")
+        lookup = {
+            "pidx": "pidx-123", "status": "Completed",
+            "total_amount": int(self.order.total_npr * 100), "transaction_id": "txn-1",
+        }
+        with mock.patch(HTTP, return_value=lookup):
+            result = get_gateway("khalti").verify(self.order, payment, self.request(pidx="pidx-123"))
+        self.assertTrue(result.success)
+        self.assertEqual(result.transaction_id, "txn-1")
+
+
+@override_settings(PAYMENTS={
+    "ESEWA_PRODUCT_CODE": "EPAYTEST", "ESEWA_SECRET_KEY": "", "ESEWA_FORM_URL": "https://example.test/form",
+    "KHALTI_SECRET_KEY": "", "KHALTI_API_URL": "https://example.test/", "STRIPE_SECRET_KEY": "",
+})
+class UnconfiguredGatewayTests(TestCase):
+    """With no credentials, a gateway must offer instructions rather than pretend to work.
+
+    This is the state the site ships in, so it is the state most likely to be hit by a real
+    visitor before the keys are set.
+    """
+
+    def setUp(self):
+        self.factory = RequestFactory()
+        self.order = Order.objects.create(
+            reference="ZC-NOKEYS", customer_name="A", email="a@example.com", phone="1",
+            subtotal_npr=Decimal("1000"), vat_npr=Decimal("130"), total_npr=Decimal("1130"),
+            exchange_rate=Decimal("134.25"), total_usd=Decimal("8.42"),
+        )
+
+    def test_in_development_each_gateway_offers_the_sandbox_simulator(self):
+        request = self.factory.get("/pay/")
+        for code in ["esewa", "khalti", "stripe"]:
+            gateway = get_gateway(code)
+            payment = Payment.objects.create(order=self.order, gateway=code, amount=self.order.total_npr)
+            self.assertFalse(gateway.is_configured(), code)
+            result = gateway.initiate(self.order, payment, request)
+            self.assertEqual(result.kind, "simulate", code)
+            self.assertIn("/sandbox/", result.url, code)
+
+    def test_an_unconfigured_gateway_never_reports_a_payment_as_successful(self):
+        """Without the simulator's session marker, nothing is paid, whatever the callback says."""
+        request = self.factory.get("/callback/", {"data": "anything", "pidx": "anything"})
+        request.session = {}
+        for code in ["esewa", "khalti", "stripe"]:
+            payment = Payment.objects.create(order=self.order, gateway=code, amount=self.order.total_npr)
+            self.assertFalse(get_gateway(code).verify(self.order, payment, request).success, code)
+
+    @override_settings(DEBUG=False)
+    def test_in_production_an_unconfigured_gateway_refuses_rather_than_simulating(self):
+        """The simulator must never exist on a live site: it would mark orders paid for free."""
+        request = self.factory.get("/callback/", {"data": "anything", "pidx": "anything"})
+        request.session = {}
+        for code in ["esewa", "khalti", "stripe"]:
+            payment = Payment.objects.create(order=self.order, gateway=code, amount=self.order.total_npr)
+            result = get_gateway(code).verify(self.order, payment, request)
+            self.assertFalse(result.success, code)
+            self.assertEqual(result.raw.get("error"), "gateway not configured", code)
+
+
+class PaymentEndpointSchemeTests(TestCase):
+    """A mistyped endpoint must fail loudly rather than make the server open a local file."""
+
+    def test_a_non_https_endpoint_is_refused_before_any_request_is_made(self):
+        from apps.commerce.payments.gateways import _http_json
+
+        for url in ["file:///etc/passwd", "http://khalti.example/api/", "ftp://example.test/x", "/local/path"]:
+            with self.assertRaises(ValueError) as caught:
+                _http_json(url, {"a": 1})
+            self.assertIn("not https", str(caught.exception))
+
+    def test_an_https_endpoint_is_called_with_the_body_and_headers_given(self):
+        from apps.commerce.payments.gateways import _http_json
+
+        captured = {}
+
+        class FakeResponse:
+            def read(self):
+                return b'{"ok": true}'
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+        def fake_urlopen(request, timeout=None):
+            captured["url"] = request.full_url
+            captured["body"] = request.data
+            captured["headers"] = {k.lower(): v for k, v in request.headers.items()}
+            captured["method"] = request.get_method()
+            return FakeResponse()
+
+        with mock.patch("apps.commerce.payments.gateways.urllib.request.urlopen", fake_urlopen):
+            result = _http_json("https://khalti.example/api/", {"amount": 100}, {"Authorization": "Key k"})
+        self.assertEqual(result, {"ok": True})
+        self.assertEqual(captured["body"], b'{"amount": 100}')
+        self.assertEqual(captured["headers"]["content-type"], "application/json")
+        self.assertEqual(captured["headers"]["authorization"], "Key k")
+        self.assertEqual(captured["method"], "POST")
+
+    def test_a_form_encoded_call_sends_a_form_body(self):
+        from apps.commerce.payments.gateways import _http_json
+
+        captured = {}
+
+        class FakeResponse:
+            def read(self):
+                return b"{}"
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+        def fake_urlopen(request, timeout=None):
+            captured["body"] = request.data
+            captured["headers"] = {k.lower(): v for k, v in request.headers.items()}
+            return FakeResponse()
+
+        with mock.patch("apps.commerce.payments.gateways.urllib.request.urlopen", fake_urlopen):
+            _http_json("https://stripe.example/v1/x", {"amount": 100, "currency": "usd"}, form=True)
+        self.assertEqual(captured["body"], b"amount=100&currency=usd")
+        self.assertEqual(captured["headers"]["content-type"], "application/x-www-form-urlencoded")
+
+    def test_a_get_with_no_body_sends_none(self):
+        from apps.commerce.payments.gateways import _http_json
+
+        captured = {}
+
+        class FakeResponse:
+            def read(self):
+                return b"{}"
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+        def fake_urlopen(request, timeout=None):
+            captured["body"] = request.data
+            captured["method"] = request.get_method()
+            return FakeResponse()
+
+        with mock.patch("apps.commerce.payments.gateways.urllib.request.urlopen", fake_urlopen):
+            _http_json("https://stripe.example/v1/x", method="GET")
+        self.assertIsNone(captured["body"])
+        self.assertEqual(captured["method"], "GET")

@@ -68,7 +68,7 @@
       {% if case.code_snippet %}
       <figure class="code-block" style="margin:0" data-reveal>
         <div class="code-block__bar"><span>{{ case.code_language }}</span><span>excerpt, simplified</span></div>
-        <pre><code class="language-{{ case.code_language }}">{{ case.code_snippet }}</code></pre>
+        <pre tabindex="0" role="region" aria-label="Code sample, scrollable"><code class="language-{{ case.code_language }}">{{ case.code_snippet }}</code></pre>
       </figure>
       {% endif %}
     </div>
@@ -79,7 +79,7 @@
   <section class="section">
     <div class="container container--narrow">
       <figure class="quote is-active" style="position:static" data-reveal>
-        <div class="stars">{% for _ in testimonial.rating|star_range %}<i class="ph-fill ph-star"></i>{% endfor %}</div>
+        <div class="stars" role="img" aria-label="Rated {{ testimonial.rating }} out of 5">{% for _ in testimonial.rating|star_range %}<i class="ph-fill ph-star"></i>{% endfor %}</div>
         <blockquote class="quote__text" style="margin:0">&ldquo;{{ testimonial.content }}&rdquo;</blockquote>
         <figcaption class="quote__by"><img src="{{ testimonial.photo_url }}" alt="" width="104" height="104" loading="lazy" data-seed="{{ testimonial.client_name }}"><div><strong>{{ testimonial.client_name }}</strong><span>{{ testimonial.role }}, {{ testimonial.company }}</span></div></figcaption>
       </figure>

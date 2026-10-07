@@ -476,3 +476,15 @@ class FrontEndPerformanceTests(TestCase):
         self.assertEqual(srcset("https://example.com/photo.jpg"), "")
         self.assertEqual(srcset(""), "")
         self.assertIn("480w", srcset("https://images.unsplash.com/photo-1?w=1200"))
+
+
+class TemplateHygieneTests(TestCase):
+    """Django's {# #} comment only works on one line; a multi-line one is printed to the page."""
+
+    def test_no_template_comment_reaches_the_browser(self):
+        for path in ["/", "/work/", "/insights/", "/careers/", "/pricing/", "/contact/", "/about/"]:
+            html = self.client.get(path).content.decode()
+            with self.subTest(path=path):
+                self.assertNotIn("{#", html)
+                self.assertNotIn("{% comment", html)
+                self.assertNotIn("{%", html)

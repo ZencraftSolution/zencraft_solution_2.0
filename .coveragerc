@@ -1,8 +1,13 @@
 [run]
 source = apps
+# Branch coverage, not just line coverage: "if the signature is valid" counts as covered when
+# only the valid path has ever run, which is exactly the half that does not matter.
+branch = True
 omit =
     */migrations/*
     */tests.py
+    */test_*.py
+    */conftest.py
     apps/core/testing.py
 
 [report]

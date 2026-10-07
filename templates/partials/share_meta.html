@@ -1,6 +1,6 @@
-{# Open Graph and Twitter cards from one set of values. Twitter does fall back to og:* when
+{% comment %}Open Graph and Twitter cards from one set of values. Twitter does fall back to og:* when
    the twitter:* tags are missing, but stating them makes what gets shared explicit and lets a
-   page give a shorter description to a card than it gives to a search result. #}
+   page give a shorter description to a card than it gives to a search result.{% endcomment %}
 <meta property="og:title" content="{{ share_title }}">
 <meta property="og:description" content="{{ share_description }}">
 <meta property="og:image" content="{{ share_image }}">

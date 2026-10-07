@@ -69,7 +69,10 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "apps.core.logging.RequestIDMiddleware",
     "django.middleware.security.SecurityMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",
+    # WhiteNoise serves the collected static files in production. In development and in tests
+    # django.contrib.staticfiles does it, and WhiteNoise would only warn that STATIC_ROOT is
+    # not there yet, which is true and not interesting.
+    *([] if DEBUG else ["whitenoise.middleware.WhiteNoiseMiddleware"]),
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -298,8 +301,9 @@ CSP_DIRECTIVES = {
     "frame-ancestors": ["'none'"],
     "form-action": ["'self'", *CSP_PAYMENT_HOSTS],
 }
-if not DEBUG:
-    CSP_DIRECTIVES["upgrade-insecure-requests"] = []
+# upgrade-insecure-requests is added by the middleware, from settings.DEBUG at request time
+# rather than at import time, so the policy is right under override_settings and in any
+# configuration that flips DEBUG after startup.
 
 SESSION_COOKIE_HTTPONLY = True
 CSRF_COOKIE_HTTPONLY = False

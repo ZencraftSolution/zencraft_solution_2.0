@@ -5,6 +5,7 @@ from django.core.cache import cache
 from django.db import models
 from django.templatetags.static import static
 
+from apps.core.fields import URLField
 from apps.core.uploads import RandomisedPath, validate_image_upload
 
 
@@ -20,19 +21,19 @@ class SiteSettings(models.Model):
     address = models.CharField(max_length=255, default="Tilottama Municipality-3, Rupandehi, Nepal")
     office_hours = models.CharField(max_length=120, default="Sun to Fri, 9:30 to 18:00 NPT")
     # Only the networks with a link are shown in the footer, so leaving one blank hides it.
-    linkedin_url = models.URLField(blank=True, default="https://www.linkedin.com/in/zencraft-solution-pvt-ltd-93ab8143b")
-    facebook_url = models.URLField(blank=True, default="https://www.facebook.com/share/1GpaRpTZJy/")
-    instagram_url = models.URLField(blank=True, default="https://www.instagram.com/zencraftsolution")
-    tiktok_url = models.URLField(blank=True, default="https://www.tiktok.com/@zencraft.solution")
-    github_url = models.URLField(blank=True)
-    x_url = models.URLField(blank=True)
+    linkedin_url = URLField(blank=True, default="https://www.linkedin.com/in/zencraft-solution-pvt-ltd-93ab8143b")
+    facebook_url = URLField(blank=True, default="https://www.facebook.com/share/1GpaRpTZJy/")
+    instagram_url = URLField(blank=True, default="https://www.instagram.com/zencraftsolution")
+    tiktok_url = URLField(blank=True, default="https://www.tiktok.com/@zencraft.solution")
+    github_url = URLField(blank=True)
+    x_url = URLField(blank=True)
 
     # The picture shown when a page is shared and has no image of its own. 1200x630 works best.
     share_image = models.ImageField(
         "Default sharing image", upload_to=RandomisedPath("branding"), blank=True, validators=[validate_image_upload],
         help_text="1200x630 JPG, PNG or WebP. Shown on Facebook, LinkedIn and X when a page has no image of its own.",
     )
-    share_image_url = models.URLField(blank=True, help_text="Used instead of an upload, if you host the image elsewhere.")
+    share_image_url = URLField(blank=True, help_text="Used instead of an upload, if you host the image elsewhere.")
 
     exchange_rate_npr_per_usd = models.DecimalField(
         max_digits=10, decimal_places=4, default=Decimal("134.2500"),

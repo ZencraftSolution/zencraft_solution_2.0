@@ -221,7 +221,7 @@
     <div class="quotes__stage" data-quotes>
       {% for t in testimonials %}
       <figure class="quote{% if forloop.first %} is-active{% endif %}" aria-hidden="{% if forloop.first %}false{% else %}true{% endif %}">
-        <div class="stars" aria-label="{{ t.rating }} out of 5">{% for _ in t.rating|star_range %}<i class="ph-fill ph-star"></i>{% endfor %}</div>
+        <div class="stars" role="img" aria-label="Rated {{ t.rating }} out of 5">{% for _ in t.rating|star_range %}<i class="ph-fill ph-star"></i>{% endfor %}</div>
         <blockquote class="quote__text" style="margin:0">&ldquo;{{ t.content }}&rdquo;</blockquote>
         <figcaption class="quote__by">
           <img src="{{ t.photo_url }}" alt="" width="104" height="104" loading="lazy" data-seed="{{ t.client_name }}">

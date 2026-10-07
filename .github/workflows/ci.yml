@@ -11,9 +11,18 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # Shared by every job that boots Django. Tests import settings with DEBUG=True (as local
+  # development does) so SSL redirects and secure cookies do not break the test client; Django's
+  # test runner still runs each test with settings.DEBUG=False, and the deploy-check step below
+  # verifies the real production configuration.
+  DEBUG: "True"
+  ALLOWED_HOSTS: testserver,localhost,127.0.0.1
+  DATABASE_URL: postgres://postgres:postgres@localhost:5432/zencraft_db
+
 jobs:
   lint-and-audit:
-    name: Lint and dependency audit
+    name: Lint, security scan and dependency audit
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -31,12 +40,17 @@ jobs:
         run: ruff check .
 
       - name: Bandit
-        run: bandit -r apps config -ll
+        run: bandit -r apps config scripts -ll
 
       - name: pip-audit (runtime and dev dependencies)
         run: |
           pip-audit -r requirements.txt
           pip-audit -r requirements-dev.txt
+
+      - name: Secrets scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   test:
     name: Tests (Python ${{ matrix.python-version }}, PostgreSQL 16)
@@ -62,14 +76,6 @@ jobs:
           --health-timeout 5s
           --health-retries 10
 
-    env:
-      # Tests import settings with DEBUG=True (like local development) so SSL redirects and secure cookies
-      # don't break the test client. Django's test runner still runs every test with settings.DEBUG=False,
-      # and the deploy-check step below plus DeployCheckSmokeTests verify the real DEBUG=False configuration.
-      DEBUG: "True"
-      ALLOWED_HOSTS: testserver,localhost,127.0.0.1
-      DATABASE_URL: postgres://postgres:postgres@localhost:5432/zencraft_db
-
     steps:
       - uses: actions/checkout@v4
 
@@ -92,8 +98,8 @@ jobs:
         env:
           DEBUG: "False"
           ALLOWED_HOSTS: zencraftsolution.com
-          # The new zencraft.E00x checks refuse a deployment that would lose media, swallow email
-          # or share one lockout counter, so the check needs a production-shaped environment.
+          # The zencraft.E00x checks refuse a deployment that would lose media, swallow email or
+          # share one lockout counter, so the check needs a production-shaped environment.
           SITE_URL: https://zencraftsolution.com
           CLOUDINARY_CLOUD_NAME: ci-placeholder
           CLOUDINARY_API_KEY: ci-placeholder
@@ -102,11 +108,11 @@ jobs:
           PRIVATE_MEDIA_PERSISTENT: "True"
         run: python manage.py check --deploy --fail-level WARNING
 
-      - name: Test suite with coverage
-        run: python -m pytest --cov --cov-report=term-missing:skip-covered --cov-report=xml
+      - name: Test suite with coverage (everything except the browser tests)
+        run: python -m pytest -m "not e2e" --cov --cov-report=term-missing:skip-covered --cov-report=xml
 
-      - name: Enforce per-app coverage floor (commerce, careers, dashboard, core)
-        run: python scripts/check_coverage.py --floor 85
+      - name: Coverage floors (85% per app, 90% branch on money and access code)
+        run: python scripts/check_coverage.py --floor 85 --branch-floor 90
 
       - name: Upload coverage report
         if: always()
@@ -115,3 +121,104 @@ jobs:
           name: coverage-${{ matrix.python-version }}
           path: coverage.xml
           if-no-files-found: ignore
+
+  browser:
+    name: Browser, accessibility and layout
+    runs-on: ubuntu-latest
+    # These are slow and need a browser, so they run once rather than across the matrix.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: zencraft_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install pinned dependencies
+        run: pip install -r requirements-dev.txt
+
+      # Browsers are ~300 MB; downloading them on every run is most of this job's time.
+      - name: Cache the Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('requirements-dev.txt') }}
+
+      - name: Install Chromium
+        run: python -m playwright install --with-deps chromium
+
+      - name: Generate a throwaway SECRET_KEY
+        run: echo "SECRET_KEY=$(python -c 'import secrets; print(secrets.token_urlsafe(64))')" >> "$GITHUB_ENV"
+
+      - name: Journeys, accessibility and layout
+        run: python -m pytest -m e2e --tracing=retain-on-failure
+
+      - name: Upload screenshots and traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-artifacts
+          path: |
+            test-results/
+            /tmp/pytest-of-runner/screenshots/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  seo:
+    name: SEO crawl
+    runs-on: ubuntu-latest
+    # These two modules also run inside the test job. Repeating them here costs two minutes and
+    # buys a check named "SEO crawl" that is red or green on its own, which is what you want to
+    # look at after changing a template.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: zencraft_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install pinned dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Generate a throwaway SECRET_KEY
+        run: echo "SECRET_KEY=$(python -c 'import secrets; print(secrets.token_urlsafe(64))')" >> "$GITHUB_ENV"
+
+      # Walks every URL in the sitemap: one h1, no skipped heading levels, title and description
+      # within the length a search result shows and unique across the site, alt text and
+      # dimensions on every image, an absolute canonical, and valid structured data.
+      - name: Crawl every page in the sitemap
+        run: python -m pytest apps/core/test_seo.py apps/core/test_security_headers.py -v

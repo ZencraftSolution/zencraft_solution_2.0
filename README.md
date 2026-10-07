@@ -159,10 +159,65 @@ The HQ dashboard login and the Django admin login share one IP-keyed lockout
 ## Tests
 
 ```powershell
-python manage.py test apps.core
+# Everything except the browser tests. This is the one to run while working.
+python -m pytest -m "not e2e"
+
+# The browser tests: real Chromium against a live server. Slow, and worth it.
+python -m pytest -m e2e
+
+# Everything, with coverage and the floors CI enforces.
+python -m pytest --cov
+python scripts/check_coverage.py
 ```
 
-22 tests cover every public page, the nine service pages' depth, the estimator (including private document upload), both application paths and fake-file rejection, cart to paid order through the sandbox, dashboard access control, kanban status API, CV access audit logging, estimator configuration and login rate limiting.
+A warning fails the run. If a dependency starts deprecating something, the suite goes red before
+the behaviour changes under you.
+
+### What is covered
+
+| Suite | File | What it checks |
+| --- | --- | --- |
+| Unit and view tests | `apps/*/tests.py` | Every public page, both application paths, cart to paid order through each gateway, forged payment callbacks, dashboard access control, the kanban API, CV access auditing, quarantine, retention and the data-request actions |
+| SEO crawl | `apps/core/test_seo.py` | Walks every URL in the sitemap: one h1, no skipped heading levels, title and description within the length a search result shows and unique across the site, alt text and dimensions on every image, an absolute canonical, valid structured data, and the front-end performance properties |
+| Security headers | `apps/core/test_security_headers.py` | Runs with production settings and checks HSTS, CSP, frame options, nosniff, referrer policy, permissions policy, COOP, cookie flags, and that `/admin/`, `/.env` and the other paths a scanner tries are 404 |
+| Journeys | `apps/core/test_e2e.py` | Contact, consultation, the estimator, cart to payment selection, the five-step application both ways, staff sign-in, the lockout after five failures, dashboard CRUD, and the 404 page — each failing on a browser console error as well as a wrong outcome |
+| Accessibility | `apps/core/test_a11y.py` | axe-core on every page type, failing on serious and critical violations, plus the skip link, focus visibility, tab order and the step markers |
+| Layout | `apps/core/test_responsive.py` | No sideways scroll at 375px on any page, the header on one row from 1140px up, and a screenshot of each page at 375, 768 and 1440 for a human to look at |
+
+### The browser tests
+
+They need Chromium once:
+
+```powershell
+python -m playwright install chromium
+```
+
+Every request to another host is answered with a stub, so the tests do not wait on a CDN, do not
+fail when the network does, and exercise the path where GSAP never loads. Each one seeds the
+database for itself, because `live_server` runs the application in another thread and pytest-django
+flushes between those tests.
+
+### Coverage floors
+
+| Floor | Applies to | Why |
+| --- | --- | --- |
+| 85% lines | `apps/commerce`, `apps/careers`, `apps/dashboard`, `apps/core` | Money, personal data and access control |
+| 90% branches | payment gateways, cart, checkout, the login throttle, uploads, the staff gate | Line coverage counts `if signature_is_valid` as covered when only the valid path ever ran, which is the half that does not matter |
+
+### Before committing
+
+```powershell
+pip install pre-commit
+pre-commit install
+```
+
+Ruff, formatting, end-of-file fixes, a secrets scan and a check that migrations match the models,
+on every commit. Everything there also runs in CI, because a hook can be skipped and CI cannot.
+
+### Load testing
+
+`loadtest/` holds a Locust profile. It writes to the database and sends email, so read
+`loadtest/README.md` before pointing it anywhere.
 
 ## Deploying to Render
 
