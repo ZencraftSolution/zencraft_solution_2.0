@@ -189,6 +189,12 @@
       scrub: SCRUB,
       anticipatePin: 1,
       invalidateOnRefresh: true,
+      /* ScrollTrigger measures triggers in the order they were made, and main.js makes the ones
+         further down the page (the reveals, the pinned case-study gallery) before this file runs.
+         Measured first, they never see the two and a half screens this pin adds above them, so
+         the gallery pinned over the services grid and the reveals fired early. A higher priority
+         plus the sort below has this pin measured before everything after it. */
+      refreshPriority: 1,
       onRefresh: resize,
       onUpdate: function (self) {
         wanted = Math.min(frames.length - 1, Math.round(self.progress * (frames.length - 1)));
@@ -197,6 +203,8 @@
       }
     });
 
+    window.ScrollTrigger.sort();
+    window.ScrollTrigger.refresh();
     resize();
 
     return function () {
@@ -223,6 +231,7 @@
     gaveUp = true;
     mm.revert();
     showStill();
+    window.ScrollTrigger.sort();
     window.ScrollTrigger.refresh();
   }
 
