@@ -1,0 +1,45 @@
+{% load static %}
+{% comment %}
+The scroll-driven exploded view, rendered only when the frames exist (apps/core/exploded.py).
+
+The canvas carries no meaning: it is aria-hidden, and the five labels are the content. With
+reduced motion, without JavaScript, or on a device that cannot cope, the still image and all five
+labels show at once and the section reads exactly the same, just without the animation. Labels are
+HTML so they are selectable, translatable, indexable and readable by a screen reader; nothing here
+depends on text inside a picture.
+{% endcomment %}
+<section class="exploded" id="inside" aria-labelledby="exploded-title" data-exploded>
+  <div class="exploded__head container" data-reveal>
+    <p class="label">Under the surface</p>
+    <h2 class="h2" id="exploded-title">What's inside every product we ship</h2>
+    <p class="lead">A finished screen is the part you see. We are accountable for every layer beneath it, which is why we can tell you what a change costs before we make it.</p>
+  </div>
+
+  <div class="exploded__stage" data-exploded-stage>
+    <div class="exploded__viz">
+      {% comment %} Sized by aspect-ratio in CSS, so the band never changes height as frames arrive. {% endcomment %}
+      <canvas class="exploded__canvas" data-exploded-canvas aria-hidden="true"></canvas>
+      <picture class="exploded__still" data-exploded-still>
+        <source media="(max-width: 767px)" srcset="{{ exploded.still_mobile }}"
+                width="{{ exploded.mobile.width }}" height="{{ exploded.mobile.height }}">
+        <img src="{{ exploded.still }}" alt="" loading="lazy" decoding="async" fetchpriority="low"
+             width="{{ exploded.desktop.width }}" height="{{ exploded.desktop.height }}">
+      </picture>
+    </div>
+
+    <ol class="exploded__layers" data-exploded-layers>
+      {% for layer in exploded_layers %}
+      <li class="exploded__layer exploded__layer--{{ layer.side }}" data-exploded-layer="{{ forloop.counter0 }}">
+        <span class="exploded__connector" aria-hidden="true"></span>
+        <span class="exploded__num" aria-hidden="true">{{ forloop.counter|stringformat:"02d" }}</span>
+        <h3 class="exploded__layer-title">
+          <a href="{% url 'services:detail' layer.service %}">{{ layer.title }}</a>
+        </h3>
+        <p class="exploded__layer-text">{{ layer.text }}</p>
+      </li>
+      {% endfor %}
+    </ol>
+  </div>
+
+  {{ exploded|json_script:"exploded-frames" }}
+</section>

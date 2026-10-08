@@ -3,6 +3,7 @@ sitemap/robots, the public core pages and the seed command. App-specific behavio
 import io
 import json
 import logging
+import pathlib
 import re
 import shutil
 import tempfile
@@ -1210,3 +1211,60 @@ class FeedbackTests(TestCase):
         """Even approved, it is a record for the team until somebody copies it across."""
         self.client.post(self.URL, {**self.VALID, "may_publish": "on"}, HTTP_REFERER="/")
         self.assertNotContains(self.client.get("/"), "shipped on time")
+
+
+class ExplodedViewTests(TestCase):
+    """The scroll-driven exploded view on the home page: present only when its frames are."""
+
+    FOUND = {
+        "desktop": {"width": 1600, "height": 900, "frames": ["/static/a.webp", "/static/b.webp"]},
+        "mobile": {"width": 800, "height": 1422, "frames": ["/static/c.webp", "/static/d.webp"]},
+        "still": "/static/still.webp",
+        "still_mobile": "/static/still_mobile.webp",
+    }
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("seed_zencraft", stdout=io.StringIO())
+
+    def setUp(self):
+        cache.clear()
+
+    def test_without_artwork_the_section_and_its_script_are_absent(self):
+        with mock.patch("apps.core.exploded.manifest", return_value=None):
+            home = self.client.get("/")
+        self.assertNotContains(home, "data-exploded")
+        self.assertNotContains(home, "exploded.js")
+
+    def test_with_artwork_the_labels_are_real_links_and_the_canvas_is_hidden(self):
+        from apps.core.exploded import LAYERS
+
+        with mock.patch("apps.core.exploded.manifest", return_value=self.FOUND):
+            home = self.client.get("/")
+        html = home.content.decode()
+        self.assertContains(home, 'aria-labelledby="exploded-title"')
+        self.assertContains(home, 'aria-hidden="true"></canvas>')
+        self.assertContains(home, "js/exploded.js")
+        self.assertIn('id="exploded-frames"', html)
+        self.assertLess(html.index("Company in numbers"), html.index("exploded-title"))
+        self.assertLess(html.index("exploded-title"), html.index("services-title"))
+        for layer in LAYERS:
+            with self.subTest(layer=layer["title"]):
+                url = reverse("services:detail", args=[layer["service"]])
+                self.assertIn(f'href="{url}"', html)
+                self.assertEqual(self.client.get(url).status_code, 200)
+
+    def test_a_broken_manifest_hides_the_section_rather_than_failing_the_page(self):
+        from apps.core import exploded
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "manifest.json"
+            with mock.patch.object(exploded, "MANIFEST_PATH", path):
+                self.assertIsNone(exploded._read_manifest())
+                path.write_text("{not json", encoding="utf-8")
+                with self.assertLogs("apps.core.exploded", "WARNING"):
+                    self.assertIsNone(exploded._read_manifest())
+                path.write_text(json.dumps({"desktop": {"width": 1, "height": 1, "frames": ["x.webp"]}}), encoding="utf-8")
+                with self.assertLogs("apps.core.exploded", "WARNING"):
+                    self.assertIsNone(exploded._read_manifest())
+        self.assertEqual(self.client.get("/").status_code, 200)

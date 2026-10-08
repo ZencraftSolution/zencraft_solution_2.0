@@ -12,6 +12,7 @@ from apps.core.mail import notify_internal, send_templated_email
 from apps.portfolio.models import CaseStudy, TeamMember, Testimonial
 from apps.services.models import Industry, Service, Technology
 
+from . import exploded
 from .forms import ConsultationForm, ContactForm, FeedbackForm, NewsletterForm
 from .models import NewsletterSubscriber
 from .utils import rate_limit, safe_referer
@@ -61,18 +62,9 @@ def _hero_slides():
 def home(request):
     services = list(Service.objects.filter(is_published=True).order_by("order"))
     technologies = list(Technology.objects.all())
-    terminal_lines = (
-        [{"t": "prompt", "v": "zencraft --services --verbose"}, {"t": "dim", "v": "resolving capabilities..."}]
-        + [{"t": "ok", "v": s.name, "k": s.nav_blurb} for s in services]
-        + [
-            {"t": "dim", "v": f"{len(services)} services ready. {len(technologies)} technologies in the stack."},
-            {"t": "prompt", "v": "zencraft estimate --interactive"},
-        ]
-    )
     context = {
         "services": services,
         "hero_slides": _hero_slides(),
-        "terminal_lines": terminal_lines,
         "case_studies": CaseStudy.objects.filter(is_published=True, featured=True).select_related("industry").prefetch_related("technologies")[:6],
         "testimonials": Testimonial.objects.filter(featured=True, verification="verified")[:6],
         "industries": Industry.objects.all()[:7],
@@ -89,6 +81,8 @@ def home(request):
             ("Support", "SLA-backed monitoring, fixes and a roadmap for the next version."),
         ],
     }
+    # Empty until the exploded-view artwork has been generated; the section hides itself.
+    context.update(exploded.context())
     return render(request, "core/home.html", context)
 
 

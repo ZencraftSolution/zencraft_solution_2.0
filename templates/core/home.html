@@ -77,6 +77,8 @@
   </div>
 </div>
 
+{% if exploded %}{% include "core/_exploded.html" %}{% endif %}
+
 <section class="section" aria-labelledby="services-title">
   <div class="container">
     <div class="section-head" data-reveal>
@@ -312,4 +314,8 @@
     </aside>
   </div>
 </section>
+{% endblock %}
+
+{% block extra_js %}
+{% if exploded %}<script src="{% static 'js/exploded.js' %}" defer></script>{% endif %}
 {% endblock %}
