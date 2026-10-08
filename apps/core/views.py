@@ -12,7 +12,7 @@ from apps.core.mail import notify_internal, send_templated_email
 from apps.portfolio.models import CaseStudy, TeamMember, Testimonial
 from apps.services.models import Industry, Service, Technology
 
-from . import exploded
+from . import exploded, hero_anim
 from .forms import ConsultationForm, ContactForm, FeedbackForm, NewsletterForm
 from .models import NewsletterSubscriber
 from .utils import rate_limit, safe_referer
@@ -83,6 +83,8 @@ def home(request):
     }
     # Empty until the exploded-view artwork has been generated; the section hides itself.
     context.update(exploded.context())
+    # The hero's scroll animation. hero_slides above stays in the context but is no longer drawn.
+    context.update(hero_anim.context())
     return render(request, "core/home.html", context)
 
 

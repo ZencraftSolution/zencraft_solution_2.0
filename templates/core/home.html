@@ -5,60 +5,52 @@
 {% block meta_description %}Zencraft Solution builds custom software, web platforms and mobile apps for businesses in Nepal and abroad, from the first workshop to long-term support.{% endblock %}
 
 {% block content %}
-<section class="hs" data-hero-slider aria-roledescription="carousel" aria-label="Industries we build software for">
-  <div class="hs__bgs" aria-hidden="true">
-    {% for s in hero_slides %}
-    <div class="hs__bg{% if forloop.first %} is-active{% endif %}" style="--tint: {{ s.tint }}" data-hs-bg>
-      <img src="{{ s.background_url }}" alt="" width="1920" height="1080" {% if not forloop.first %}loading="lazy"{% else %}fetchpriority="high"{% endif %} data-seed="hero-bg-{{ forloop.counter }}">
+{% comment %}
+The hero: a scroll-controlled animation (static/js/hero-anim.js) behind the headline. The canvas
+is decoration and aria-hidden; the H1, the tagline and the five chapter labels carry the meaning.
+The poster is a real <img> so the first paint does not wait for any script. With reduced motion
+the end-state image shows instead, every chapter is lit, and nothing is pinned.
+hero_slides is still in the context (apps/core/views.py) but is no longer drawn.
+{% endcomment %}
+<section class="hero ha" id="top" aria-label="What we build: software, web, mobile, application services and testing" data-hero-anim>
+  <div class="ha__stage" data-ha-stage>
+    {% if hero_anim %}
+    <div class="ha__media" aria-hidden="true">
+      <picture class="ha__still ha__still--poster">
+        <source media="(max-width: 767px)" srcset="{{ hero_anim.mobile.poster }}" width="{{ hero_anim.mobile.width }}" height="{{ hero_anim.mobile.height }}">
+        <img src="{{ hero_anim.desktop.poster }}" alt="" width="{{ hero_anim.desktop.width }}" height="{{ hero_anim.desktop.height }}" fetchpriority="high" decoding="async">
+      </picture>
+      <picture class="ha__still ha__still--end">
+        <source media="(max-width: 767px)" srcset="{{ hero_anim.mobile.end }}" width="{{ hero_anim.mobile.width }}" height="{{ hero_anim.mobile.height }}">
+        <img src="{{ hero_anim.desktop.end }}" alt="" width="{{ hero_anim.desktop.width }}" height="{{ hero_anim.desktop.height }}" loading="lazy" decoding="async">
+      </picture>
+      <canvas class="ha__canvas" data-ha-canvas></canvas>
     </div>
-    {% endfor %}
-    <svg class="hs__wave" viewBox="0 0 1440 220" preserveAspectRatio="none"><path d="M0 120 C 240 40, 520 40, 760 110 S 1200 200, 1440 60 L1440 220 L0 220 Z"/></svg>
-  </div>
+    {% endif %}
+    <div class="ha__shade" aria-hidden="true"></div>
 
-  <div class="container hs__grid">
-    <div class="hs__copy">
-      <h1 class="hs__title" data-split>Custom Software and IT&nbsp;Services</h1>
-      <p class="hs__tagline" data-hero-item>Engineering outcomes you can measure</p>
-      <div class="hs__tabs" role="tablist" aria-label="Choose an industry" data-hero-item>
-        {% for s in hero_slides %}
-        <button class="hs__tab{% if forloop.first %} is-active{% endif %}" type="button" role="tab" id="hs-tab-{{ forloop.counter0 }}"
-                aria-selected="{% if forloop.first %}true{% else %}false{% endif %}" aria-controls="hs-slide-{{ forloop.counter0 }}"
-                tabindex="{% if forloop.first %}0{% else %}-1{% endif %}" data-hs-tab="{{ forloop.counter0 }}">
-          {{ s.label }}<span class="hs__tab-bar" aria-hidden="true"></span>
-        </button>
+    <div class="container ha__copy">
+      <h1 class="ha__title" data-split>Custom Software and IT&nbsp;Services</h1>
+      <p class="ha__tagline" data-hero-item>Engineering outcomes you can measure</p>
+      <div class="ha__actions" data-hero-item>
+        <a class="btn btn--primary" href="{% url 'estimator:start' %}">Get an estimate <i class="ph ph-arrow-right"></i></a>
+      </div>
+    </div>
+
+    <div class="container ha__nav">
+      <div class="ha__progress" aria-hidden="true"><span class="ha__progress-bar" data-ha-bar></span></div>
+      <ol class="ha__chapters">
+        {% for c in hero_chapters %}
+        <li class="ha__chapter{% if forloop.first %} is-active{% endif %}" data-ha-chapter="{{ c.progress }}">
+          <span class="ha__chapter-num" aria-hidden="true">{{ forloop.counter|stringformat:"02d" }}</span>
+          <a class="ha__chapter-title" href="{% url 'services:detail' c.service %}">{{ c.title }}</a>
+          <span class="ha__chapter-text">{{ c.text }}</span>
+        </li>
         {% endfor %}
-      </div>
-    </div>
-
-    <div class="hs__visual" data-hero-visual>
-      <button class="hs__arrow hs__arrow--prev" type="button" aria-label="Previous slide" data-hs-prev><i class="ph ph-caret-left"></i></button>
-      <div class="hs__frame">
-        <div class="hs__stack" aria-live="polite">
-          {% for s in hero_slides %}
-          <figure class="hs__slide{% if forloop.first %} is-active{% endif %}" id="hs-slide-{{ forloop.counter0 }}" role="tabpanel"
-                  aria-labelledby="hs-tab-{{ forloop.counter0 }}" aria-roledescription="slide" aria-label="{{ forloop.counter }} of {{ hero_slides|length }}"
-                  {% if not forloop.first %}aria-hidden="true"{% endif %} data-hs-slide>
-            <div class="hs__media"><img src="{{ s.image_url }}" srcset="{% srcset s.image_url %}" sizes="(min-width: 1000px) 640px, 100vw" alt="{{ s.caption }} built by Zencraft Solution" width="1200" height="760" {% if not forloop.first %}loading="lazy"{% endif %} data-seed="hero-{{ forloop.counter }}"></div>
-            <figcaption class="hs__caption">
-              <span>{{ s.caption }}</span>
-              <strong class="mono">{{ s.metric }}</strong>
-            </figcaption>
-          </figure>
-          {% endfor %}
-        </div>
-      </div>
-      <button class="hs__arrow hs__arrow--next" type="button" aria-label="Next slide" data-hs-next><i class="ph ph-caret-right"></i></button>
+      </ol>
     </div>
   </div>
-
-  <div class="container hs__foot">
-    {% with first=hero_slides.0 %}
-    <a class="hs__link" href="{{ first.url }}" data-hs-link>
-      <span data-hs-link-text>{{ first.link }}</span> <i class="ph ph-arrow-right"></i>
-    </a>
-    {% endwith %}
-    {{ hero_slides|json_script:"hero-slides" }}
-  </div>
+  {% if hero_anim %}{{ hero_anim|json_script:"hero-anim-frames" }}{% endif %}
 </section>
 
 <section class="container" aria-label="Company in numbers">
@@ -317,5 +309,6 @@
 {% endblock %}
 
 {% block extra_js %}
+{% if hero_anim %}<script src="{% static 'js/hero-anim.js' %}" defer></script>{% endif %}
 {% if exploded %}<script src="{% static 'js/exploded.js' %}" defer></script>{% endif %}
 {% endblock %}

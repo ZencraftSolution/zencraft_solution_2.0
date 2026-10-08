@@ -1115,7 +1115,7 @@ class SeededSiteSmokeTests(TestCase):
                 self.assertEqual(self.client.get(url).status_code, 200)
         home = self.client.get("/")
         self.assertEqual(len(home.context["hero_slides"]), 4)
-        self.assertContains(home, "data-hero-slider")
+        self.assertContains(home, "data-hero-anim")
         self.assertContains(home, '"@type":"Organization"')
 
     def test_removed_industry_is_gone_everywhere(self):
@@ -1268,3 +1268,52 @@ class ExplodedViewTests(TestCase):
                 with self.assertLogs("apps.core.exploded", "WARNING"):
                     self.assertIsNone(exploded._read_manifest())
         self.assertEqual(self.client.get("/").status_code, 200)
+
+
+class HeroAnimationTests(TestCase):
+    """The scroll-controlled hero: the headline and chapters always render, the picture only with frames."""
+
+    FOUND = {
+        variant: {"width": 1600, "height": 792, "duration": 15.04, "frames": ["/static/a.webp", "/static/b.webp"],
+                  "poster": "/static/poster.webp", "end": "/static/end.webp"}
+        for variant in ("desktop", "mobile")
+    }
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("seed_zencraft", stdout=io.StringIO())
+
+    def setUp(self):
+        cache.clear()
+
+    def test_the_hero_replaces_the_slider_and_keeps_the_headline(self):
+        with mock.patch("apps.core.hero_anim.manifest", return_value=self.FOUND):
+            home = self.client.get("/")
+        html = home.content.decode()
+        self.assertNotIn("data-hero-slider", html)
+        self.assertIn("data-split>Custom Software and IT&nbsp;Services</h1>", html)
+        self.assertContains(home, 'fetchpriority="high"')
+        self.assertContains(home, "js/hero-anim.js")
+        self.assertContains(home, reverse("estimator:start"))
+        # The slider's context is still there for anything that reads it.
+        self.assertEqual(len(home.context["hero_slides"]), 4)
+
+    def test_every_chapter_links_to_a_real_service_at_its_measured_time(self):
+        from apps.core.hero_anim import CHAPTERS
+
+        with mock.patch("apps.core.hero_anim.manifest", return_value=self.FOUND):
+            chapters = self.client.get("/").context["hero_chapters"]
+        self.assertEqual([c["title"] for c in chapters], [c["title"] for c in CHAPTERS])
+        self.assertEqual([c["progress"] for c in chapters], sorted(c["progress"] for c in chapters))
+        self.assertAlmostEqual(chapters[-1]["progress"], 12.17 / 15.04, places=3)
+        for chapter in chapters:
+            with self.subTest(chapter=chapter["title"]):
+                self.assertEqual(self.client.get(reverse("services:detail", args=[chapter["service"]])).status_code, 200)
+
+    def test_without_frames_the_hero_still_has_its_headline_but_no_picture(self):
+        with mock.patch("apps.core.hero_anim.manifest", return_value=None):
+            home = self.client.get("/")
+        self.assertContains(home, "data-hero-anim")
+        self.assertContains(home, "Custom Software and IT&nbsp;Services")
+        self.assertNotContains(home, "hero-anim.js")
+        self.assertNotContains(home, "data-ha-canvas")
