@@ -15,6 +15,18 @@ from django.urls import reverse
 
 from apps.core import seo
 from apps.core.sitemaps import SITEMAPS
+from apps.core.testing import make_job
+
+
+def open_role():
+    """A live, salaried, hybrid job. The seed ships no vacancies, so tests that need one make it."""
+    from datetime import timedelta
+    from decimal import Decimal
+
+    from django.utils import timezone
+
+    return make_job(salary_min_npr=Decimal("110000"), salary_max_npr=Decimal("170000"), show_salary=True,
+                    closing_date=timezone.localdate() + timedelta(days=30))
 
 SITE = "https://zencraftsolution.com"
 
@@ -168,6 +180,7 @@ class NoindexTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         call_command("seed_zencraft", verbosity=0)
+        open_role()
 
     def assert_noindex(self, path, **kwargs):
         response = self.client.get(path, **kwargs)
@@ -215,6 +228,7 @@ class StructuredDataTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         call_command("seed_zencraft", verbosity=0)
+        open_role()
 
     def blocks(self, path):
         response = self.client.get(path)
@@ -297,8 +311,11 @@ class StructuredDataTests(TestCase):
 
     def test_a_case_study_publishes_as_an_article(self):
         from apps.portfolio.models import CaseStudy
+        from apps.services.models import Industry
 
-        case = CaseStudy.objects.filter(is_published=True, industry__isnull=False).first()
+        case = CaseStudy.objects.filter(is_published=True).first()
+        case.industry = Industry.objects.order_by("order").first()
+        case.save(update_fields=["industry"])
         article = self.of_type(case.get_absolute_url(), "Article")
         self.assertEqual(article["headline"], case.title)
         self.assertTrue(article["image"].startswith("http"))
@@ -370,13 +387,21 @@ class SitemapContentTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         call_command("seed_zencraft", verbosity=0)
+        open_role()
 
     def body(self):
         return self.client.get("/sitemap.xml").content.decode()
 
     def test_entries_carry_a_last_modified_date(self):
-        body = self.body()
-        self.assertGreater(body.count("<lastmod>"), 20)
+        """Every record-driven entry is dated: each service, case study, article and open role."""
+        from apps.blog.models import BlogPost
+        from apps.careers.models import JobOpening
+        from apps.portfolio.models import CaseStudy
+        from apps.services.models import Service
+
+        records = (Service.objects.filter(is_published=True).count() + CaseStudy.objects.filter(is_published=True).count()
+                   + BlogPost.objects.filter(is_published=True).count() + JobOpening.objects.filter(is_active=True).count())
+        self.assertGreaterEqual(self.body().count("<lastmod>"), records)
 
     def test_case_studies_and_articles_offer_their_image(self):
         body = self.body()
@@ -464,6 +489,14 @@ class FrontEndPerformanceTests(TestCase):
                     self.assertIn("height", image)
 
     def test_images_below_the_first_screen_are_lazy_and_the_hero_is_not(self):
+        # The seed ships a single post, so add two to put something below the fold.
+        from apps.blog.models import BlogPost
+
+        seeded = BlogPost.objects.get()
+        for n in (2, 3):
+            BlogPost.objects.create(slug=f"{seeded.slug}-{n}", title=f"{seeded.title} {n}", category=seeded.category,
+                                    excerpt=seeded.excerpt, body=seeded.body, hero_image_url=seeded.hero_image_url,
+                                    is_published=True, published_at=seeded.published_at)
         html = self.head("/insights/")
         # data-seed marks content imagery. The small logo in the header is above the fold and
         # correctly carries neither hint: lazy would delay it, high would outrank the real hero.

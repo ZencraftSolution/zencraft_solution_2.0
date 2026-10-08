@@ -12,6 +12,8 @@ import pytest
 from django.core.cache import cache
 from django.core.management import call_command
 
+from apps.core.testing import make_job
+
 # Playwright's synchronous API runs an event loop in this thread, and Django then refuses ORM
 # calls as "async unsafe". The queries here are ordinary synchronous ones in a test process, so
 # the guard is describing a situation that does not apply. This is the documented way to use the
@@ -91,6 +93,8 @@ def site(live_server, transactional_db):
     after the first then looks at an empty site and fails in ways that look like browser faults.
     """
     call_command("seed_zencraft", verbosity=0)
+    # The seed ships no vacancies; the application and accessibility journeys need one to open.
+    make_job()
     # The navigation menu is cached for two minutes. A list cached before the seed would make
     # every test that opens the services menu fail for a reason unrelated to the browser.
     cache.clear()

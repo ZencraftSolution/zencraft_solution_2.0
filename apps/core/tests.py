@@ -33,6 +33,7 @@ from apps.core.models import ConsultationBooking, ContactSubmission, Feedback, N
 from apps.core.testing import CLAMAV_SCAN, NOOP_SCAN, docx_bytes, make_application, make_job, make_product, pdf_upload
 from apps.core.uploads import get_private_storage
 from apps.core.utils import client_ip, format_npr, format_usd, log_action, make_reference, npr_to_usd, rate_limit
+from apps.portfolio.models import CaseStudy
 from apps.services.models import Service
 
 
@@ -1102,7 +1103,9 @@ class SeededSiteSmokeTests(TestCase):
         counts = (Service.objects.count(), JobOpening.objects.count(), BlogPost.objects.count())
         call_command("seed_zencraft", stdout=io.StringIO())
         self.assertEqual(counts, (Service.objects.count(), JobOpening.objects.count(), BlogPost.objects.count()))
-        self.assertEqual(counts, (9, 7, 6))
+        # Nine services, no vacancies, one article.
+        self.assertEqual(counts, (9, 0, 1))
+        self.assertEqual(CaseStudy.objects.count(), 1)
         for service in Service.objects.all():
             self.assertEqual(service.steps.count(), 6)
             self.assertGreaterEqual(len(service.deliverables), 6)

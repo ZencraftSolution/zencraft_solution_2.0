@@ -9,7 +9,6 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.blog.models import BlogCategory, BlogPost
-from apps.careers.models import Department, JobOpening
 from apps.commerce.models import EngagementModel, FixedPriceRange, ProductizedService, RoleRate
 from apps.core import seed_content as C
 from apps.core import seed_services as S
@@ -33,7 +32,6 @@ class Command(BaseCommand):
         self.seed_services()
         self.seed_estimator()
         self.seed_portfolio()
-        self.seed_careers()
         self.seed_blog()
         self.seed_admin()
         self.clear_cache()
@@ -155,22 +153,6 @@ class Command(BaseCommand):
         for order, (url, caption, cat) in enumerate(C.GALLERY):
             GalleryImage.objects.create(image_url=url, caption=caption, category=cat, order=order)
         self.stdout.write(f"  case studies: {len(C.CASE_STUDIES)}, testimonials, team, gallery")
-
-    def seed_careers(self):
-        depts = {}
-        for order, (name, slug) in enumerate(C.DEPARTMENTS):
-            depts[slug], _ = Department.objects.update_or_create(slug=slug, defaults={"name": name, "order": order})
-        today = timezone.localdate()
-        for i, j in enumerate(C.JOBS):
-            job, _ = JobOpening.objects.update_or_create(slug=j["slug"], defaults=dict(
-                title=j["title"], department=depts[j["dept"]], work_mode=j["mode"], employment_type=j["type"],
-                experience_level=j["level"], experience_years=j["years"], summary=j["summary"], description=j["description"],
-                responsibilities=j["responsibilities"], requirements=j["requirements"], nice_to_haves=j["nice"],
-                growth_path=j["growth"], salary_min_npr=Decimal(j["salary"][0]), salary_max_npr=Decimal(j["salary"][1]),
-                show_salary=True, is_active=True, posted_at=today - timedelta(days=3 + i * 4), closing_date=today + timedelta(days=30 + i * 5),
-            ))
-            job.tech_stack.set(Technology.objects.filter(slug__in=j["techs"]))
-        self.stdout.write(f"  jobs: {len(C.JOBS)}")
 
     def seed_blog(self):
         cats = {}
