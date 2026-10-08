@@ -3,7 +3,6 @@ sitemap/robots, the public core pages and the seed command. App-specific behavio
 import io
 import json
 import logging
-import pathlib
 import re
 import shutil
 import tempfile
@@ -1115,7 +1114,7 @@ class SeededSiteSmokeTests(TestCase):
                 self.assertEqual(self.client.get(url).status_code, 200)
         home = self.client.get("/")
         self.assertEqual(len(home.context["hero_slides"]), 4)
-        self.assertContains(home, "data-hero-anim")
+        self.assertContains(home, "data-hero-slider")
         self.assertContains(home, '"@type":"Organization"')
 
     def test_removed_industry_is_gone_everywhere(self):
@@ -1211,109 +1210,3 @@ class FeedbackTests(TestCase):
         """Even approved, it is a record for the team until somebody copies it across."""
         self.client.post(self.URL, {**self.VALID, "may_publish": "on"}, HTTP_REFERER="/")
         self.assertNotContains(self.client.get("/"), "shipped on time")
-
-
-class ExplodedViewTests(TestCase):
-    """The scroll-driven exploded view on the home page: present only when its frames are."""
-
-    FOUND = {
-        "desktop": {"width": 1600, "height": 900, "frames": ["/static/a.webp", "/static/b.webp"]},
-        "mobile": {"width": 800, "height": 1422, "frames": ["/static/c.webp", "/static/d.webp"]},
-        "still": "/static/still.webp",
-        "still_mobile": "/static/still_mobile.webp",
-    }
-
-    @classmethod
-    def setUpTestData(cls):
-        call_command("seed_zencraft", stdout=io.StringIO())
-
-    def setUp(self):
-        cache.clear()
-
-    def test_without_artwork_the_section_and_its_script_are_absent(self):
-        with mock.patch("apps.core.exploded.manifest", return_value=None):
-            home = self.client.get("/")
-        self.assertNotContains(home, "data-exploded")
-        self.assertNotContains(home, "exploded.js")
-
-    def test_with_artwork_the_labels_are_real_links_and_the_canvas_is_hidden(self):
-        from apps.core.exploded import LAYERS
-
-        with mock.patch("apps.core.exploded.manifest", return_value=self.FOUND):
-            home = self.client.get("/")
-        html = home.content.decode()
-        self.assertContains(home, 'aria-labelledby="exploded-title"')
-        self.assertContains(home, 'aria-hidden="true"></canvas>')
-        self.assertContains(home, "js/exploded.js")
-        self.assertIn('id="exploded-frames"', html)
-        self.assertLess(html.index("Company in numbers"), html.index("exploded-title"))
-        self.assertLess(html.index("exploded-title"), html.index("services-title"))
-        for layer in LAYERS:
-            with self.subTest(layer=layer["title"]):
-                url = reverse("services:detail", args=[layer["service"]])
-                self.assertIn(f'href="{url}"', html)
-                self.assertEqual(self.client.get(url).status_code, 200)
-
-    def test_a_broken_manifest_hides_the_section_rather_than_failing_the_page(self):
-        from apps.core import exploded
-
-        with tempfile.TemporaryDirectory() as tmp:
-            path = pathlib.Path(tmp) / "manifest.json"
-            with mock.patch.object(exploded, "MANIFEST_PATH", path):
-                self.assertIsNone(exploded._read_manifest())
-                path.write_text("{not json", encoding="utf-8")
-                with self.assertLogs("apps.core.exploded", "WARNING"):
-                    self.assertIsNone(exploded._read_manifest())
-                path.write_text(json.dumps({"desktop": {"width": 1, "height": 1, "frames": ["x.webp"]}}), encoding="utf-8")
-                with self.assertLogs("apps.core.exploded", "WARNING"):
-                    self.assertIsNone(exploded._read_manifest())
-        self.assertEqual(self.client.get("/").status_code, 200)
-
-
-class HeroAnimationTests(TestCase):
-    """The scroll-controlled hero: the headline and chapters always render, the picture only with frames."""
-
-    FOUND = {
-        variant: {"width": 1600, "height": 792, "duration": 15.04, "frames": ["/static/a.webp", "/static/b.webp"],
-                  "poster": "/static/poster.webp", "end": "/static/end.webp"}
-        for variant in ("desktop", "mobile")
-    }
-
-    @classmethod
-    def setUpTestData(cls):
-        call_command("seed_zencraft", stdout=io.StringIO())
-
-    def setUp(self):
-        cache.clear()
-
-    def test_the_hero_replaces_the_slider_and_keeps_the_headline(self):
-        with mock.patch("apps.core.hero_anim.manifest", return_value=self.FOUND):
-            home = self.client.get("/")
-        html = home.content.decode()
-        self.assertNotIn("data-hero-slider", html)
-        self.assertIn("data-split>Custom Software and IT&nbsp;Services</h1>", html)
-        self.assertContains(home, 'fetchpriority="high"')
-        self.assertContains(home, "js/hero-anim.js")
-        self.assertContains(home, reverse("estimator:start"))
-        # The slider's context is still there for anything that reads it.
-        self.assertEqual(len(home.context["hero_slides"]), 4)
-
-    def test_every_chapter_links_to_a_real_service_at_its_measured_time(self):
-        from apps.core.hero_anim import CHAPTERS
-
-        with mock.patch("apps.core.hero_anim.manifest", return_value=self.FOUND):
-            chapters = self.client.get("/").context["hero_chapters"]
-        self.assertEqual([c["title"] for c in chapters], [c["title"] for c in CHAPTERS])
-        self.assertEqual([c["progress"] for c in chapters], sorted(c["progress"] for c in chapters))
-        self.assertAlmostEqual(chapters[-1]["progress"], 12.17 / 15.04, places=3)
-        for chapter in chapters:
-            with self.subTest(chapter=chapter["title"]):
-                self.assertEqual(self.client.get(reverse("services:detail", args=[chapter["service"]])).status_code, 200)
-
-    def test_without_frames_the_hero_still_has_its_headline_but_no_picture(self):
-        with mock.patch("apps.core.hero_anim.manifest", return_value=None):
-            home = self.client.get("/")
-        self.assertContains(home, "data-hero-anim")
-        self.assertContains(home, "Custom Software and IT&nbsp;Services")
-        self.assertNotContains(home, "hero-anim.js")
-        self.assertNotContains(home, "data-ha-canvas")
