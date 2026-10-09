@@ -464,12 +464,16 @@
         gsap.set("[data-reveal], [data-reveal-group] > *, [data-hero-item]", { opacity: 1 });
         return;
       }
+      var observers = [];
       heroIntro();
-      reveals();
-      counters();
-      processLines(c.desktop);
+      reveals(observers);
+      counters(observers);
+      processLines(c.desktop, observers);
       var undoCases = casesGallery(c.desktop);
-      return function () { if (undoCases) undoCases(); };
+      return function () {
+        observers.forEach(function (o) { o.disconnect(); });
+        if (undoCases) undoCases();
+      };
     });
 
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { if (window.ScrollTrigger) ScrollTrigger.refresh(); });
@@ -493,26 +497,43 @@
     if (visual) tl.fromTo(visual, { opacity: 0, scale: 0.96 }, { opacity: 1, scale: 1, duration: MOTION.dur.slow, clearProps: "transform" }, 0.2);
   }
 
-  function reveals() {
+  /* Calls start() once, when the top of `el` rises above `line` (a fraction of the window
+     height, as in ScrollTrigger's "top 88%"), or at once if it is already above the window.
+
+     An IntersectionObserver rather than a ScrollTrigger: ScrollTrigger starts a tween inside its
+     scroll handler, and the tween's first frame moves the element right there, which Firefox
+     reports as a "scroll-linked positioning effect". Observer callbacks run outside scroll
+     events, so starting an animation from one is not scroll-linked. */
+  function whenInView(el, line, start, observers) {
+    var observer = new IntersectionObserver(function (entries) {
+      var entry = entries[entries.length - 1];
+      if (entry.isIntersecting || entry.boundingClientRect.bottom < 0) {
+        observer.disconnect();
+        start();
+      }
+    }, { rootMargin: "0px 0px -" + Math.round((1 - line) * 100) + "% 0px" });
+    observer.observe(el);
+    observers.push(observer);
+  }
+
+  function reveals(observers) {
     $$("[data-reveal]").forEach(function (el) {
-      gsap.fromTo(el, { opacity: 0, y: 34 }, {
-        opacity: 1, y: 0, duration: 0.9, clearProps: "transform",
-        scrollTrigger: { trigger: el, start: "top 88%", once: true },
-      });
+      var tween = gsap.fromTo(el, { opacity: 0, y: 34 }, { opacity: 1, y: 0, duration: 0.9, clearProps: "transform", paused: true });
+      whenInView(el, 0.88, function () { tween.play(); }, observers);
     });
     $$("[data-reveal-group]").forEach(function (group) {
       var items = Array.prototype.slice.call(group.children);
       if (!items.length) return;
       var wave = group.hasAttribute("data-grid-wave");
-      gsap.fromTo(items, { opacity: 0, y: 28 }, {
-        opacity: 1, y: 0, duration: 0.8, clearProps: "transform",
+      var tween = gsap.fromTo(items, { opacity: 0, y: 28 }, {
+        opacity: 1, y: 0, duration: 0.8, clearProps: "transform", paused: true,
         stagger: wave ? { each: MOTION.stagger, grid: "auto", from: "start" } : MOTION.stagger,
-        scrollTrigger: { trigger: group, start: "top 86%", once: true },
       });
+      whenInView(group, 0.86, function () { tween.play(); }, observers);
     });
   }
 
-  function counters() {
+  function counters(observers) {
     $$("[data-count]").forEach(function (el) {
       var end = parseFloat(el.dataset.count);
       if (isNaN(end)) return;
@@ -521,20 +542,16 @@
       var obj = { v: from };
       var format = function (v) { return decimals ? v.toFixed(decimals) : Math.round(v).toLocaleString("en-IN"); };
       el.textContent = format(from);
-      ScrollTrigger.create({
-        trigger: el, start: "top 92%", once: true,
-        onEnter: function () {
-          gsap.to(obj, { v: end, duration: 1.8, ease: "power2.out", onUpdate: function () { el.textContent = format(obj.v); } });
-        },
-      });
+      whenInView(el, 0.92, function () {
+        gsap.to(obj, { v: end, duration: 1.8, ease: "power2.out", onUpdate: function () { el.textContent = format(obj.v); } });
+      }, observers);
     });
   }
 
   /* The line through the process steps fills once, on its own clock, when it comes into view,
-     lighting each step as it reaches it. It used to track the scroll position, which meant moving
-     an element from inside a scroll handler: Firefox flags that as a "scroll-linked effect"
-     because it stutters when scrolling happens off the main thread. */
-  function processLines(desktop) {
+     lighting each step as it reaches it. Started by whenInView, not by scrolling, for the reason
+     given there. */
+  function processLines(desktop, observers) {
     $$("[data-process]").forEach(function (p) {
       var fill = $(".process__fill", p);
       var steps = $$(".process__step", p);
@@ -542,15 +559,15 @@
       var horizontal = desktop && p.classList.contains("process--horizontal");
       var prop = horizontal ? "scaleX" : "scaleY";
       var from = {}; from[prop] = 0;
-      var to = { ease: "power1.inOut", duration: 0.35 * steps.length };
+      var to = { ease: "power1.inOut", duration: 0.35 * steps.length, paused: true };
       to[prop] = 1;
-      to.scrollTrigger = { trigger: p, start: horizontal ? "top 78%" : "top 70%", once: true };
       to.onUpdate = function () {
         var progress = this.progress();
         var n = steps.length - 1 || 1;
         steps.forEach(function (s, i) { s.classList.toggle("is-lit", progress >= i / n - 0.02); });
       };
-      gsap.fromTo(fill, from, to);
+      var tween = gsap.fromTo(fill, from, to);
+      whenInView(p, horizontal ? 0.78 : 0.70, function () { tween.play(); }, observers);
     });
   }
 
