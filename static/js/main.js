@@ -182,9 +182,14 @@
 
     var DELAY = 6.5;
     var index = 0;
-    var paused = false;
     var timer = null;
     var progress = null;
+    /* Autoplay stops while any of these holds. Hovering counts only over the framed picture: the
+       whole section used to count, and since it fills the top of the page a resting mouse froze
+       the slider on its first slide. Focus counts only from the keyboard, so clicking a tab does
+       not stop it either. The Pause button is the way to stop it for good (WCAG 2.2.2). */
+    var hold = { hover: false, keyboard: false, hidden: false, user: false };
+    function paused() { return hold.hover || hold.keyboard || hold.hidden || hold.user; }
 
     function animated() { return motionAllowed() && root.ownerDocument.documentElement.classList.contains("js-motion"); }
 
@@ -194,12 +199,15 @@
       if (!animated()) return;
       var bar = $(".hs__tab-bar", tabs[index]);
       if (!bar) return;
-      progress = gsap.fromTo(bar, { scaleX: 0 }, { scaleX: 1, duration: DELAY, ease: "none", paused: paused });
+      progress = gsap.fromTo(bar, { scaleX: 0 }, { scaleX: 1, duration: DELAY, ease: "none", paused: paused() });
     }
 
+    /* It also plays with reduced motion: slides then swap without sliding or zooming (animated()
+       is false), and the Pause button stops it. Turning autoplay off there left a slider that
+       never moved for anyone with Windows' animation effects switched off. */
     function schedule() {
       clearTimeout(timer);
-      if (paused || reduceQuery.matches) return;
+      if (paused()) return;
       timer = setTimeout(function () { go(index + 1, 1); }, DELAY * 1000);
     }
 
@@ -274,17 +282,35 @@
       });
     }
 
-    function setPaused(state) {
-      paused = state;
-      if (progress) { if (state) progress.pause(); else progress.resume(); }
-      if (state) clearTimeout(timer);
+    function setHold(reason, state) {
+      hold[reason] = state;
+      if (progress) { if (paused()) progress.pause(); else progress.resume(); }
+      if (paused()) clearTimeout(timer);
       else schedule();
     }
-    root.addEventListener("mouseenter", function () { setPaused(true); });
-    root.addEventListener("mouseleave", function () { setPaused(false); });
-    root.addEventListener("focusin", function () { setPaused(true); });
-    root.addEventListener("focusout", function (e) { if (!root.contains(e.relatedTarget)) setPaused(false); });
-    document.addEventListener("visibilitychange", function () { setPaused(document.hidden); });
+    var frame = $(".hs__visual", root) || root;
+    frame.addEventListener("mouseenter", function () { setHold("hover", true); });
+    frame.addEventListener("mouseleave", function () { setHold("hover", false); });
+    root.addEventListener("focusin", function (e) {
+      var keyboard = false;
+      try { keyboard = e.target.matches(":focus-visible"); } catch (err) {}
+      setHold("keyboard", keyboard);
+    });
+    root.addEventListener("focusout", function (e) { if (!root.contains(e.relatedTarget)) setHold("keyboard", false); });
+    document.addEventListener("visibilitychange", function () { setHold("hidden", document.hidden); });
+
+    var pauseButton = $("[data-hs-pause]", root);
+    if (pauseButton) {
+      pauseButton.hidden = false;
+      pauseButton.addEventListener("click", function () {
+        var stop = !hold.user;
+        pauseButton.setAttribute("aria-pressed", String(stop));
+        pauseButton.setAttribute("aria-label", stop ? "Play slideshow" : "Pause slideshow");
+        var icon = $("i", pauseButton);
+        if (icon) icon.className = "ph " + (stop ? "ph-play" : "ph-pause");
+        setHold("user", stop);
+      });
+    }
 
     // Warm the next images so crossfades never show a blank frame
     setTimeout(function () {

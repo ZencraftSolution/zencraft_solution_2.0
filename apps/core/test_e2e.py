@@ -436,3 +436,37 @@ class StaffDashboardTests:
         assert not Technology.objects.filter(name__startswith="Bulk tool").exists()
         assert Technology.objects.exists(), "records outside the search were deleted too"
         assert console_errors == [], console_errors
+
+
+class HeroSliderTests:
+    """The home-page slider plays on its own and can be paused.
+
+    These run with reduced motion on and GSAP stubbed out (see conftest.py), which is also the
+    case that used to leave the slider frozen: autoplay was switched off entirely for reduced
+    motion, and hovering anywhere in the hero stopped it.
+    """
+
+    ACTIVE = "() => [...document.querySelectorAll('[data-hs-slide]')].findIndex(s => s.classList.contains('is-active'))"
+
+    def test_it_advances_with_the_mouse_resting_on_the_headline_and_pause_stops_it(self, page, site, console_errors):
+        goto(page, site, "/", console_errors)
+        headline = page.locator("h1").bounding_box()
+        page.mouse.move(headline["x"] + 30, headline["y"] + headline["height"] / 2)
+        first = page.evaluate(self.ACTIVE)
+        # Polled from here: wait_for_function evaluates a string, which this site's CSP refuses.
+        for _ in range(24):
+            page.wait_for_timeout(500)
+            if page.evaluate(self.ACTIVE) != first:
+                break
+        assert page.evaluate(self.ACTIVE) != first, "the slider did not move on its own within 12 s"
+
+        pause = page.locator("[data-hs-pause]")
+        assert pause.is_visible()
+        pause.click()
+        assert pause.get_attribute("aria-pressed") == "true"
+        assert pause.get_attribute("aria-label") == "Play slideshow"
+        page.mouse.move(headline["x"] + 30, headline["y"] + headline["height"] / 2)
+        held = page.evaluate(self.ACTIVE)
+        page.wait_for_timeout(8_000)  # longer than one slide (6.5 s)
+        assert page.evaluate(self.ACTIVE) == held, "the slider moved while paused"
+        assert console_errors == [], console_errors

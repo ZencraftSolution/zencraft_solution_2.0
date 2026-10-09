@@ -52,6 +52,8 @@
   </div>
 
   <div class="container hs__foot">
+    {% comment %}Hidden until main.js runs: without JavaScript there is no autoplay to pause.{% endcomment %}
+    <button class="hs__pause" type="button" aria-pressed="false" aria-label="Pause slideshow" data-hs-pause hidden><i class="ph ph-pause"></i></button>
     {% with first=hero_slides.0 %}
     <a class="hs__link" href="{{ first.url }}" data-hs-link>
       <span data-hs-link-text>{{ first.link }}</span> <i class="ph ph-arrow-right"></i>

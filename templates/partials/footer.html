@@ -41,7 +41,7 @@
       </div>
       <div class="footer-col">
         <h3>Newsletter</h3>
-        <p style="font-size:.93rem">Engineering notes and project lessons, once a month.</p>
+        <p class="footer-col__lead">Engineering notes and project lessons, once a month.</p>
         <form class="newsletter" method="post" action="{% url 'core:newsletter' %}" data-newsletter>
           {% csrf_token %}
           <label class="sr-only" for="nl-email">Email address</label>
@@ -50,13 +50,13 @@
           <button class="btn btn--light" type="submit">Subscribe</button>
         </form>
         <p class="newsletter__msg" aria-live="polite" data-newsletter-msg></p>
-        <ul class="mt-2" style="list-style:none;display:grid;gap:6px;font-size:.9rem">
+        <ul class="footer-contact">
           {% firstof site.secondary_email site.email as footer_email %}
           {% firstof site.secondary_phone site.phone as footer_phone %}
-          <li><a href="mailto:{{ footer_email }}">{{ footer_email }}</a></li>
-          <li><a href="tel:{{ footer_phone|cut:' ' }}">{{ footer_phone }}</a></li>
-          {% if site.international_phone %}<li><a href="tel:{{ site.international_phone|cut:' ' }}">{{ site.international_phone }}</a></li>{% endif %}
-          <li>{{ site.address }}</li>
+          <li><i class="ph ph-envelope-simple" aria-hidden="true"></i><a href="mailto:{{ footer_email }}">{{ footer_email }}</a></li>
+          <li><i class="ph ph-phone" aria-hidden="true"></i><a href="tel:{{ footer_phone|cut:' ' }}">{{ footer_phone }}</a></li>
+          {% if site.international_phone %}<li><i class="ph ph-phone" aria-hidden="true"></i><a href="tel:{{ site.international_phone|cut:' ' }}">{{ site.international_phone }}</a></li>{% endif %}
+          <li><i class="ph ph-map-pin" aria-hidden="true"></i><span>{{ site.address }}</span></li>
         </ul>
       </div>
     </div>
