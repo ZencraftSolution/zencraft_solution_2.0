@@ -26,8 +26,10 @@
      round trip to two more hosts before the first paint. Regenerate with scripts/fetch_fonts.py
      and scripts/fetch_icons.py.{% endcomment %}
   <link rel="preconnect" href="https://images.unsplash.com">
-  {# One file: Geist is a variable font, so this single download serves every weight the body uses. #}
-  <link rel="preload" href="{% static 'fonts/geist-latin.woff2' %}" as="font" type="font/woff2" crossorigin>
+  {% comment %}No font preload. fonts.css below is the first stylesheet, so the browser finds the
+  fonts as soon as it lays out text, and font-display: swap shows text in the system font until
+  they arrive. A preload started the download earlier, but Firefox reported it as "not used within
+  a few seconds" whenever the main stylesheet was slow to arrive.{% endcomment %}
   <link rel="stylesheet" href="{% static 'css/fonts.css' %}">
   <link rel="stylesheet" href="{% static 'css/main.css' %}">
   {% comment %}Loaded normally rather than with the media="print" onload swap: that trick needs an inline

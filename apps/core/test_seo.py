@@ -452,14 +452,15 @@ class FrontEndPerformanceTests(TestCase):
             external = re.findall(r'<link[^>]+rel="stylesheet"[^>]+href="(https?://[^"]+)"', html)
             self.assertEqual(external, [], f"{path} loads a stylesheet from {external}")
 
-    def test_the_fonts_are_served_from_this_site_and_preloaded(self):
+    def test_the_fonts_are_served_from_this_site_and_not_preloaded(self):
         html = self.head()
         self.assertNotIn("fonts.googleapis.com", html)
         self.assertNotIn("fonts.gstatic.com", html)
         self.assertIn("css/fonts", html)
-        preloads = re.findall(r'<link rel="preload" href="([^"]+)" as="font"[^>]*crossorigin', html)
-        self.assertTrue(preloads, "the font used for body text is not preloaded")
-        self.assertTrue(all("geist" in url for url in preloads))
+        # fonts.css is the first stylesheet and asks for font-display: swap, so text is never
+        # invisible. A font preload was reported by Firefox as unused whenever the main stylesheet
+        # arrived late, so there is none.
+        self.assertEqual(re.findall(r'<link rel="preload"[^>]*as="font"', html), [])
 
     def test_every_preloaded_font_is_one_the_stylesheet_uses(self):
         """A preload that no @font-face asks for is downloaded for nothing, and browsers warn that

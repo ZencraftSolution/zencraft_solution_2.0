@@ -469,7 +469,6 @@
       counters();
       processLines(c.desktop);
       var undoCases = casesGallery(c.desktop);
-      footerParallax();
       return function () { if (undoCases) undoCases(); };
     });
 
@@ -531,6 +530,10 @@
     });
   }
 
+  /* The line through the process steps fills once, on its own clock, when it comes into view,
+     lighting each step as it reaches it. It used to track the scroll position, which meant moving
+     an element from inside a scroll handler: Firefox flags that as a "scroll-linked effect"
+     because it stutters when scrolling happens off the main thread. */
   function processLines(desktop) {
     $$("[data-process]").forEach(function (p) {
       var fill = $(".process__fill", p);
@@ -539,16 +542,13 @@
       var horizontal = desktop && p.classList.contains("process--horizontal");
       var prop = horizontal ? "scaleX" : "scaleY";
       var from = {}; from[prop] = 0;
-      var to = { ease: "none" }; to[prop] = 1;
-      to.scrollTrigger = {
-        trigger: p,
-        start: horizontal ? "top 78%" : "top 70%",
-        end: horizontal ? "top 30%" : "bottom 60%",
-        scrub: 0.6,
-        onUpdate: function (self) {
-          var n = steps.length - 1 || 1;
-          steps.forEach(function (s, i) { s.classList.toggle("is-lit", self.progress >= i / n - 0.02); });
-        },
+      var to = { ease: "power1.inOut", duration: 0.35 * steps.length };
+      to[prop] = 1;
+      to.scrollTrigger = { trigger: p, start: horizontal ? "top 78%" : "top 70%", once: true };
+      to.onUpdate = function () {
+        var progress = this.progress();
+        var n = steps.length - 1 || 1;
+        steps.forEach(function (s, i) { s.classList.toggle("is-lit", progress >= i / n - 0.02); });
       };
       gsap.fromTo(fill, from, to);
     });
@@ -575,15 +575,6 @@
       },
     });
     return function () { section.classList.remove("is-pinned"); };
-  }
-
-  function footerParallax() {
-    var inner = $("[data-footer-inner]");
-    if (!inner) return;
-    gsap.fromTo(inner, { yPercent: -10 }, {
-      yPercent: 0, ease: "none",
-      scrollTrigger: { trigger: ".site-footer", start: "top bottom", end: "top 35%", scrub: true },
-    });
   }
 
   function boot() {
