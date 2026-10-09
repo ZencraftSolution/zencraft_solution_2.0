@@ -6,6 +6,8 @@ miss on a desktop, because one over-wide element anywhere on the page does it.
 
 import pytest
 
+from apps.core.testing import page_params
+
 pytestmark = [pytest.mark.e2e, pytest.mark.django_db]
 
 WIDTHS = {"phone": 375, "tablet": 768, "desktop": 1440}
@@ -48,7 +50,7 @@ def overflow(page):
 
 
 class NoHorizontalScrollTests:
-    @pytest.mark.parametrize("name,path", PAGES.items(), ids=list(PAGES))
+    @pytest.mark.parametrize("name,path", page_params(PAGES))
     def test_the_page_does_not_scroll_sideways_on_a_phone(self, page, site, name, path):
         page.set_viewport_size({"width": WIDTHS["phone"], "height": 812})
         response = page.goto(f"{site}{path}", wait_until="load")

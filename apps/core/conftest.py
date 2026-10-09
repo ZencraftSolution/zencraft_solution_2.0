@@ -20,8 +20,34 @@ from apps.core.testing import make_job
 # sync API alongside Django's test tools.
 os.environ.setdefault("DJANGO_ALLOW_ASYNC_UNSAFE", "true")
 
-# Marks every test in this package's browser modules, so `-m "not e2e"` skips the slow ones.
-pytestmark = pytest.mark.e2e
+# The fixtures pytest-playwright provides. A test that needs any of them needs a browser
+# installed, and only the CI browser job installs one.
+BROWSER_FIXTURES = {"page", "context", "browser", "browser_type", "browser_name", "new_context"}
+
+
+def is_browser_test(item):
+    return item.get_closest_marker("e2e") is not None
+
+
+def pytest_collection_finish(session):
+    """Refuses a run in which a test would need a browser but is not marked e2e.
+
+    The test job in CI runs `-m "not e2e"` without installing browsers. A browser test that forgot
+    its marker would otherwise fail there with a confusing launch error -- or, worse, an autouse
+    fixture would quietly make every test start one. The browser modules mark themselves with
+    `pytestmark = [pytest.mark.e2e, ...]`; this keeps it that way.
+    """
+    offenders = [
+        item.nodeid for item in session.items
+        if not is_browser_test(item) and BROWSER_FIXTURES & set(getattr(item, "fixturenames", ()))
+    ]
+    if offenders:
+        listed = "\n  ".join(offenders)
+        raise pytest.UsageError(
+            f"These tests use a browser but are not marked e2e:\n  {listed}\n"
+            "Add pytest.mark.e2e to them (pytestmark at the top of the module)."
+        )
+
 
 # A 1x1 transparent PNG, served in place of any image hosted elsewhere.
 PIXEL = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==")
@@ -52,28 +78,39 @@ def browser_type_launch_args(browser_type_launch_args):
 
 
 @pytest.fixture(autouse=True)
-def patient(page):
+def patient(request):
     """Playwright's 30 second default is not enough on a slow machine.
 
     Closing a browser context alone takes about 25 seconds on the Windows laptop this was
     written on, and under that load navigations began timing out. The failures looked like
     layout faults and were not, which is worse than a slow test.
+
+    Autouse applies to every test in apps/core, so the page is only requested for browser tests:
+    asking for it unconditionally made every unit test here launch Chromium.
     """
+    if not is_browser_test(request.node):
+        return
+    page = request.getfixturevalue("page")
     page.set_default_timeout(60_000)
     page.set_default_navigation_timeout(60_000)
 
 
 @pytest.fixture(autouse=True)
-def offline(page, live_server):
+def offline(request):
     """Answers every request to another host with a harmless stub.
 
     Without this the tests wait on a CDN and a photo library, which makes them slow, makes them
     fail when the network does, and means a red build says nothing about this code. The site is
     built to work when GSAP does not load, so stubbing the scripts also exercises that path.
     """
+    if not is_browser_test(request.node):
+        yield
+        return
+    page = request.getfixturevalue("page")
+    live_server = request.getfixturevalue("live_server")
 
-    def handle(route, request):
-        content_type, body = STUBS.get(request.resource_type, ("text/plain", b""))
+    def handle(route, browser_request):
+        content_type, body = STUBS.get(browser_request.resource_type, ("text/plain", b""))
         route.fulfill(status=200, content_type=content_type, body=body)
 
     # Matched by predicate so only external URLs cross into Python. Routing "**/*" sends every
@@ -81,6 +118,18 @@ def offline(page, live_server):
     # minute while Playwright drained the queue.
     page.route(lambda url: not url.startswith(live_server.url), handle)
     yield
+
+
+@pytest.fixture(autouse=True)
+def shop(request):
+    """Opens the shop for tests marked `store`; it is closed by default (STORE_ENABLED=False).
+
+    Through pytest-django's settings fixture, which restores the value afterwards. The live server
+    runs in this process and reads django.conf.settings per request, so it sees the change too.
+    The tests that check a closed shop answers 404 carry no marker and keep the default.
+    """
+    if request.node.get_closest_marker("store") is not None:
+        request.getfixturevalue("settings").STORE_ENABLED = True
 
 
 @pytest.fixture

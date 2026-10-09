@@ -116,3 +116,17 @@ def image_upload(name="photo.png", size=(40, 40), fmt="PNG", color=(31, 79, 216)
     """A genuine image file, so ImageField's Pillow validation passes."""
     content_type = "image/png" if fmt == "PNG" else f"image/{fmt.lower()}"
     return SimpleUploadedFile(name, image_bytes(size, fmt, color), content_type=content_type)
+
+
+def page_params(pages):
+    """pytest.param for each (name, path) of a browser test, opening the shop for its own pages.
+
+    The shop is closed by default, so /pricing/ and everything under it answers 404 unless a test
+    is marked `store` (see the shop fixture in apps/core/conftest.py).
+    """
+    import pytest
+
+    return [
+        pytest.param(name, path, id=name, marks=[pytest.mark.store] if path.startswith("/pricing/") else [])
+        for name, path in pages.items()
+    ]

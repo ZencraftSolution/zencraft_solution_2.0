@@ -1,0 +1,24 @@
+# Secrets scan configuration, read by gitleaks and by the gitleaks GitHub Action in CI.
+#
+# Every default rule stays on. The allowlist below covers only things that were checked by hand
+# and are not secrets, matched as narrowly as possible, so a real key pasted anywhere -- these files
+# included -- is still caught.
+title = "Zencraft Solution gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Variable names and test-only values the generic-api-key rule mistakes for secrets"
+regexTarget = "match"
+regexes = [
+  # render.yaml lists variables by name ("- key: PRIVATE_S3_SECRET_KEY"); values live in Render.
+  '''^key:\s*[A-Z][A-Z0-9_]*\s*$''',
+  # .env.example leaves values empty, so the rule reads the next variable's name as the value
+  # ("PRIVATE_S3_ACCESS_KEY=" followed by "PRIVATE_S3_SECRET_KEY=").
+  '''^[A-Z][A-Z0-9_]*=\s*[A-Z][A-Z0-9_]*=?\s*$''',
+  # The password the test suite gives the throwaway users it creates (apps/core/testing.py).
+  '''a-strong-passphrase-2026''',
+  # The SECRET_KEY DeployCheckSmokeTests hands its subprocess, marked test-only where it is used.
+  '''k7Rq2vX9mZp4Lw8Ns3Tb6Yc1Hd5Fg0Jj-e_uQaWoPiUyTrEsDxCvBnM''',
+]

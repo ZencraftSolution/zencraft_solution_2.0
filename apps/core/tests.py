@@ -3,6 +3,7 @@ sitemap/robots, the public core pages and the seed command. App-specific behavio
 import io
 import json
 import logging
+import pathlib
 import re
 import shutil
 import tempfile
@@ -1044,9 +1045,20 @@ class DeployCheckSmokeTests(TestCase):
         "CLOUDINARY_API_KEY": "test-placeholder",
         "CLOUDINARY_API_SECRET": "test-placeholder",
         "EMAIL_BACKEND": "django.core.mail.backends.smtp.EmailBackend",
-        "CACHE_URL": "",
         "PRIVATE_MEDIA_PERSISTENT": "True",
     }
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        # The deploy check writes a probe to the cache (zencraft.E009). Left empty, CACHE_URL means
+        # the database cache, whose table lives in whatever DATABASE_URL names -- the developer's
+        # database, not the test one -- and does not exist on a fresh CI database. A file cache in a
+        # private directory needs no table, is not LocMemCache (which zencraft.E006 refuses), and
+        # makes these tests independent of any database's state.
+        cls._cache_dir = tempfile.TemporaryDirectory()
+        cls.addClassCleanup(cls._cache_dir.cleanup)
+        cls.cache_url = "filecache://" + pathlib.Path(cls._cache_dir.name).as_posix()
 
     def run_in_production_mode(self, code):
         import os
@@ -1055,7 +1067,7 @@ class DeployCheckSmokeTests(TestCase):
 
         from django.conf import settings
 
-        env = {**os.environ, **self.PRODUCTION_ENV}
+        env = {**os.environ, **self.PRODUCTION_ENV, "CACHE_URL": self.cache_url}
         env.pop("UPLOAD_SCAN_HOOK", None)  # must default to ClamAV in production
         # Set by apps/core/conftest.py so Playwright's sync API can touch the ORM. It is a test
         # harness setting, and Django's own deploy check rightly refuses it in a deployment, so

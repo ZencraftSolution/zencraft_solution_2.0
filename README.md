@@ -197,6 +197,15 @@ fail when the network does, and exercise the path where GSAP never loads. Each o
 database for itself, because `live_server` runs the application in another thread and pytest-django
 flushes between those tests.
 
+Two conventions keep the two halves of the suite apart:
+
+- **A test that uses a browser must be marked `e2e`** (`pytestmark` at the top of the module).
+  The CI test job installs no browser, so `apps/core/conftest.py` refuses to start a run in which
+  an unmarked test asks for `page`, `context` or `browser`. CI checks this in its own step.
+- **The shop is closed by default** (`STORE_ENABLED=False`), so its pages answer 404. A test of
+  the open shop is marked `store`, which turns it on for that test, live server included. The
+  tests that check the closed shop returns 404 have no marker.
+
 ### Coverage floors
 
 | Floor | Applies to | Why |
@@ -221,9 +230,36 @@ on every commit. Everything there also runs in CI, because a hook can be skipped
 
 ## Deploying to Render
 
-`render.yaml` describes the whole deployment: the web service, a PostgreSQL 16 database and two
-cron jobs. From the Render dashboard choose **New > Blueprint** and point it at this repository.
-Every value marked `sync: false` in that file is a secret you fill in once, in the dashboard.
+`render.yaml` describes the whole deployment: the web service, a PostgreSQL 16 database, a
+private ClamAV service and two cron jobs. From the Render dashboard choose **New > Blueprint** and
+point it at this repository. Every value marked `sync: false` in that file is a secret you fill in
+once, in the dashboard, on the web service; the cron jobs copy those values from it.
+
+### Read this before applying the Blueprint: names decide what happens to your data
+
+Render matches the resources in `render.yaml` to your workspace **by name**:
+
+- A service or database whose name already exists is **adopted**: Render applies this file's
+  settings to it. Its data and its existing environment values stay.
+- Any other name **creates a new resource**. For a database that means a new, **empty** one, and
+  the web service's `DATABASE_URL` would then point at it. The live site would look as if every
+  case study, article, order and application had vanished.
+
+The file is written for the live setup:
+
+| In `render.yaml` | Must match in the Render dashboard |
+| --- | --- |
+| web service `zencraft_solution` | your existing web service (it is) |
+| database `zencraft-db` | your existing PostgreSQL instance, **check this** |
+| `zencraft-clamav`, `zencraft-scan-uploads`, `zencraft-purge` | new; these are created |
+
+Open your database in the dashboard and compare its name with `name:` under `databases:`. If it
+differs, change `zencraft-db` everywhere in `render.yaml` (the `databases:` entry and every
+`fromDatabase` block) to the existing name before you apply. If you would rather start from a
+fresh deployment, apply it as written, and new resources with these names will be created.
+
+The ClamAV service needs the 2 GB `standard` plan: clamd holds its signatures in memory and is
+killed while loading on 512 MB. Its 1 GB disk keeps those signatures across restarts.
 
 ### The build command, and why each line is there
 
@@ -263,8 +299,8 @@ deliberate, and the fix is always to set the variable below.
 | `PRIVATE_S3_ENDPOINT_URL` | Blank for AWS; the account endpoint for R2 or Spaces. | `https://abc123.r2.cloudflarestorage.com` |
 | `PRIVATE_S3_ACCESS_KEY` / `_SECRET_KEY` | Credentials for that bucket. | |
 | `PRIVATE_MEDIA_PERSISTENT` | Only with `PRIVATE_STORAGE_BACKEND=local`, and only if a real disk is mounted. | `False` |
-| `UPLOAD_SCAN_MODE` | `quarantine` on a plain web service, `strict` if ClamAV is reachable. | `quarantine` |
-| `CLAMAV_HOST` / `CLAMAV_PORT` | The ClamAV daemon, for whichever service does the scanning. | `clamav:3310` |
+| `UPLOAD_SCAN_MODE` | `quarantine` holds uploads for the scan job; `strict` scans inside the upload request. | `quarantine` |
+| `CLAMAV_HOST` / `CLAMAV_PORT` | The ClamAV daemon. On Render, set from the `zencraft-clamav` private service by `render.yaml`. | `zencraft-clamav:3310` |
 | `EMAIL_URL` | SMTP connection. Without it, nothing is sent. | `smtp+tls://apikey:SG.xxx@smtp.sendgrid.net:587` |
 | `DEFAULT_FROM_EMAIL` | The From address on every message. | `Zencraft Solution <hello@zencraftsolution.com>` |
 | `INTERNAL_NOTIFY_EMAIL` | Where new leads and applications are announced. | `team@zencraftsolution.com` |
@@ -295,9 +331,10 @@ that gateway has a bad minute.
 | `scan_quarantined_uploads --retry-errors` | every 10 minutes | Releases uploaded CVs to the hiring team. **Until it runs, a CV cannot be opened.** |
 | `purge_applications` | daily | Enforces the retention periods the privacy policy promises. |
 
-The scanning job needs ClamAV on whichever service runs it. On Render, add
-`apt-get install -y clamav clamav-daemon && freshclam` to that service's build, or run ClamAV as a
-separate private service and point `CLAMAV_HOST` at it.
+The scanning job does not run ClamAV itself; it streams each held file to the `zencraft-clamav`
+private service (the official `clamav/clamav` image), whose address `render.yaml` gives it as
+`CLAMAV_HOST`. Render's Python runtime cannot `apt-get install` ClamAV, which is why the scanner is
+a service of its own. Elsewhere, any reachable clamd works: see "Virus scanning with ClamAV" above.
 
 ### Moving CVs to object storage
 

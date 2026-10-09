@@ -4,6 +4,13 @@
 # Everything marked `sync: false` is a secret you fill in once, in the Render dashboard; those
 # values are never committed here. Everything else is set from this file on every deploy.
 #
+# NAMES MATTER. Render matches resources by name: a service or database named here that already
+# exists in the workspace is adopted and reconfigured, and any other name creates a new one.
+# The web service is named zencraft_solution so that it adopts the live site. Before applying,
+# check that the database name below (zencraft-db) is the name of your existing database in the
+# dashboard. If it is not, Render creates a second, EMPTY database and points DATABASE_URL at it.
+# See "Deploying to Render" in README.md.
+#
 # What the build command does, in order and for a reason:
 #   collectstatic     - WhiteNoise serves hashed static files; without this the site has no CSS.
 #   migrate           - schema and the data migrations that carry content changes.
@@ -13,7 +20,7 @@
 #                       on later deploys.
 
 databases:
-  - name: zencraft-db
+  - name: zencraft-db            # must match your existing database; see NAMES MATTER above
     databaseName: zencraft_db
     user: zencraft
     plan: basic-256mb
@@ -21,7 +28,7 @@ databases:
 
 services:
   - type: web
-    name: zencraft-web
+    name: zencraft_solution      # the existing service; see NAMES MATTER above
     runtime: python
     plan: starter
     region: singapore          # closest Render region to Nepal
@@ -88,12 +95,17 @@ services:
       - key: PRIVATE_S3_SECRET_KEY
         sync: false
 
-      # A plain web service cannot run ClamAV, so uploads are held and scanned by the cron job
-      # below. Switch to "strict" only if you run a ClamAV service this one can reach.
+      # Uploads are held on arrival and scanned by the zencraft-scan-uploads cron job below, which
+      # streams each file to the zencraft-clamav private service. This service can reach the
+      # scanner too, so "strict" (scan inside the upload request) would also work; "quarantine"
+      # keeps a slow or restarting scanner off the request path.
       - key: UPLOAD_SCAN_MODE
         value: quarantine
       - key: CLAMAV_HOST
-        sync: false            # the private ClamAV service's host, if you add one
+        fromService:
+          name: zencraft-clamav
+          type: pserv
+          property: host
       - key: CLAMAV_PORT
         value: "3310"
 
@@ -147,9 +159,28 @@ services:
       - key: DJANGO_SUPERUSER_PASSWORD
         sync: false
 
+  # The virus scanner: the official ClamAV image, running clamd on port 3310 and freshclam for
+  # signature updates. A private service has no public URL; only services in this workspace can
+  # reach it. It runs on its own because Render's Python runtime cannot install ClamAV.
+  # clamd keeps every signature in memory (about 1.2 GB, briefly double while it reloads after an
+  # update), so it needs the 2 GB "standard" plan; on 512 MB it is killed while loading. The disk
+  # keeps the ~300 MB signature database across restarts, so a restart does not download it again
+  # and run into the ClamAV mirrors' rate limits.
+  - type: pserv
+    name: zencraft-clamav
+    runtime: image
+    image:
+      url: docker.io/clamav/clamav:stable
+    plan: standard
+    region: singapore
+    disk:
+      name: clamav-signatures
+      mountPath: /var/lib/clamav
+      sizeGB: 1
+
   # Scans the files held by UPLOAD_SCAN_MODE=quarantine and releases the clean ones to the hiring
   # team. Until this runs, an uploaded CV cannot be opened in the dashboard, which is the point.
-  # It needs ClamAV, so the build installs it and the start command runs the daemon alongside.
+  # It does not run ClamAV itself: it streams each file to the zencraft-clamav service above.
   - type: cron
     name: zencraft-scan-uploads
     runtime: python
@@ -161,9 +192,46 @@ services:
     startCommand: python manage.py scan_quarantined_uploads --retry-errors
     envVars:
       - fromGroup: zencraft-shared
+      # Everything Django needs to start and to reach the database, the CV bucket and the scanner.
+      # Values entered on the web service are copied from it (envVarKey), so each is still set in
+      # one place. Fill them in on the web service before this job first runs.
+      - key: DATABASE_URL
+        fromDatabase:
+          name: zencraft-db
+          property: connectionString
+      - key: SECRET_KEY
+        fromService: {name: zencraft_solution, type: web, envVarKey: SECRET_KEY}
+      - key: SITE_URL
+        fromService: {name: zencraft_solution, type: web, envVarKey: SITE_URL}
+      - key: ALLOWED_HOSTS
+        fromService: {name: zencraft_solution, type: web, envVarKey: ALLOWED_HOSTS}
+      - key: CACHE_URL
+        value: ""              # the database cache, as on the web service
+      - key: PRIVATE_STORAGE_BACKEND
+        value: s3
+      - key: PRIVATE_S3_BUCKET
+        fromService: {name: zencraft_solution, type: web, envVarKey: PRIVATE_S3_BUCKET}
+      - key: PRIVATE_S3_REGION
+        fromService: {name: zencraft_solution, type: web, envVarKey: PRIVATE_S3_REGION}
+      - key: PRIVATE_S3_ENDPOINT_URL
+        fromService: {name: zencraft_solution, type: web, envVarKey: PRIVATE_S3_ENDPOINT_URL}
+      - key: PRIVATE_S3_ACCESS_KEY
+        fromService: {name: zencraft_solution, type: web, envVarKey: PRIVATE_S3_ACCESS_KEY}
+      - key: PRIVATE_S3_SECRET_KEY
+        fromService: {name: zencraft_solution, type: web, envVarKey: PRIVATE_S3_SECRET_KEY}
+      - key: CLAMAV_HOST
+        fromService:
+          name: zencraft-clamav
+          type: pserv
+          property: host
+      - key: CLAMAV_PORT
+        value: "3310"
+      - key: EMAIL_URL
+        fromService: {name: zencraft_solution, type: web, envVarKey: EMAIL_URL}
 
   # Enforces the retention periods the privacy policy promises: unsuccessful applications after
-  # CV_RETENTION_DAYS, inquiries that never became projects after INQUIRY_RETENTION_DAYS.
+  # CV_RETENTION_DAYS, inquiries that never became projects after INQUIRY_RETENTION_DAYS. It
+  # deletes CVs from the private bucket, so it needs the same storage settings as the scanner.
   - type: cron
     name: zencraft-purge
     runtime: python
@@ -175,15 +243,48 @@ services:
     startCommand: python manage.py purge_applications
     envVars:
       - fromGroup: zencraft-shared
+      - key: DATABASE_URL
+        fromDatabase:
+          name: zencraft-db
+          property: connectionString
+      - key: SECRET_KEY
+        fromService: {name: zencraft_solution, type: web, envVarKey: SECRET_KEY}
+      - key: SITE_URL
+        fromService: {name: zencraft_solution, type: web, envVarKey: SITE_URL}
+      - key: ALLOWED_HOSTS
+        fromService: {name: zencraft_solution, type: web, envVarKey: ALLOWED_HOSTS}
+      - key: CACHE_URL
+        value: ""
+      - key: PRIVATE_STORAGE_BACKEND
+        value: s3
+      - key: PRIVATE_S3_BUCKET
+        fromService: {name: zencraft_solution, type: web, envVarKey: PRIVATE_S3_BUCKET}
+      - key: PRIVATE_S3_REGION
+        fromService: {name: zencraft_solution, type: web, envVarKey: PRIVATE_S3_REGION}
+      - key: PRIVATE_S3_ENDPOINT_URL
+        fromService: {name: zencraft_solution, type: web, envVarKey: PRIVATE_S3_ENDPOINT_URL}
+      - key: PRIVATE_S3_ACCESS_KEY
+        fromService: {name: zencraft_solution, type: web, envVarKey: PRIVATE_S3_ACCESS_KEY}
+      - key: PRIVATE_S3_SECRET_KEY
+        fromService: {name: zencraft_solution, type: web, envVarKey: PRIVATE_S3_SECRET_KEY}
+      - key: CLAMAV_HOST
+        fromService:
+          name: zencraft-clamav
+          type: pserv
+          property: host
+      - key: CLAMAV_PORT
+        value: "3310"
+      - key: EMAIL_URL
+        fromService: {name: zencraft_solution, type: web, envVarKey: EMAIL_URL}
 
-# The cron jobs need the same database, storage and scanner settings as the web service. Create an
-# environment group called "zencraft-shared" in the Render dashboard holding at least:
-#   DATABASE_URL, SECRET_KEY, DEBUG, ALLOWED_HOSTS, SITE_URL, CACHE_URL,
-#   CLOUDINARY_*, PRIVATE_STORAGE_BACKEND, PRIVATE_S3_*, UPLOAD_SCAN_MODE, CLAMAV_HOST, EMAIL_URL
-# and add the web service to it too, so there is one place to change a value.
+# Plain values shared by the cron jobs. Render does not allow an environment group to reference a
+# database or a service, or to hold a `sync: false` secret, so DATABASE_URL, SECRET_KEY and the
+# other secrets are listed on each cron job above instead, copied from the web service.
 envVarGroups:
   - name: zencraft-shared
     envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.7"        # the same interpreter as the web service
       - key: DEBUG
         value: "False"
       - key: UPLOAD_SCAN_MODE

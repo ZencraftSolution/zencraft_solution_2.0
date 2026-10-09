@@ -106,9 +106,25 @@ jobs:
           CLOUDINARY_API_SECRET: ci-placeholder
           EMAIL_BACKEND: django.core.mail.backends.smtp.EmailBackend
           PRIVATE_MEDIA_PERSISTENT: "True"
-        run: python manage.py check --deploy --fail-level WARNING
+        # The same order as the Render build: production uses the database cache, and the deploy
+        # check writes a probe to it (zencraft.E009), so its table must exist first. It is created
+        # here, with this step's production settings, because under DEBUG=True the cache is
+        # in-memory and createcachetable would quietly do nothing.
+        run: |
+          python manage.py createcachetable
+          python manage.py check --deploy --fail-level WARNING
+
+      # This job installs no browser. apps/core/conftest.py refuses a run in which a test that is
+      # not marked e2e would need one (it asks for page, context or browser), so collecting the
+      # "not e2e" selection is enough to fail here, by name, before anything runs.
+      - name: No test outside the browser job needs a browser
+        run: python -m pytest -m "not e2e" --collect-only -q
 
       - name: Test suite with coverage (everything except the browser tests)
+        env:
+          # Belt and braces: a browser launch that slipped past the check above finds no browser
+          # here and fails at once, rather than this job quietly starting to need one.
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/no-browsers-in-this-job
         run: python -m pytest -m "not e2e" --cov --cov-report=term-missing:skip-covered --cov-report=xml
 
       - name: Coverage floors (85% per app, 90% branch on money and access code)

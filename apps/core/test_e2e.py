@@ -29,7 +29,8 @@ class PublicPagesTests:
         assert page.locator("h1").count() == 1
         assert page.title()
 
-    @pytest.mark.parametrize("path", ["/services/", "/work/", "/pricing/", "/insights/", "/careers/", "/about/", "/contact/"])
+    @pytest.mark.parametrize("path", ["/services/", "/work/", pytest.param("/pricing/", marks=pytest.mark.store),
+                                      "/insights/", "/careers/", "/about/", "/contact/"])
     def test_every_main_page_loads_cleanly(self, page, site, console_errors, path):
         goto(page, site, path, console_errors)
         assert page.locator("h1").is_visible()
@@ -142,20 +143,27 @@ class ConsultationBookingTests:
 class EstimatorTests:
     def test_the_first_steps_advance_and_show_a_range(self, page, site, console_errors):
         goto(page, site, "/estimate/", console_errors)
-        page.locator("[data-estimator] button, [data-estimator] [role=button]").first.wait_for(timeout=10000)
-        # Pick the first project type, then keep taking the default path forward.
-        page.locator("[data-option]").first.click()
-        for _ in range(6):
-            nxt = page.locator("[data-next]:visible")
-            if not nxt.count():
-                break
-            if nxt.first.is_disabled():
-                page.locator("[data-option]:visible").first.click()
-            nxt.first.click()
-            page.wait_for_timeout(400)
+        # The Continue button, not the first button in the form: that is "Back", which is hidden
+        # on step one, so waiting for it to become visible timed out.
+        continue_button = page.locator("[data-estimator] [data-next]")
+        continue_button.wait_for(state="visible", timeout=10_000)
+        # Project types arrive from the config API; the tiles replace a "Loading options" note.
+        page.locator("[data-types] .tile").first.wait_for(state="visible", timeout=10_000)
+        progress = page.locator("[data-progress-text]")
+        for step in range(1, 6):
+            assert progress.inner_text() == f"Step {step} of 6"
+            current = page.locator(f"[data-step='{step}']")
+            # Steps 1 (project type) and 3 (platform) refuse to advance until something is chosen;
+            # the rest have defaults. Choosing the first tile is the default path forward.
+            if step in (1, 3):
+                current.locator(".tile").first.click()
+            continue_button.click()
+            page.locator(f"[data-step='{step + 1}']").wait_for(state="visible")
+        assert progress.inner_text() == "Step 6 of 6"
         assert console_errors == [], console_errors
 
 
+@pytest.mark.store
 class StoreAndCheckoutTests:
     def test_currency_switches_between_npr_and_usd(self, page, site, console_errors):
         goto(page, site, "/pricing/", console_errors)

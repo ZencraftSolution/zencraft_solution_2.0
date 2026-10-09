@@ -10,6 +10,8 @@ import json
 import pytest
 from axe_playwright_python.sync_playwright import Axe
 
+from apps.core.testing import page_params
+
 pytestmark = [pytest.mark.e2e, pytest.mark.django_db]
 
 BLOCKING = {"serious", "critical"}
@@ -54,7 +56,7 @@ def violations(page, url):
 
 
 class AccessibilityTests:
-    @pytest.mark.parametrize("name,path", PAGES.items(), ids=list(PAGES))
+    @pytest.mark.parametrize("name,path", page_params(PAGES))
     def test_no_serious_or_critical_violations(self, page, site, name, path):
         found = violations(page, f"{site}{path}")
         assert found == [], f"{name} ({path}):\n{json.dumps(found, indent=2)}"
