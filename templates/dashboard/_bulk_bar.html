@@ -1,0 +1,21 @@
+{% comment %}
+Select-all and bulk delete for a dashboard list (apps/dashboard/bulk.py, static/js/dashboard.js).
+Include it inside the list's <form data-bulk>, with:
+  section_name  the bulk section: a crud slug, or leads / applications / orders / audit
+  total         how many records the current filters match
+  shown         how many of them the page lists
+  select_all    True on a page with no table header checkbox (the lead board)
+Rows carry <input type="checkbox" name="ids" value="pk" data-bulk-item>. When every row on the
+page is ticked and more match than are shown, "Select all N matching" widens the selection to
+all of them (scope=all, re-resolved on the server from these same filters).
+{% endcomment %}
+<div class="bulk-bar" data-bulk-bar data-total="{{ total }}" data-shown="{{ shown }}">
+  {% if select_all %}<label class="bulk-bar__all"><input type="checkbox" data-bulk-all> Select all</label>{% endif %}
+  <span class="bulk-bar__count mono" data-bulk-count aria-live="polite">0 selected</span>
+  <button class="btn btn--ghost btn--sm" type="button" data-bulk-all-matching hidden>Select all {{ total }} matching</button>
+  <input type="hidden" name="scope" value="" data-bulk-scope>
+  <input type="hidden" name="filters" value="{{ request.GET.urlencode }}">
+  <button class="btn btn--sm bulk-bar__delete" type="submit" formaction="{% url 'dashboard:bulk_delete' section_name %}" data-bulk-delete disabled>
+    <i class="ph ph-trash"></i> Delete selected
+  </button>
+</div>

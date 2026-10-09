@@ -126,12 +126,20 @@ def _daily_views(days):
 
 # Leads -----------------------------------------------------------------
 
+# Each list's filters live in one function, used by the page and by bulk delete (bulk.py), so
+# "select all matching" deletes exactly what the page was showing.
+
+def filtered_leads(request, params):
+    qs = ProjectInquiry.objects.select_related("assigned_to", "project_type")
+    if params.get("mine") == "1":
+        qs = qs.filter(assigned_to=request.user)
+    return qs
+
+
 @staff_required
 def leads_board(request):
-    qs = ProjectInquiry.objects.select_related("assigned_to", "project_type")
+    qs = filtered_leads(request, request.GET)
     mine = request.GET.get("mine") == "1"
-    if mine:
-        qs = qs.filter(assigned_to=request.user)
     columns = [(code, label, [lead for lead in qs if lead.status == code]) for code, label in ProjectInquiry.STATUS_CHOICES]
     total = qs.count()
     won = qs.filter(status="won").count()
@@ -174,12 +182,13 @@ def lead_document(request, pk):
 
 # Recruitment -------------------------------------------------------------
 
-def _filtered_applications(request):
+def _filtered_applications(request, params=None):
+    params = request.GET if params is None else params
     qs = JobApplication.objects.select_related("job", "job__department").filter(purged_at__isnull=True)
-    job = request.GET.get("job")
+    job = params.get("job")
     if job:
         qs = qs.filter(job_id=job)
-    exp = request.GET.get("exp")
+    exp = params.get("exp")
     if exp == "0-1":
         qs = qs.filter(years_experience__lt=1)
     elif exp == "1-3":
@@ -188,10 +197,10 @@ def _filtered_applications(request):
         qs = qs.filter(years_experience__gte=3, years_experience__lt=6)
     elif exp == "6+":
         qs = qs.filter(years_experience__gte=6)
-    status = request.GET.get("status")
+    status = params.get("status")
     if status:
         qs = qs.filter(status=status)
-    q = request.GET.get("q", "").strip()
+    q = params.get("q", "").strip()
     if q:
         qs = qs.filter(Q(full_name__icontains=q) | Q(email__icontains=q) | Q(skills__icontains=q) | Q(reference__iexact=q))
     return qs
@@ -202,7 +211,7 @@ def applications_board(request):
     qs = _filtered_applications(request)
     columns = [(code, label, [a for a in qs if a.status == code]) for code, label in JobApplication.STATUS_CHOICES]
     return render(request, "dashboard/applications_board.html", {
-        "columns": columns, "jobs": JobOpening.objects.all(), "params": request.GET,
+        "columns": columns, "total": qs.count(), "jobs": JobOpening.objects.all(), "params": request.GET,
         "by_role": JobOpening.objects.annotate(n=Count("applications")).filter(n__gt=0).order_by("-n")[:6],
     })
 
@@ -219,7 +228,7 @@ def applications_list(request):
             messages.success(request, f"Updated {updated} applications.")
         return redirect(request.get_full_path())
     return render(request, "dashboard/applications_list.html", {
-        "applications": qs[:500], "jobs": JobOpening.objects.all(), "params": request.GET,
+        "applications": qs[:500], "total": qs.count(), "jobs": JobOpening.objects.all(), "params": request.GET,
         "statuses": JobApplication.STATUS_CHOICES,
     })
 
@@ -322,13 +331,21 @@ def _private_file_response(field_file, filename, inline):
 
 # Orders ------------------------------------------------------------------
 
-@staff_required
-def orders_list(request):
+def filtered_orders(request, params):
     orders = Order.objects.prefetch_related("items")
-    status = request.GET.get("status")
+    status = params.get("status")
     if status:
         orders = orders.filter(payment_status=status)
-    return render(request, "dashboard/orders_list.html", {"orders": orders[:300], "statuses": Order.PAYMENT_STATUS, "status": status})
+    return orders
+
+
+@staff_required
+def orders_list(request):
+    orders = filtered_orders(request, request.GET)
+    status = request.GET.get("status")
+    return render(request, "dashboard/orders_list.html", {
+        "orders": orders[:300], "total": orders.count(), "statuses": Order.PAYMENT_STATUS, "status": status,
+    })
 
 
 @staff_required
@@ -414,13 +431,19 @@ def analytics(request):
     })
 
 
-@staff_required
-def audit_log(request):
+def filtered_audit_log(request, params):
     logs = AuditLog.objects.select_related("user")
-    q = request.GET.get("q", "").strip()
+    q = params.get("q", "").strip()
     if q:
         logs = logs.filter(Q(action__icontains=q) | Q(object_repr__icontains=q) | Q(user__username__icontains=q))
-    return render(request, "dashboard/audit_log.html", {"logs": logs[:400], "q": q})
+    return logs
+
+
+@staff_required
+def audit_log(request):
+    logs = filtered_audit_log(request, request.GET)
+    q = request.GET.get("q", "").strip()
+    return render(request, "dashboard/audit_log.html", {"logs": logs[:400], "total": logs.count(), "q": q})
 
 
 @staff_required

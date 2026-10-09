@@ -10,17 +10,20 @@
   </div>
 </div>
 <form class="dash-filters" method="get"><div class="field"><label for="crud-q">Search</label><input class="input" id="crud-q" type="search" name="q" value="{{ q }}"></div><button class="btn btn--dark btn--sm" type="submit">Search</button>{% if q %}<a class="btn btn--ghost btn--sm" href="?">Clear</a>{% endif %}</form>
-<div class="panel">
+<form method="post" class="panel" data-bulk>
+  {% csrf_token %}
+  {% include "dashboard/_bulk_bar.html" with section_name=slug total=count shown=rows|length %}
   <div class="dtable-wrap"><table class="dtable">
-    <thead><tr>{% for h in headers %}<th>{{ h }}</th>{% endfor %}<th><span class="sr-only">Actions</span></th></tr></thead>
+    <thead><tr><th class="dtable__check"><input type="checkbox" aria-label="Select all on this page" data-bulk-all></th>{% for h in headers %}<th>{{ h }}</th>{% endfor %}<th><span class="sr-only">Actions</span></th></tr></thead>
     <tbody>
       {% for obj, cells in rows %}
       <tr>
+        <td class="dtable__check"><input type="checkbox" name="ids" value="{{ obj.pk }}" aria-label="Select {{ obj|truncatechars:60 }}" data-bulk-item></td>
         {% for c in cells %}<td>{% if forloop.first %}<a href="{% url 'dashboard:crud_edit' slug obj.pk %}">{{ c|truncatechars:70 }}</a>{% elif c is True %}<span class="tag tag--green">Yes</span>{% elif c is False %}<span class="tag">No</span>{% else %}{{ c|default_if_none:"-"|truncatechars:60 }}{% endif %}</td>{% endfor %}
         <td style="white-space:nowrap;text-align:right"><a class="btn btn--ghost btn--sm" href="{% url 'dashboard:crud_edit' slug obj.pk %}">Edit</a> <a class="btn btn--ghost btn--sm" href="{% url 'dashboard:crud_delete' slug obj.pk %}" aria-label="Delete {{ obj }}"><i class="ph ph-trash"></i></a></td>
       </tr>
-      {% empty %}<tr><td colspan="{{ headers|length|add:1 }}" class="muted">Nothing here yet. <a class="text-link" href="{% url 'dashboard:crud_create' slug %}">Add the first one</a>.</td></tr>{% endfor %}
+      {% empty %}<tr><td colspan="{{ headers|length|add:2 }}" class="muted">Nothing here yet. <a class="text-link" href="{% url 'dashboard:crud_create' slug %}">Add the first one</a>.</td></tr>{% endfor %}
     </tbody>
   </table></div>
-</div>
+</form>
 {% endblock %}

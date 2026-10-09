@@ -851,3 +851,152 @@ class ApplicantDataRequestTests(DashboardTestCase):
         for url in [reverse("dashboard:application_export", args=[self.app.pk]),
                     reverse("dashboard:application_erase", args=[self.app.pk])]:
             self.assertEqual(self.client.get(url).status_code, 302)
+
+
+def make_lead(reference, **extra):
+    return ProjectInquiry.objects.create(
+        reference=reference, project_type_label="Web", timeline="standard", team_preference="unsure", design_needs="existing",
+        name="Lead", email=f"{reference.lower()}@example.com", estimate_low_npr=1, estimate_high_npr=2, estimate_weeks_low=1,
+        estimate_weeks_high=2, exchange_rate=Decimal("134"), **extra,
+    )
+
+
+class CommercialSectionRemovedTests(DashboardTestCase):
+    """The Commercial group (engagement models, rate card, fixed-price ranges, products) is gone."""
+
+    def test_its_pages_are_gone_and_it_is_not_in_the_menu(self):
+        for slug in ["engagement-models", "role-rates", "fixed-ranges", "products"]:
+            with self.subTest(slug=slug):
+                self.assertNotIn(slug, REGISTRY)
+                self.assertEqual(self.client.get(f"/{settings.DASHBOARD_PATH}manage/{slug}/").status_code, 404)
+        overview = self.client.get(reverse("dashboard:overview")).content.decode()
+        for title in ["Engagement models", "Rate card", "Fixed-price ranges", "Productized services"]:
+            self.assertNotIn(title, overview)
+        # Store orders were not part of it and stay.
+        self.assertEqual(self.client.get(reverse("dashboard:orders")).status_code, 200)
+
+
+class BulkDeleteTests(DashboardTestCase):
+    """Select-all and bulk delete on every dashboard list (apps/dashboard/bulk.py)."""
+
+    def tearDown(self):
+        for app in JobApplication.objects.exclude(cv=""):
+            app.cv.delete(save=False)
+        for lead in ProjectInquiry.objects.exclude(document=""):
+            lead.document.delete(save=False)
+
+    def bulk(self, section, **data):
+        return self.client.post(reverse("dashboard:bulk_delete", args=[section]), data)
+
+    def confirm(self, section, **data):
+        """Posts the selection, then confirms it with the count the confirmation page showed."""
+        first = self.bulk(section, **data)
+        self.assertEqual(first.status_code, 200)
+        return self.bulk(section, **data, confirm="1", expected=str(first.context["count"]))
+
+    def test_every_list_offers_select_all_and_bulk_delete(self):
+        make_lead("PI-LIST")
+        pages = [reverse("dashboard:crud_list", args=[slug]) for slug in REGISTRY]
+        pages += [reverse(f"dashboard:{name}") for name in ["leads", "applications", "applications_list", "orders", "audit"]]
+        for url in pages:
+            with self.subTest(url=url):
+                html = self.client.get(url).content.decode()
+                self.assertIn("data-bulk-all", html)
+                self.assertIn("data-bulk-delete", html)
+                self.assertIn(f"/{settings.DASHBOARD_PATH}bulk-delete/", html)
+
+    def test_selected_rows_are_confirmed_then_deleted_and_logged(self):
+        keep, *gone = [Technology.objects.create(name=f"Tool {n}", slug=f"tool-{n}", category="frontend") for n in range(4)]
+        ids = [str(t.pk) for t in gone]
+        page = self.bulk("technologies", ids=ids)
+        self.assertContains(page, "Delete 3 technologies records?")
+        self.assertEqual(Technology.objects.filter(pk__in=ids).count(), 3, "nothing is deleted before confirming")
+
+        response = self.bulk("technologies", ids=ids, confirm="1", expected="3")
+        self.assertRedirects(response, reverse("dashboard:crud_list", args=["technologies"]))
+        self.assertFalse(Technology.objects.filter(pk__in=ids).exists())
+        self.assertTrue(Technology.objects.filter(pk=keep.pk).exists())
+        self.assertTrue(audit("bulk deleted", detail__startswith="Technologies: 3 deleted, 0 kept").exists())
+
+    def test_select_all_matching_reaches_past_the_page_and_respects_the_search(self):
+        for n in range(305):
+            Technology.objects.create(name=f"Match {n}", slug=f"match-{n}", category="frontend")
+        Technology.objects.create(name="Other", slug="other", category="frontend")
+        listing = self.client.get(reverse("dashboard:crud_list", args=["technologies"]) + "?q=match")
+        self.assertEqual(len(listing.context["rows"]), 300)
+        self.assertContains(listing, "Select all 305 matching")
+
+        response = self.confirm("technologies", scope="all", filters="q=match")
+        self.assertRedirects(response, reverse("dashboard:crud_list", args=["technologies"]) + "?q=match")
+        self.assertFalse(Technology.objects.filter(name__startswith="Match").exists())
+        self.assertTrue(Technology.objects.filter(slug="other").exists())
+
+    def test_a_changed_selection_asks_again_instead_of_deleting(self):
+        for n in range(3):
+            Technology.objects.create(name=f"Match {n}", slug=f"match-{n}", category="frontend")
+        response = self.bulk("technologies", scope="all", filters="q=match", confirm="1", expected="2")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["changed"])
+        self.assertEqual(response.context["count"], 3)
+        self.assertEqual(Technology.objects.filter(name__startswith="Match").count(), 3)
+
+    def test_records_still_in_use_are_kept_and_reported(self):
+        from apps.careers.models import Department
+
+        used = make_job().department  # a job still points at it (on_delete=PROTECT)
+        spare = Department.objects.create(name="Spare", slug="spare")
+        response = self.confirm("departments", ids=[str(used.pk), str(spare.pk)])
+        self.assertTrue(Department.objects.filter(pk=used.pk).exists())
+        self.assertFalse(Department.objects.filter(pk=spare.pk).exists())
+        shown = [str(m) for m in response.wsgi_request._messages]
+        self.assertTrue(any("1 could not be deleted" in m for m in shown), shown)
+        self.assertTrue(audit("bulk deleted", detail__startswith="Departments: 1 deleted, 1 kept").exists())
+
+    def test_deleting_applications_removes_their_cvs(self):
+        job = make_job()
+        apps = [make_application(job, email=f"a{n}@example.com", reference=f"ZA-B{n}", cv=pdf_upload(), cv_original_name="cv.pdf")
+                for n in range(2)]
+        storage, names = apps[0].cv.storage, [a.cv.name for a in apps]
+        self.assertTrue(all(storage.exists(name) for name in names))
+        self.confirm("applications", scope="all", filters=f"job={job.pk}")
+        self.assertFalse(JobApplication.objects.filter(pk__in=[a.pk for a in apps]).exists())
+        self.assertFalse(any(storage.exists(name) for name in names), "a deleted application left its CV in storage")
+
+    def test_deleting_leads_removes_their_documents(self):
+        lead = make_lead("PI-BULK", document=pdf_upload("brief.pdf"), document_name="brief.pdf")
+        storage, name = lead.document.storage, lead.document.name
+        self.confirm("leads", ids=[str(lead.pk)])
+        self.assertFalse(ProjectInquiry.objects.filter(pk=lead.pk).exists())
+        self.assertFalse(storage.exists(name))
+
+    def test_orders_can_be_deleted_in_bulk(self):
+        orders = [Order.objects.create(reference=f"ZC-B{n}", customer_name="C", email="c@example.com", phone="1",
+                                       exchange_rate=Decimal("134"), total_usd=Decimal("1")) for n in range(2)]
+        self.confirm("orders", ids=[str(o.pk) for o in orders])
+        self.assertFalse(Order.objects.filter(pk__in=[o.pk for o in orders]).exists())
+
+    def test_clearing_the_audit_log_still_leaves_a_record_of_it(self):
+        for n in range(3):
+            AuditLog.objects.create(action=f"old action {n}")
+        self.confirm("audit", scope="all", filters="")
+        remaining = list(AuditLog.objects.values_list("action", "detail", "user_id"))
+        self.assertEqual(len(remaining), 1)
+        self.assertEqual(remaining[0][0], "bulk deleted")
+        self.assertTrue(remaining[0][1].startswith("Audit log: 3 deleted"))
+        self.assertEqual(remaining[0][2], self.staff.pk)
+
+    def test_nothing_selected_deletes_nothing(self):
+        Technology.objects.create(name="Safe", slug="safe", category="frontend")
+        response = self.bulk("technologies", confirm="1", expected="0")
+        self.assertRedirects(response, reverse("dashboard:crud_list", args=["technologies"]))
+        self.assertTrue(Technology.objects.filter(slug="safe").exists())
+
+    def test_only_staff_and_only_by_post(self):
+        tech = Technology.objects.create(name="Safe", slug="safe", category="frontend")
+        url = reverse("dashboard:bulk_delete", args=["technologies"])
+        self.assertEqual(self.client.get(url).status_code, 405)
+        self.assertEqual(self.client.post(reverse("dashboard:bulk_delete", args=["users"]), {"ids": [tech.pk]}).status_code, 404)
+        visitor = Client()
+        visitor.force_login(make_user("visitor"))
+        self.assertEqual(visitor.post(url, {"ids": [tech.pk], "confirm": "1", "expected": "1"}).status_code, 404)
+        self.assertTrue(Technology.objects.filter(pk=tech.pk).exists())

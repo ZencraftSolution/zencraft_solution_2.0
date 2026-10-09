@@ -10,7 +10,6 @@ from django.urls import reverse
 
 from apps.blog.models import BlogCategory, BlogPost
 from apps.careers.models import Department, JobOpening
-from apps.commerce.models import EngagementModel, FixedPriceRange, ProductizedService, RoleRate
 from apps.core.models import ConsultationBooking, ContactSubmission, Feedback, NewsletterSubscriber
 from apps.core.utils import log_action
 from apps.estimator.models import FeatureOption, ProjectType
@@ -18,6 +17,9 @@ from apps.portfolio.models import CaseStudy, CaseStudyImage, GalleryImage, TeamM
 from apps.services.models import FAQ, Industry, ProcessStep, Service, ServiceCategory, Technology
 
 from .mixins import staff_required
+
+# A list page shows at most this many rows; "select all matching" reaches the rest.
+LIST_LIMIT = 300
 
 REGISTRY = {
     "services": dict(model=Service, group="Content", title="Services", columns=["name", "category", "order", "featured", "is_published"], search=["name", "summary"]),
@@ -35,10 +37,6 @@ REGISTRY = {
     "blog-categories": dict(model=BlogCategory, group="Insights", title="Blog categories", columns=["name", "order"], search=["name"]),
     "jobs": dict(model=JobOpening, group="Recruitment", title="Job openings", columns=["title", "department", "experience_level", "work_mode", "is_active", "closing_date"], search=["title"]),
     "departments": dict(model=Department, group="Recruitment", title="Departments", columns=["name", "order"], search=["name"]),
-    "engagement-models": dict(model=EngagementModel, group="Commercial", title="Engagement models", columns=["name", "kind", "order"], search=["name"]),
-    "role-rates": dict(model=RoleRate, group="Commercial", title="Rate card", columns=["role", "experience_band", "hourly_rate_npr", "monthly_rate_npr"], search=["role"]),
-    "fixed-ranges": dict(model=FixedPriceRange, group="Commercial", title="Fixed-price ranges", columns=["project_type", "min_npr", "max_npr", "typical_timeline"], search=["project_type"]),
-    "products": dict(model=ProductizedService, group="Commercial", title="Productized services", columns=["name", "tier_label", "category", "price_npr", "billing", "is_active"], search=["name"]),
     "project-types": dict(model=ProjectType, group="Estimator", title="Project types", columns=["label", "key", "base_hours", "is_active"], search=["label"]),
     "features": dict(model=FeatureOption, group="Estimator", title="Feature options", columns=["label", "key", "hours", "is_active"], search=["label"]),
     "consultations": dict(model=ConsultationBooking, group="Inbox", title="Consultation bookings", columns=["name", "company", "topic", "preferred_date", "preferred_slot", "status"], search=["name", "company", "email"]),
@@ -90,6 +88,21 @@ def _form_class(model):
     return modelform_factory(model, fields=names, widgets=widgets)
 
 
+def filtered_queryset(cfg, params):
+    """The records a list page shows for these query parameters (its search box).
+
+    Shared with bulk delete, so "select all matching" means exactly what the list was showing.
+    """
+    qs = cfg["model"].objects.all()
+    q = params.get("q", "").strip()
+    if q:
+        cond = Q()
+        for field in cfg["search"]:
+            cond |= Q(**{f"{field}__icontains": q})
+        qs = qs.filter(cond)
+    return qs
+
+
 def _cell(obj, name):
     value = getattr(obj, name)
     field = obj._meta.get_field(name)
@@ -102,14 +115,9 @@ def _cell(obj, name):
 def crud_list(request, slug):
     cfg = _config(slug)
     model = cfg["model"]
-    qs = model.objects.all()
+    qs = filtered_queryset(cfg, request.GET)
     q = request.GET.get("q", "").strip()
-    if q:
-        cond = Q()
-        for field in cfg["search"]:
-            cond |= Q(**{f"{field}__icontains": q})
-        qs = qs.filter(cond)
-    rows = [(obj, [_cell(obj, c) for c in cfg["columns"]]) for obj in qs[:300]]
+    rows = [(obj, [_cell(obj, c) for c in cfg["columns"]]) for obj in qs[:LIST_LIMIT]]
     headers = [model._meta.get_field(c).verbose_name.capitalize() for c in cfg["columns"]]
     return render(request, "dashboard/crud_list.html", {"cfg": cfg, "slug": slug, "rows": rows, "headers": headers, "q": q, "count": qs.count()})
 

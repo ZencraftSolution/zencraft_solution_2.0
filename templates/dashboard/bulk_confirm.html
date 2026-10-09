@@ -1,0 +1,22 @@
+{% extends "dashboard/base.html" %}
+{% block title %}Delete {{ count }} records{% endblock %}
+{% block top_title %}{{ section.title }}{% endblock %}
+{% block content %}
+<div class="panel" style="max-width:680px">
+  <h1 class="h3">Delete {{ count }} {{ section.title|lower }} record{{ count|pluralize }}?</h1>
+  {% if changed %}<p class="bulk-confirm__changed mt-2"><i class="ph ph-warning"></i> The matching records changed since you confirmed. This is the up-to-date count; check it and confirm again.</p>{% endif %}
+  <p class="muted mt-2">This permanently removes {% if count == 1 %}this record{% else %}all {{ count }} records{% endif %}{% if section.files %}, and any files uploaded with them{% endif %}. It cannot be undone, and it will be recorded in the audit log. Records that other data still depends on are kept and reported.</p>
+  <ul class="bulk-confirm__sample mt-2">
+    {% for label in sample %}<li>{{ label|truncatechars:90 }}</li>{% endfor %}
+    {% if more %}<li class="muted">and {{ more }} more</li>{% endif %}
+  </ul>
+  <form method="post" class="flex gap-1 mt-3">{% csrf_token %}
+    <input type="hidden" name="scope" value="{{ scope }}">
+    <input type="hidden" name="filters" value="{{ filters }}">
+    {% for id in ids %}<input type="hidden" name="ids" value="{{ id }}">{% endfor %}
+    <input type="hidden" name="expected" value="{{ count }}">
+    <button class="btn btn--primary" style="background:var(--red)" type="submit" name="confirm" value="1">Yes, delete {{ count }}</button>
+    <a class="btn btn--ghost" href="{{ back }}">Cancel</a>
+  </form>
+</div>
+{% endblock %}

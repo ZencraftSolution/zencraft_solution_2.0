@@ -11,6 +11,9 @@
 </div>
 {% if by_role %}<div class="kpis">{% for j in by_role %}<a class="kpi" href="?job={{ j.pk }}"><div class="kpi__value">{{ j.n }}</div><div class="kpi__label">{{ j.title }}</div></a>{% endfor %}</div>{% endif %}
 {% include "dashboard/_app_filters.html" %}
+<form method="post" data-bulk>
+{% csrf_token %}
+{% include "dashboard/_bulk_bar.html" with section_name="applications" total=total shown=total select_all=True %}
 <div class="board" data-board data-endpoint="{% url 'dashboard:api_application_status' 0 %}">
   {% for code, label, apps in columns %}
   <section class="board__col" data-status="{{ code }}" aria-label="{{ label }}">
@@ -18,6 +21,7 @@
     <div class="board__list">
       {% for a in apps %}
       <article class="bcard" draggable="true" data-id="{{ a.pk }}">
+        <input class="bcard__check" type="checkbox" name="ids" value="{{ a.pk }}" aria-label="Select {{ a.full_name }}" data-bulk-item>
         <a class="bcard__title" href="{% url 'dashboard:application_detail' a.pk %}">{{ a.full_name }}</a>
         <div class="bcard__meta">{{ a.job.title }}</div>
         <div class="bcard__meta">{{ a.years_experience }} yrs / {{ a.current_location }}</div>
@@ -31,4 +35,5 @@
   </section>
   {% endfor %}
 </div>
+</form>
 {% endblock %}

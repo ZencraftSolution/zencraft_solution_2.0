@@ -8,11 +8,15 @@
   <li><a class="chip {% if not status %}is-active{% endif %}" href="?">All</a></li>
   {% for v, l in statuses %}<li><a class="chip {% if status == v %}is-active{% endif %}" href="?status={{ v }}">{{ l }}</a></li>{% endfor %}
 </ul>
-<div class="panel"><div class="dtable-wrap"><table class="dtable">
-  <thead><tr><th>Reference</th><th>Customer</th><th>Items</th><th>Total NPR</th><th>Total USD</th><th>Method</th><th>Payment</th><th>Fulfilment</th><th>Created</th></tr></thead>
+<form method="post" class="panel" data-bulk>
+  {% csrf_token %}
+  {% include "dashboard/_bulk_bar.html" with section_name="orders" total=total shown=orders|length %}
+  <div class="dtable-wrap"><table class="dtable">
+  <thead><tr><th class="dtable__check"><input type="checkbox" aria-label="Select all on this page" data-bulk-all></th><th>Reference</th><th>Customer</th><th>Items</th><th>Total NPR</th><th>Total USD</th><th>Method</th><th>Payment</th><th>Fulfilment</th><th>Created</th></tr></thead>
   <tbody>
     {% for o in orders %}
     <tr>
+      <td class="dtable__check"><input type="checkbox" name="ids" value="{{ o.pk }}" aria-label="Select order {{ o.reference }}" data-bulk-item></td>
       <td><a class="mono" href="{% url 'dashboard:order_detail' o.pk %}">{{ o.reference }}</a></td>
       <td>{{ o.customer_name }}<br><span class="muted" style="font-size:.78rem">{{ o.company|default:o.email }}</span></td>
       <td>{% for i in o.items.all %}{{ i.quantity }} x {{ i.name }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</td>
@@ -22,7 +26,8 @@
       <td><span class="tag">{{ o.get_fulfilment_status_display }}</span></td>
       <td class="mono" style="font-size:.78rem">{{ o.created_at|date:"j M Y" }}</td>
     </tr>
-    {% empty %}<tr><td colspan="9" class="muted">No orders yet.</td></tr>{% endfor %}
+    {% empty %}<tr><td colspan="10" class="muted">No orders yet.</td></tr>{% endfor %}
   </tbody>
-</table></div></div>
+</table></div>
+</form>
 {% endblock %}

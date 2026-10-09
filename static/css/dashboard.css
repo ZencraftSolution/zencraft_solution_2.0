@@ -69,6 +69,9 @@ a.kpi:hover { border-color: var(--blue); }
 .bcard:hover { box-shadow: var(--shadow-md); }
 .bcard.is-dragging { opacity: 0.5; transform: rotate(1.5deg); }
 .bcard__title { font-weight: 600; color: var(--ink); font-size: 0.9rem; display: block; }
+.bcard { position: relative; }
+.bcard__check { position: absolute; top: 12px; right: 12px; width: 16px; height: 16px; accent-color: var(--red); cursor: pointer; }
+.bcard__check + .bcard__title { padding-right: 24px; }
 .bcard__meta { font-size: 0.78rem; color: var(--muted); margin-top: 4px; }
 .bcard__foot { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; gap: 6px; flex-wrap: wrap; }
 
@@ -91,3 +94,15 @@ a.kpi:hover { border-color: var(--blue); }
 .login-card { width: min(420px, 100%); background: #fff; border-radius: var(--r-md); padding: 32px; box-shadow: var(--shadow-lg); }
 .dash-menu-btn { display: grid; }
 @media (min-width: 1024px) { .dash-menu-btn { display: none; } }
+
+/* Select-all and bulk delete (templates/dashboard/_bulk_bar.html) ----------------- */
+.bulk-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }
+.bulk-bar__all { display: inline-flex; align-items: center; gap: 6px; font-size: 0.88rem; cursor: pointer; }
+.bulk-bar__count { font-size: 0.8rem; color: var(--muted); }
+.bulk-bar__delete { margin-left: auto; background: var(--red); color: #fff; }
+.bulk-bar__delete:hover { background: #8f1c13; }
+.bulk-bar__delete:disabled { background: var(--line-strong); color: var(--muted); cursor: not-allowed; }
+.dtable__check { width: 36px; }
+.dtable__check input, .bulk-bar__all input { width: 16px; height: 16px; accent-color: var(--red); cursor: pointer; }
+.bulk-confirm__sample { list-style: disc; padding-left: 20px; font-size: 0.9rem; display: grid; gap: 4px; max-height: 320px; overflow: auto; }
+.bulk-confirm__changed { color: var(--amber); background: var(--amber-50); padding: 10px 12px; border-radius: var(--r-sm); font-size: 0.9rem; }

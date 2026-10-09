@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import api, crud, two_factor, views
+from . import api, bulk, crud, two_factor, views
 
 app_name = "dashboard"
 
@@ -34,4 +34,5 @@ urlpatterns = [
     path("manage/<slug:slug>/new/", crud.crud_edit, name="crud_create"),
     path("manage/<slug:slug>/<int:pk>/", crud.crud_edit, name="crud_edit"),
     path("manage/<slug:slug>/<int:pk>/delete/", crud.crud_delete, name="crud_delete"),
+    path("bulk-delete/<slug:section_name>/", bulk.bulk_delete, name="bulk_delete"),
 ]

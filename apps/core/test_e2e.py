@@ -394,3 +394,45 @@ class StaffDashboardTests:
         page.click("form.panel button[type=submit]:has-text('Save')")
         page.wait_for_load_state("load")
         assert "Browser Test Person" in page.inner_text("body")
+
+    def test_select_all_matching_then_delete_in_bulk(self, page, site, staff, console_errors):
+        from django.conf import settings
+
+        from apps.services.models import Technology
+
+        # More matches than a list page shows (300), so "select all matching" has work to do.
+        Technology.objects.bulk_create(
+            [Technology(name=f"Bulk tool {n}", slug=f"bulk-tool-{n}", category="frontend") for n in range(305)]
+        )
+        self.sign_in(page, site, *staff)
+        goto(page, site, f"/{settings.DASHBOARD_PATH}manage/technologies/?q=bulk+tool", console_errors)
+
+        count = page.locator("[data-bulk-count]")
+        delete = page.locator("[data-bulk-delete]")
+        matching = page.locator("[data-bulk-all-matching]")
+        assert count.inner_text() == "0 selected"
+        assert delete.is_disabled()
+        assert matching.is_hidden()
+
+        page.locator("thead [data-bulk-all]").check()
+        assert count.inner_text() == "300 selected"
+        assert delete.is_enabled()
+        assert matching.is_visible() and matching.inner_text() == "Select all 305 matching"
+
+        matching.click()
+        assert count.inner_text() == "All 305 selected"
+        # Unticking one row narrows the selection back to the ticked rows.
+        page.locator("tbody [data-bulk-item]").first.uncheck()
+        assert count.inner_text() == "299 selected"
+        page.locator("thead [data-bulk-all]").check()
+        matching.click()
+
+        delete.click()
+        page.wait_for_load_state("load")
+        assert "Delete 305 technologies records?" in page.inner_text("h1")
+        page.click("button[name=confirm]")
+        page.wait_for_load_state("load")
+        assert "Deleted 305 technologies records." in page.inner_text("body")
+        assert not Technology.objects.filter(name__startswith="Bulk tool").exists()
+        assert Technology.objects.exists(), "records outside the search were deleted too"
+        assert console_errors == [], console_errors

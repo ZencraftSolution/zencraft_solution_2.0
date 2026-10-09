@@ -67,18 +67,48 @@
     });
   });
 
-  var bulk = document.querySelector("[data-bulk]");
-  if (bulk) {
-    var all = bulk.querySelector("[data-bulk-all]");
-    var items = Array.prototype.slice.call(bulk.querySelectorAll("[data-bulk-item]"));
-    var count = bulk.querySelector("[data-bulk-count]");
-    var update = function () { count.textContent = items.filter(function (i) { return i.checked; }).length + " selected"; };
-    if (all) all.addEventListener("change", function () { items.forEach(function (i) { i.checked = all.checked; }); update(); });
-    items.forEach(function (i) { i.addEventListener("change", update); });
-    bulk.addEventListener("submit", function (e) {
-      if (!items.some(function (i) { return i.checked; })) { e.preventDefault(); alert("Select at least one application."); }
+  /* Selection on every dashboard list (templates/dashboard/_bulk_bar.html). Ticking the header
+     box selects every row on the page; once they are all ticked and more records match than the
+     page shows, "Select all N matching" widens the selection to every one of them (scope=all,
+     which the server re-resolves from the page's filters). Unticking any row narrows it back. */
+  document.querySelectorAll("[data-bulk]").forEach(function (form) {
+    var items = Array.prototype.slice.call(form.querySelectorAll("[data-bulk-item]"));
+    var alls = Array.prototype.slice.call(form.querySelectorAll("[data-bulk-all]"));
+    var bar = form.querySelector("[data-bulk-bar]");
+    var count = form.querySelector("[data-bulk-count]");
+    var scope = form.querySelector("[data-bulk-scope]");
+    var matching = form.querySelector("[data-bulk-all-matching]");
+    var del = form.querySelector("[data-bulk-delete]");
+    var total = bar ? parseInt(bar.dataset.total, 10) || 0 : 0;
+    var shown = bar ? parseInt(bar.dataset.shown, 10) || 0 : items.length;
+
+    function checked() { return items.filter(function (i) { return i.checked; }).length; }
+
+    function update() {
+      var n = checked();
+      var every = items.length > 0 && n === items.length;
+      if (!every && scope) scope.value = "";
+      var all = scope && scope.value === "all";
+      alls.forEach(function (box) { box.checked = every; box.indeterminate = n > 0 && !every; });
+      if (count) count.textContent = all ? "All " + total + " selected" : n + " selected";
+      if (matching) matching.hidden = !(every && total > shown && !all);
+      if (del) del.disabled = n === 0;
+    }
+
+    alls.forEach(function (box) {
+      box.addEventListener("change", function () {
+        items.forEach(function (i) { i.checked = box.checked; });
+        update();
+      });
     });
-  }
+    items.forEach(function (i) { i.addEventListener("change", update); });
+    if (matching) matching.addEventListener("click", function () { scope.value = "all"; update(); });
+
+    form.addEventListener("submit", function (e) {
+      if (!checked()) { e.preventDefault(); alert("Select at least one record first."); }
+    });
+    update();
+  });
 })();
 
 /* Forms that cannot be undone ask first. The server does not rely on this; it is here so a
