@@ -389,56 +389,21 @@
     form.addEventListener("change", run);
   }
 
-  /* Page transitions -------------------------------------------------------- */
-  function initTransitions() {
-    var veil = $(".page-veil");
-    if (!veil) return;
-
-    if (root.classList.contains("veil-in")) {
-      if (motionAllowed()) {
-        gsap.fromTo(veil, { opacity: 1 }, { opacity: 0, duration: 0.5, ease: MOTION.ease.move, delay: 0.05 });
-      }
-      root.classList.remove("veil-in");
+  /* Page views for prerendered pages ------------------------------------------
+     Chrome and Edge load a page in the background when a visitor hovers a link to it (the
+     speculation rules in base.html), so it appears at once on click. That background request is
+     not a visit, and PageViewMiddleware skips it; this records the visit when the page is
+     actually shown. Pages loaded normally are counted by the middleware and send nothing. */
+  function countPrerenderedView() {
+    var meta = $('meta[name="zc-pageview"]');
+    if (!meta || !navigator.sendBeacon) return;
+    var send = function () { navigator.sendBeacon(meta.content, location.pathname + "\n" + document.referrer); };
+    if (document.prerendering) {
+      document.addEventListener("prerenderingchange", send, { once: true });
+      return;
     }
-    window.addEventListener("pageshow", function (e) { if (e.persisted) { veil.style.opacity = "0"; } });
-
-    if (!motionAllowed()) return;
-
-    document.addEventListener("click", function (e) {
-      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-      var a = e.target.closest("a[href]");
-      if (!a || a.target || a.hasAttribute("download") || a.dataset.noTransition !== undefined) return;
-      var url = new URL(a.href, location.href);
-      if (url.origin !== location.origin) return;
-      if (url.pathname === location.pathname && url.hash) return;
-      if (/\.(pdf|csv|docx?|xml|txt)$/i.test(url.pathname)) return;
-
-      var card = a.closest("[data-flip-card]");
-      e.preventDefault();
-      try { sessionStorage.setItem("zc-veil", "1"); } catch (err) {}
-      if (card && window.Flip) return flipToCase(card, url.href, veil);
-      gsap.to(veil, { opacity: 1, duration: 0.32, ease: MOTION.ease.move, onComplete: function () { location.href = url.href; } });
-    });
-  }
-
-  function flipToCase(card, href, veil) {
-    var img = $("[data-flip-img]", card);
-    if (!img) { location.href = href; return; }
-    var rect = img.getBoundingClientRect();
-    var clone = img.cloneNode(true);
-    Object.assign(clone.style, {
-      position: "fixed", left: rect.left + "px", top: rect.top + "px", width: rect.width + "px", height: rect.height + "px",
-      objectFit: "cover", zIndex: 85, borderRadius: "14px", margin: 0,
-    });
-    document.body.appendChild(clone);
-    var state = Flip.getState(clone);
-    var gutter = Math.max(16, Math.min(32, window.innerWidth * 0.04));
-    var width = Math.min(1240, window.innerWidth) - gutter * 2;
-    Object.assign(clone.style, {
-      left: (window.innerWidth - width) / 2 + "px", top: "96px", width: width + "px", height: Math.min(window.innerHeight * 0.52, width * 0.43) + "px", borderRadius: "20px",
-    });
-    Flip.from(state, { duration: 0.75, ease: MOTION.ease.move });
-    gsap.to(veil, { opacity: 1, duration: 0.45, delay: 0.3, ease: MOTION.ease.move, onComplete: function () { location.href = href; } });
+    var nav = performance.getEntriesByType && performance.getEntriesByType("navigation")[0];
+    if (nav && nav.activationStart > 0) send();  // shown before this script had run
   }
 
   /* GSAP choreography ------------------------------------------------------- */
@@ -605,7 +570,7 @@
     initHeroSlider();
     initQuotes();
     initJobFilters();
-    initTransitions();
+    countPrerenderedView();
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);

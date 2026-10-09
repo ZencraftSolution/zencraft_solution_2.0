@@ -4,6 +4,7 @@ from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
+from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 from apps.blog.models import BlogPost
@@ -14,7 +15,8 @@ from apps.services.models import Industry, Service, Technology
 
 from . import display_cache
 from .forms import ConsultationForm, ContactForm, FeedbackForm, NewsletterForm
-from .models import NewsletterSubscriber
+from .middleware import SKIP_PREFIXES
+from .models import NewsletterSubscriber, PageView
 from .utils import rate_limit, safe_referer
 
 
@@ -233,3 +235,25 @@ def page_not_found(request, exception=None):
 
 def server_error(request):
     return render(request, "500.html", status=500)
+
+
+@csrf_exempt  # navigator.sendBeacon cannot send a CSRF token; this only ever adds one analytics row
+@require_POST
+def pageview(request):
+    """Counts a page that was prerendered in the background and then actually shown.
+
+    main.js sends "path\nreferrer" when a prerendered page is activated; the prerender request
+    itself was skipped by PageViewMiddleware. Same-origin only, and only for paths the middleware
+    would have counted, so it cannot be used to record views of the dashboard or of other sites.
+    """
+    if request.headers.get("Sec-Fetch-Site", "same-origin") != "same-origin":
+        return HttpResponse(status=403)
+    origin = request.headers.get("Origin")
+    if origin and origin != f"{request.scheme}://{request.get_host()}":
+        return HttpResponse(status=403)
+    path, _, referrer = request.body[:2048].decode("utf-8", "replace").partition("\n")
+    dashboard = "/" + settings.DASHBOARD_PATH
+    if not path.startswith("/") or path.startswith("//") or path.startswith(SKIP_PREFIXES) or path.startswith(dashboard) or "/api/" in path:
+        return HttpResponse(status=400)
+    PageView.objects.create(path=path[:255], referrer=referrer[:255], session_key=(request.session.session_key or "")[:64])
+    return HttpResponse(status=204)

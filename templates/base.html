@@ -43,13 +43,6 @@
       try { if (localStorage.getItem("zc-currency") === "usd") d.setAttribute("data-currency", "usd"); } catch (e) {}
       if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
         d.classList.add("js-motion");
-        try {
-          if (sessionStorage.getItem("zc-veil")) {
-            sessionStorage.removeItem("zc-veil");
-            d.classList.add("veil-in");
-            setTimeout(function () { d.classList.remove("veil-in"); }, 1500);
-          }
-        } catch (e) {}
         setTimeout(function () { if (!window.__zcMotionReady) d.classList.remove("js-motion"); }, 6000);
       }
       document.addEventListener("error", function (e) {
@@ -69,6 +62,24 @@
     })();
   </script>
 
+  {% comment %}Instant navigation in Chrome and Edge: hovering a link to one of these pages loads it in
+  the background, so it shows at once on click. Content pages only: never the dashboard, a form
+  step, the cart or a download. Other browsers ignore this; the current page then stays on screen
+  until the next one is ready, so there is no blank screen either way. The background request is
+  not counted as a visit (PageViewMiddleware); main.js reports the visit when the page is shown.{% endcomment %}
+  <meta name="zc-pageview" content="{% url 'core:pageview' %}">
+  <script type="speculationrules" nonce="{{ request.csp_nonce }}">
+  {"prerender": [{"where": {"and": [
+    {"or": [
+      {"href_matches": "/"}, {"href_matches": "/about/"}, {"href_matches": "/contact/"},
+      {"href_matches": "/book-consultation/"}, {"href_matches": "/legal/*"}, {"href_matches": "/estimate/"},
+      {"href_matches": "/services/*"}, {"href_matches": "/work/*"}, {"href_matches": "/insights/*"},
+      {"href_matches": "/careers/"}, {"href_matches": "/careers/jobs/"}, {"href_matches": "/careers/jobs/:slug/"}
+    ]},
+    {"not": {"selector_matches": "[download], [target], [data-no-prerender]"}}
+  ]}, "eagerness": "moderate"}]}
+  </script>
+
   {% schema "organization" %}
   {% schema "website" %}
   {% block json_ld %}{% endblock %}
@@ -76,7 +87,6 @@
 </head>
 <body class="{% block body_class %}{% endblock %}">
   <a class="skip-link" href="#main">Skip to content</a>
-  <div class="page-veil" aria-hidden="true"></div>
 
   {% include "partials/header.html" %}
 

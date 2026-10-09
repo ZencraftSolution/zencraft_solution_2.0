@@ -12,6 +12,7 @@ urlpatterns = [
     path("newsletter/", views.newsletter_subscribe, name="newsletter"),
     path("feedback/", views.feedback, name="feedback"),
     path("search/", views.search, name="search"),
+    path("pageview/", views.pageview, name="pageview"),
     path("legal/privacy/", views.legal, {"page": "privacy"}, name="privacy"),
     path("legal/terms/", views.legal, {"page": "terms"}, name="terms"),
     path("legal/cookies/", views.legal, {"page": "cookies"}, name="cookies"),

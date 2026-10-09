@@ -51,7 +51,6 @@
 
   --z-header: 50;
   --z-menu: 60;
-  --z-veil: 80;
   --z-toast: 90;
 }
 
@@ -261,9 +260,12 @@ table { border-collapse: collapse; width: 100%; }
 .toast--error i { color: #ff9b91; }
 .toast button { margin-left: auto; background: none; border: 0; color: #fff; opacity: 0.7; font-size: 1rem; }
 
-/* Page veil (route transition) ----------------------------------------- */
-.page-veil { position: fixed; inset: 0; background: var(--bg); z-index: var(--z-veil); pointer-events: none; opacity: 0; }
-html.veil-in .page-veil { opacity: 1; }
+/* Page transitions ----------------------------------------------------------
+   The browser's own cross-document view transition: the old page stays on screen until the new
+   one is ready, then cross-fades into it. Where it is not supported the page simply switches.
+   There is no overlay: an earlier one covered the page in white for the whole navigation. */
+@view-transition { navigation: auto; }
+@media (prefers-reduced-motion: reduce) { @view-transition { navigation: none; } }
 
 /* Hero ---------------------------------------------------------------- */
 .hero { position: relative; overflow: hidden; border-bottom: 1px solid var(--line); }

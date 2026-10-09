@@ -57,6 +57,13 @@ class SecurityHeadersMiddleware:
         return response
 
 
+def is_speculative(request):
+    """A page the browser loaded in the background in case the visitor clicks (prefetch or
+    prerender, from the speculation rules in base.html). Not a visit; main.js reports one if the
+    page is then shown."""
+    return "prefetch" in request.headers.get("Sec-Purpose", "") or request.headers.get("Purpose", "") == "prefetch"
+
+
 class PageViewMiddleware:
     """Records lightweight first-party page views for the dashboard analytics screen."""
 
@@ -69,6 +76,7 @@ class PageViewMiddleware:
         path = request.path
         if (
             request.method == "GET"
+            and not is_speculative(request)
             and response.status_code == 200
             and "text/html" in response.get("Content-Type", "")
             and not path.startswith(SKIP_PREFIXES)

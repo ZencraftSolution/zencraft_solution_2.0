@@ -18,9 +18,9 @@
   <div class="container">
     <nav aria-label="Filter by industry" data-reveal>
       <ul class="chips" style="margin-bottom:40px">
-        <li><a class="chip {% if not active_industry %}is-active{% endif %}" href="{% url 'portfolio:list' %}" data-no-transition>All industries</a></li>
+        <li><a class="chip {% if not active_industry %}is-active{% endif %}" href="{% url 'portfolio:list' %}">All industries</a></li>
         {% for i in industries %}
-        <li><a class="chip {% if active_industry == i.slug %}is-active{% endif %}" href="?industry={{ i.slug }}" data-no-transition>{{ i.name }}</a></li>
+        <li><a class="chip {% if active_industry == i.slug %}is-active{% endif %}" href="?industry={{ i.slug }}">{{ i.name }}</a></li>
         {% endfor %}
       </ul>
     </nav>

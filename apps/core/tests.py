@@ -1364,3 +1364,58 @@ class DisplayCacheTests(TestCase):
 
         for module in (throttle, utils):
             self.assertNotIn("caches[\"local\"]", open(module.__file__, encoding="utf-8").read())
+
+
+class InstantNavigationTests(TestCase):
+    """No white overlay between pages; hovered links prerender in Chrome and Edge; page views stay honest."""
+
+    def rules(self, html):
+        match = re.search(r'<script type="speculationrules" nonce="([^"]+)">(.*?)</script>', html, re.S)
+        self.assertIsNotNone(match, "no speculation rules on the page")
+        return match.group(1), json.loads(match.group(2))
+
+    def test_no_page_covers_itself_while_navigating(self):
+        html = self.client.get("/contact/").content.decode()
+        self.assertNotIn("page-veil", html)
+        self.assertNotIn("zc-veil", html)
+        css = (settings.BASE_DIR / "static" / "css" / "main.css").read_text(encoding="utf-8")
+        self.assertNotIn(".page-veil", css)
+        self.assertIn("@view-transition { navigation: auto; }", css)
+
+    def test_prerender_rules_carry_the_csp_nonce_and_cover_content_pages_only(self):
+        response = self.client.get("/contact/")
+        nonce, rules = self.rules(response.content.decode())
+        self.assertIn(f"'nonce-{nonce}'", response["Content-Security-Policy"])
+        patterns = [c["href_matches"] for c in rules["prerender"][0]["where"]["and"][0]["or"]]
+        self.assertIn("/services/*", patterns)
+        dashboard = "/" + settings.DASHBOARD_PATH
+        for pattern in patterns:
+            self.assertFalse(pattern.startswith(dashboard), pattern)
+            self.assertNotIn("apply", pattern)
+            self.assertNotIn("pricing", pattern)
+
+    def test_a_background_load_is_not_counted_as_a_visit(self):
+        for purpose in ["prefetch", "prefetch;prerender"]:
+            with self.subTest(purpose=purpose):
+                self.client.get("/contact/", HTTP_SEC_PURPOSE=purpose)
+                self.assertEqual(PageView.objects.count(), 0)
+        self.client.get("/contact/")
+        self.assertEqual(PageView.objects.count(), 1)
+
+    def test_a_prerendered_page_that_is_shown_is_counted_once(self):
+        client = self.client_class(enforce_csrf_checks=True)  # sendBeacon cannot send a token
+        response = client.post(reverse("core:pageview"), "/services/\nhttps://zencraftsolution.com/",
+                               content_type="text/plain", HTTP_SEC_FETCH_SITE="same-origin")
+        self.assertEqual(response.status_code, 204)
+        view = PageView.objects.get()
+        self.assertEqual((view.path, view.referrer), ("/services/", "https://zencraftsolution.com/"))
+
+    def test_the_ping_refuses_other_sites_the_dashboard_and_get(self):
+        url = reverse("core:pageview")
+        self.assertEqual(self.client.post(url, "/", content_type="text/plain", HTTP_SEC_FETCH_SITE="cross-site").status_code, 403)
+        self.assertEqual(self.client.post(url, "/", content_type="text/plain", HTTP_ORIGIN="https://evil.example").status_code, 403)
+        for path in [f"/{settings.DASHBOARD_PATH}", "/static/css/main.css", "//evil.example/", "services/"]:
+            with self.subTest(path=path):
+                self.assertEqual(self.client.post(url, path, content_type="text/plain").status_code, 400)
+        self.assertEqual(self.client.get(url).status_code, 405)
+        self.assertEqual(PageView.objects.count(), 0)
