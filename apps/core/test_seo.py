@@ -461,6 +461,27 @@ class FrontEndPerformanceTests(TestCase):
         self.assertTrue(preloads, "the font used for body text is not preloaded")
         self.assertTrue(all("geist" in url for url in preloads))
 
+    def test_every_preloaded_font_is_one_the_stylesheet_uses(self):
+        """A preload that no @font-face asks for is downloaded for nothing, and browsers warn that
+        it was "not used within a few seconds of the load event"."""
+        css = (settings.BASE_DIR / "static" / "css" / "fonts.css").read_text(encoding="utf-8")
+        used = {name for name in re.findall(r"url\('\.\./fonts/([^']+)'\)", css)}
+        preloads = re.findall(r'<link rel="preload" href="[^"]*/fonts/([^"/]+?)(?:\.[0-9a-f]{12})?\.woff2"', self.head())
+        self.assertEqual(len(preloads), len(set(preloads)), "a font is preloaded twice")
+        for name in preloads:
+            self.assertIn(f"{name}.woff2", used, f"{name}.woff2 is preloaded but no @font-face uses it")
+
+    def test_no_font_file_is_shipped_twice(self):
+        """The fonts are variable: one file serves every weight. A copy per weight under another
+        name made a first visit download the same bytes up to four times."""
+        import hashlib
+
+        seen = {}
+        for path in sorted((settings.BASE_DIR / "static" / "fonts").glob("*.woff2")):
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+            self.assertNotIn(digest, seen, f"{path.name} is a copy of {seen.get(digest)}")
+            seen[digest] = path.name
+
     def test_the_self_hosted_font_css_asks_for_swap_so_text_is_never_invisible(self):
         css = (settings.BASE_DIR / "static" / "css" / "fonts.css").read_text(encoding="utf-8")
         self.assertIn("font-display: swap", css)
