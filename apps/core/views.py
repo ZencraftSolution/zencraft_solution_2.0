@@ -12,6 +12,7 @@ from apps.core.mail import notify_internal, send_templated_email
 from apps.portfolio.models import CaseStudy, TeamMember, Testimonial
 from apps.services.models import Industry, Service, Technology
 
+from . import display_cache
 from .forms import ConsultationForm, ContactForm, FeedbackForm, NewsletterForm
 from .models import NewsletterSubscriber
 from .utils import rate_limit, safe_referer
@@ -58,9 +59,27 @@ def _hero_slides():
     return slides
 
 
+def _home_content():
+    """The home page's database content, evaluated (prefetches included) so it can be cached."""
+    case_studies = list(
+        CaseStudy.objects.filter(is_published=True, featured=True).select_related("industry").prefetch_related("technologies")[:6]
+    )
+    return {
+        "services": list(Service.objects.filter(is_published=True).order_by("order")),
+        "technologies": list(Technology.objects.all()),
+        "case_studies": case_studies,
+        "testimonials": list(Testimonial.objects.filter(featured=True, verification="verified")[:6]),
+        "industries": list(Industry.objects.all()[:7]),
+        "engagement_models": list(EngagementModel.objects.all()[:4]),
+        "posts": list(BlogPost.objects.filter(is_published=True).select_related("category")[:3]),
+    }
+
+
 def home(request):
-    services = list(Service.objects.filter(is_published=True).order_by("order"))
-    technologies = list(Technology.objects.all())
+    # Kept in the worker's memory for a minute: eight queries a request, each a round trip to the
+    # database, for content that changes a few times a week (apps/core/display_cache.py).
+    content = display_cache.cached(display_cache.HOME_CONTENT, _home_content)
+    services, technologies = content["services"], content["technologies"]
     terminal_lines = (
         [{"t": "prompt", "v": "zencraft --services --verbose"}, {"t": "dim", "v": "resolving capabilities..."}]
         + [{"t": "ok", "v": s.name, "k": s.nav_blurb} for s in services]
@@ -70,16 +89,10 @@ def home(request):
         ]
     )
     context = {
-        "services": services,
+        **content,
         "hero_slides": _hero_slides(),
         "terminal_lines": terminal_lines,
-        "case_studies": CaseStudy.objects.filter(is_published=True, featured=True).select_related("industry").prefetch_related("technologies")[:6],
-        "testimonials": Testimonial.objects.filter(featured=True, verification="verified")[:6],
-        "industries": Industry.objects.all()[:7],
-        "technologies": technologies,
-        "engagement_models": EngagementModel.objects.all()[:4],
         "feedback_form": FeedbackForm(),
-        "posts": BlogPost.objects.filter(is_published=True).select_related("category")[:3],
         "process": [
             ("Discover", "Workshops with your stakeholders to map goals, users, risks and the first release."),
             ("Design", "Architecture decisions, clickable prototypes and a delivery plan you can hold us to."),

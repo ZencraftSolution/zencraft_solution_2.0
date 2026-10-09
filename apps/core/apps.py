@@ -8,3 +8,6 @@ class CoreConfig(AppConfig):
 
     def ready(self):
         from . import checks  # noqa: F401 - importing registers the deploy checks
+        from .display_cache import connect_signals
+
+        connect_signals()

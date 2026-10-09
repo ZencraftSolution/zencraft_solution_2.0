@@ -333,6 +333,24 @@ returns `{"status": "ok"}` with a 200, or 503 naming the failing component. It d
 heavier on purpose: a health check that calls a payment gateway takes your site offline whenever
 that gateway has a bad minute.
 
+### Speed: two Render settings that matter more than any code
+
+1. **Put the web service and the database in the same region.** Within one region a query takes
+   about a millisecond; across regions, about 50 to 100. Every page makes several, so a database
+   in another region adds most of a second to every page. Check both regions in the dashboard
+   (web service > Settings, database > Info); if they differ, create the database again in the
+   web service's region and restore a backup into it.
+2. **Turn on edge caching for static files** (web service > Settings > Edge Caching >
+   "Common static files"). CSS, JavaScript, fonts and images are then served from Cloudflare's
+   edge nearest the visitor (Kathmandu, for Nepal) instead of from the server. Static files carry
+   a content hash in their name and a one-year cache header, so this is safe, and each deploy
+   purges the edge cache.
+
+On the code side, what every page displays (site settings, the navigation, the home page's
+content) is held in each worker's memory for a minute (`apps/core/display_cache.py`), because
+the shared cache lives in the database and even a cache hit is a round trip. A change made in the
+dashboard can therefore take up to a minute to appear on every worker.
+
 ### Checking the live site
 
 `.github/workflows/live-site.yml` runs `scripts/check_live_site.py` against the deployed site. It

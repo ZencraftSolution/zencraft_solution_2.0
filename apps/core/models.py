@@ -1,7 +1,6 @@
 from decimal import Decimal
 
 from django.conf import settings
-from django.core.cache import cache
 from django.db import models
 from django.templatetags.static import static
 
@@ -58,8 +57,6 @@ class SiteSettings(models.Model):
 
     updated_at = models.DateTimeField(auto_now=True)
 
-    CACHE_KEY = "site-settings"
-
     class Meta:
         verbose_name = "Site settings"
         verbose_name_plural = "Site settings"
@@ -70,15 +67,15 @@ class SiteSettings(models.Model):
     def save(self, *args, **kwargs):
         self.pk = 1
         super().save(*args, **kwargs)
-        cache.delete(self.CACHE_KEY)
+        # post_save clears the per-process display cache (apps/core/display_cache.py).
 
     @classmethod
     def load(cls):
-        obj = cache.get(cls.CACHE_KEY)
-        if obj is None:
-            obj, _ = cls.objects.get_or_create(pk=1)
-            cache.set(cls.CACHE_KEY, obj, 300)
-        return obj
+        """Read on every page, so kept in the worker's memory rather than the database cache,
+        where even a hit is a round trip to PostgreSQL."""
+        from .display_cache import SITE_SETTINGS, cached
+
+        return cached(SITE_SETTINGS, lambda: cls.objects.get_or_create(pk=1)[0])
 
     @property
     def share_image_src(self):

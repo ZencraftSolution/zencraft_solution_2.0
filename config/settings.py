@@ -232,7 +232,12 @@ OTP_TOTP_ISSUER = env("OTP_TOTP_ISSUER", default="Zencraft Solution")
 LOGIN_URL = "dashboard:login"
 LOGIN_REDIRECT_URL = "dashboard:overview"
 
-CACHES = {"default": cache_config(env("CACHE_URL", default=""), debug=DEBUG)}
+CACHES = {
+    "default": cache_config(env("CACHE_URL", default=""), debug=DEBUG),
+    # Per-process, for what every public page displays (apps/core/display_cache.py). Never for
+    # lockouts or rate limits, which must be shared across workers and stay in "default".
+    "local": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "zencraft-display"},
+}
 
 EMAIL_BACKEND = env("EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")
 if env("EMAIL_URL", default=""):

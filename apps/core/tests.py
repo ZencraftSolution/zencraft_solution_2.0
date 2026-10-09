@@ -19,10 +19,12 @@ from django.core.files.storage import FileSystemStorage
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from django.db import connection
 from django.db.utils import OperationalError
 from django.http import HttpResponse
 from django.template import Context, Template
 from django.test import RequestFactory, TestCase, override_settings
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 
@@ -34,7 +36,7 @@ from apps.core.models import ConsultationBooking, ContactSubmission, Feedback, N
 from apps.core.testing import CLAMAV_SCAN, NOOP_SCAN, docx_bytes, make_application, make_job, make_product, pdf_upload
 from apps.core.uploads import get_private_storage
 from apps.core.utils import client_ip, format_npr, format_usd, log_action, make_reference, npr_to_usd, rate_limit
-from apps.portfolio.models import CaseStudy
+from apps.portfolio.models import CaseStudy, Testimonial
 from apps.services.models import Service
 
 
@@ -292,7 +294,9 @@ class MiddlewareAndContextTests(TestCase):
         self.client.post(reverse("commerce:cart_add", args=[product.pk]), {"quantity": 3})
         self.assertEqual(self.client.get("/legal/cookies/").context["cart_count"], 3)
         site = SiteSettings.load()
-        self.assertIsNotNone(cache.get(SiteSettings.CACHE_KEY))  # load() populates the cache
+        from apps.core import display_cache
+
+        self.assertIsNotNone(display_cache.local().get(display_cache.SITE_SETTINGS))  # load() populates the cache
         site.phone = "+977 9811111111"
         site.save()
         self.assertEqual(SiteSettings.load().phone, "+977 9811111111")
@@ -1312,3 +1316,51 @@ class LiveSiteCheckTests(TestCase):
             response = pages["/robots.txt" if url.endswith("/robots.txt") else "/"]
             return response.status_code, response.content.decode()
         self.assertEqual(self.live.check(self.SITE, fetch=fetch, sleep=lambda seconds: None), [])
+
+
+class DisplayCacheTests(TestCase):
+    """What every page shows is kept in the worker's memory, not fetched from the database each time."""
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("seed_zencraft", stdout=io.StringIO())
+
+    def test_the_home_page_makes_no_content_queries_once_cached(self):
+        self.client.get("/")
+        # One write remains: the page view recorded for the analytics screen.
+        with self.assertNumQueries(1):
+            self.assertEqual(self.client.get("/").status_code, 200)
+
+    def test_every_page_reads_settings_and_navigation_from_memory(self):
+        self.client.get("/contact/")
+        with CaptureQueriesContext(connection) as queries:
+            self.client.get("/contact/")
+        tables = " ".join(q["sql"] for q in queries.captured_queries)
+        for table in ["core_sitesettings", "services_service", "zencraft_cache"]:
+            self.assertNotIn(table, tables)
+
+    def test_saving_content_shows_on_the_next_request_in_this_worker(self):
+        self.client.get("/")
+        service = Service.objects.get(slug="web-development")
+        service.name = "Web Platforms"
+        service.save()
+        home = self.client.get("/")
+        self.assertContains(home, "Web Platforms")
+        self.assertIn("Web Platforms", [s.name for s in home.context["nav_services"]])
+
+        site = SiteSettings.load()
+        site.phone = "+977 9800000001"
+        site.save()
+        self.assertContains(self.client.get("/contact/"), "+977 9800000001")
+
+    def test_deleting_content_clears_it_too(self):
+        self.client.get("/")
+        Testimonial.objects.all().delete()
+        self.assertEqual(self.client.get("/").context["testimonials"], [])
+
+    def test_lockouts_and_rate_limits_still_use_the_shared_cache(self):
+        self.assertEqual(settings.CACHES["local"]["BACKEND"], "django.core.cache.backends.locmem.LocMemCache")
+        from apps.core import throttle, utils
+
+        for module in (throttle, utils):
+            self.assertNotIn("caches[\"local\"]", open(module.__file__, encoding="utf-8").read())
