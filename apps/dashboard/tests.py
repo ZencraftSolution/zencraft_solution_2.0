@@ -5,10 +5,12 @@ import tempfile
 import time
 from datetime import timedelta
 from decimal import Decimal
+from unittest import mock
 
 from django.conf import settings
 from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db.models import ProtectedError
 from django.db.models.fields.files import FieldFile
 from django.forms.models import model_to_dict
 from django.test import Client, TestCase, override_settings
@@ -484,6 +486,26 @@ class TeamPhotoUploadTests(DashboardTestCase):
         member.save()
         self.assertEqual(member.photo_src, member.photo.url)  # the upload still wins
 
+    def test_deleting_a_member_removes_their_uploaded_photo(self):
+        self.client.post(self.CREATE, self.form_data(photo=image_upload()))
+        member = TeamMember.objects.get()
+        storage, name = member.photo.storage, member.photo.name
+        self.assertTrue(storage.exists(name))
+        delete = reverse("dashboard:crud_delete", args=["team", member.pk])
+        self.assertRedirects(self.client.post(delete), reverse("dashboard:crud_list", args=["team"]))
+        self.assertFalse(TeamMember.objects.filter(pk=member.pk).exists())
+        self.assertFalse(storage.exists(name), "the deleted member's photo is still stored")
+
+    def test_a_record_still_in_use_keeps_its_files(self):
+        from apps.dashboard.deletion import delete_with_files
+
+        self.client.post(self.CREATE, self.form_data(photo=image_upload()))
+        member = TeamMember.objects.get()
+        storage, name = member.photo.storage, member.photo.name
+        with mock.patch.object(TeamMember, "delete", side_effect=ProtectedError("in use", set())):
+            self.assertFalse(delete_with_files(member))
+        self.assertTrue(storage.exists(name), "a record that was not deleted lost its photo")
+
     def test_photo_url_alone_is_still_allowed(self):
         self.client.post(self.CREATE, self.form_data(photo_url="https://example.com/a.jpg"))
         member = TeamMember.objects.get()
@@ -897,13 +919,24 @@ class BulkDeleteTests(DashboardTestCase):
     def test_every_list_offers_select_all_and_bulk_delete(self):
         make_lead("PI-LIST")
         pages = [reverse("dashboard:crud_list", args=[slug]) for slug in REGISTRY]
-        pages += [reverse(f"dashboard:{name}") for name in ["leads", "applications", "applications_list", "orders", "audit"]]
+        pages += [reverse(f"dashboard:{name}") for name in ["leads", "applications", "applications_list"]]
         for url in pages:
             with self.subTest(url=url):
                 html = self.client.get(url).content.decode()
                 self.assertIn("data-bulk-all", html)
                 self.assertIn("data-bulk-delete", html)
                 self.assertIn(f"/{settings.DASHBOARD_PATH}bulk-delete/", html)
+
+    def test_the_audit_log_page_offers_no_selection(self):
+        html = self.client.get(reverse("dashboard:audit")).content.decode()
+        self.assertNotIn("data-bulk", html)
+        self.assertNotIn("bulk-delete", html)
+
+    def test_orders_offer_selection_to_superusers_only(self):
+        orders = reverse("dashboard:orders")
+        self.assertNotIn("data-bulk-delete", self.client.get(orders).content.decode())
+        self.client.force_login(make_staff("hq-owner", is_superuser=True))
+        self.assertIn("data-bulk-delete", self.client.get(orders).content.decode())
 
     def test_selected_rows_are_confirmed_then_deleted_and_logged(self):
         keep, *gone = [Technology.objects.create(name=f"Tool {n}", slug=f"tool-{n}", category="frontend") for n in range(4)]
@@ -969,21 +1002,37 @@ class BulkDeleteTests(DashboardTestCase):
         self.assertFalse(ProjectInquiry.objects.filter(pk=lead.pk).exists())
         self.assertFalse(storage.exists(name))
 
-    def test_orders_can_be_deleted_in_bulk(self):
-        orders = [Order.objects.create(reference=f"ZC-B{n}", customer_name="C", email="c@example.com", phone="1",
-                                       exchange_rate=Decimal("134"), total_usd=Decimal("1")) for n in range(2)]
+    def make_orders(self, n=2):
+        return [Order.objects.create(reference=f"ZC-B{i}", customer_name="C", email="c@example.com", phone="1",
+                                     exchange_rate=Decimal("134"), total_usd=Decimal("1")) for i in range(n)]
+
+    def test_a_superuser_can_delete_orders_in_bulk(self):
+        orders = self.make_orders()
+        self.client.force_login(make_staff("hq-owner", is_superuser=True))
         self.confirm("orders", ids=[str(o.pk) for o in orders])
         self.assertFalse(Order.objects.filter(pk__in=[o.pk for o in orders]).exists())
 
-    def test_clearing_the_audit_log_still_leaves_a_record_of_it(self):
-        for n in range(3):
-            AuditLog.objects.create(action=f"old action {n}")
-        self.confirm("audit", scope="all", filters="")
-        remaining = list(AuditLog.objects.values_list("action", "detail", "user_id"))
-        self.assertEqual(len(remaining), 1)
-        self.assertEqual(remaining[0][0], "bulk deleted")
-        self.assertTrue(remaining[0][1].startswith("Audit log: 3 deleted"))
-        self.assertEqual(remaining[0][2], self.staff.pk)
+    def test_other_staff_get_403_and_delete_no_orders(self):
+        self.assertFalse(self.staff.is_superuser)
+        orders = self.make_orders()
+        ids = [str(o.pk) for o in orders]
+        for data in [{"ids": ids}, {"ids": ids, "confirm": "1", "expected": "2"},
+                     {"scope": "all", "filters": "", "confirm": "1", "expected": "2"}]:
+            with self.subTest(data=data):
+                self.assertEqual(self.bulk("orders", **data).status_code, 403)
+                self.assertEqual(Order.objects.filter(pk__in=ids).count(), 2)
+        self.assertFalse(audit("bulk deleted").exists())
+
+    def test_the_audit_log_cannot_be_deleted_from_the_dashboard(self):
+        entries = [AuditLog.objects.create(action=f"old action {n}") for n in range(3)]
+        ids = [str(e.pk) for e in entries]
+        self.client.force_login(make_staff("hq-owner", is_superuser=True))  # not even by a superuser
+        for data in [{"ids": ids}, {"ids": ids, "confirm": "1", "expected": "3"},
+                     {"scope": "all", "filters": "", "confirm": "1", "expected": "3"}]:
+            with self.subTest(data=data):
+                self.assertEqual(self.bulk("audit", **data).status_code, 404)
+        self.assertEqual(AuditLog.objects.filter(pk__in=ids).count(), 3)
+        self.assertFalse(audit("bulk deleted").exists())
 
     def test_nothing_selected_deletes_nothing(self):
         Technology.objects.create(name="Safe", slug="safe", category="frontend")

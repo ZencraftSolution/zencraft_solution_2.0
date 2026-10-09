@@ -269,7 +269,16 @@ python manage.py collectstatic --noinput   # WhiteNoise serves hashed files; wit
 python manage.py migrate --noinput         # schema, and the data migrations that carry content changes
 python manage.py createcachetable          # the default cache is the database; lockouts live there
 python manage.py ensure_superuser          # first admin only; a no-op afterwards
+python manage.py check --deploy --fail-level ERROR   # refuses a misconfigured deploy
 ```
+
+The last line is a safety net. If `SITE_URL` is set to `http://localhost:8000` or
+`http://127.0.0.1:8000` (or any other local address), the check fails with `zencraft.E002` and
+Render stops the deploy at the build step, so the version already running stays up. Without it,
+the site would go live with canonical tags, `og:url`, the sitemap and payment return URLs all
+pointing at the server itself. The same check refuses a deploy with no real email backend or with
+media a redeploy would wipe. Only errors stop it; warnings do not. Fix the variable in the Render
+dashboard and redeploy.
 
 Leaving out `createcachetable` makes every sign-in and every form submission error, because the
 rate limiter cannot reach its table. Leaving out `migrate` makes the deploy fail outright.
@@ -323,6 +332,18 @@ Set Render's **Health Check Path** to `/healthz/`. It checks the database and th
 returns `{"status": "ok"}` with a 200, or 503 naming the failing component. It does nothing
 heavier on purpose: a health check that calls a payment gateway takes your site offline whenever
 that gateway has a bad minute.
+
+### Checking the live site
+
+`.github/workflows/live-site.yml` runs `scripts/check_live_site.py` against the deployed site. It
+fails if the home page's canonical link or `og:url`, or the `Sitemap:` line in `robots.txt`,
+contains `localhost` or `127.0.0.1`, or if `/healthz/` does not answer 200. Those are the symptoms
+of an unset `SITE_URL`, which otherwise goes unnoticed because the site still works.
+
+Set the repository variable **`LIVE_SITE_URL`** (Settings > Secrets and variables > Actions >
+Variables) to the live address, for example `https://zencraftsolution.com`. The check then runs
+after every successful deployment the host reports to GitHub, and on demand from Actions > Live
+site check > Run workflow. To run it yourself: `python scripts/check_live_site.py https://zencraftsolution.com`.
 
 ### Scheduled jobs
 

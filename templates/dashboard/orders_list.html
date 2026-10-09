@@ -10,13 +10,14 @@
 </ul>
 <form method="post" class="panel" data-bulk>
   {% csrf_token %}
-  {% include "dashboard/_bulk_bar.html" with section_name="orders" total=total shown=orders|length %}
+  {% comment %}Bulk delete of payment records is for superusers only (apps/dashboard/bulk.py).{% endcomment %}
+  {% if request.user.is_superuser %}{% include "dashboard/_bulk_bar.html" with section_name="orders" total=total shown=orders|length %}{% endif %}
   <div class="dtable-wrap"><table class="dtable">
-  <thead><tr><th class="dtable__check"><input type="checkbox" aria-label="Select all on this page" data-bulk-all></th><th>Reference</th><th>Customer</th><th>Items</th><th>Total NPR</th><th>Total USD</th><th>Method</th><th>Payment</th><th>Fulfilment</th><th>Created</th></tr></thead>
+  <thead><tr>{% if request.user.is_superuser %}<th class="dtable__check"><input type="checkbox" aria-label="Select all on this page" data-bulk-all></th>{% endif %}<th>Reference</th><th>Customer</th><th>Items</th><th>Total NPR</th><th>Total USD</th><th>Method</th><th>Payment</th><th>Fulfilment</th><th>Created</th></tr></thead>
   <tbody>
     {% for o in orders %}
     <tr>
-      <td class="dtable__check"><input type="checkbox" name="ids" value="{{ o.pk }}" aria-label="Select order {{ o.reference }}" data-bulk-item></td>
+      {% if request.user.is_superuser %}<td class="dtable__check"><input type="checkbox" name="ids" value="{{ o.pk }}" aria-label="Select order {{ o.reference }}" data-bulk-item></td>{% endif %}
       <td><a class="mono" href="{% url 'dashboard:order_detail' o.pk %}">{{ o.reference }}</a></td>
       <td>{{ o.customer_name }}<br><span class="muted" style="font-size:.78rem">{{ o.company|default:o.email }}</span></td>
       <td>{% for i in o.items.all %}{{ i.quantity }} x {{ i.name }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</td>
@@ -26,7 +27,7 @@
       <td><span class="tag">{{ o.get_fulfilment_status_display }}</span></td>
       <td class="mono" style="font-size:.78rem">{{ o.created_at|date:"j M Y" }}</td>
     </tr>
-    {% empty %}<tr><td colspan="10" class="muted">No orders yet.</td></tr>{% endfor %}
+    {% empty %}<tr><td colspan="{% if request.user.is_superuser %}10{% else %}9{% endif %}" class="muted">No orders yet.</td></tr>{% endfor %}
   </tbody>
 </table></div>
 </form>

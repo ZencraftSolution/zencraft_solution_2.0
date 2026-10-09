@@ -4,16 +4,12 @@
 {% block content %}
 <div class="dash-head"><div><h1>Audit log</h1><p>Sign-ins, content changes, pipeline moves and every access to applicant data.</p></div></div>
 <form class="dash-filters" method="get"><div class="field"><label for="audit-q">Search</label><input class="input" id="audit-q" type="search" name="q" value="{{ q }}" placeholder="Action, record or user"></div><button class="btn btn--dark btn--sm" type="submit">Search</button></form>
-<form method="post" class="panel" data-bulk>
-  {% csrf_token %}
-  {% include "dashboard/_bulk_bar.html" with section_name="audit" total=total shown=logs|length %}
-  <div class="dtable-wrap"><table class="dtable">
-  <thead><tr><th class="dtable__check"><input type="checkbox" aria-label="Select all on this page" data-bulk-all></th><th>When</th><th>User</th><th>Action</th><th>Record</th><th>Detail</th><th>IP</th></tr></thead>
+<div class="panel"><div class="dtable-wrap"><table class="dtable">
+  <thead><tr><th>When</th><th>User</th><th>Action</th><th>Record</th><th>Detail</th><th>IP</th></tr></thead>
   <tbody>
     {% for l in logs %}
-    <tr><td class="dtable__check"><input type="checkbox" name="ids" value="{{ l.pk }}" aria-label="Select entry {{ l.created_at|date:'j M Y, H:i' }} {{ l.action }}" data-bulk-item></td><td class="mono" style="font-size:.78rem;white-space:nowrap">{{ l.created_at|date:"j M Y, H:i:s" }}</td><td>{{ l.user|default:"-" }}</td><td><span class="tag {% if 'CV' in l.action or 'application' in l.action %}tag--amber{% endif %}">{{ l.action }}</span></td><td>{{ l.object_repr|truncatechars:60 }}</td><td class="muted" style="font-size:.8rem">{{ l.detail|truncatechars:80 }}</td><td class="mono" style="font-size:.78rem">{{ l.ip_address|default:"-" }}</td></tr>
-    {% empty %}<tr><td colspan="7" class="muted">No entries.</td></tr>{% endfor %}
+    <tr><td class="mono" style="font-size:.78rem;white-space:nowrap">{{ l.created_at|date:"j M Y, H:i:s" }}</td><td>{{ l.user|default:"-" }}</td><td><span class="tag {% if 'CV' in l.action or 'application' in l.action %}tag--amber{% endif %}">{{ l.action }}</span></td><td>{{ l.object_repr|truncatechars:60 }}</td><td class="muted" style="font-size:.8rem">{{ l.detail|truncatechars:80 }}</td><td class="mono" style="font-size:.78rem">{{ l.ip_address|default:"-" }}</td></tr>
+    {% empty %}<tr><td colspan="6" class="muted">No entries.</td></tr>{% endfor %}
   </tbody>
-</table></div>
-</form>
+</table></div></div>
 {% endblock %}

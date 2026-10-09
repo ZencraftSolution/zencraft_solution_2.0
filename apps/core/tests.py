@@ -1225,3 +1225,90 @@ class FeedbackTests(TestCase):
         """Even approved, it is a record for the team until somebody copies it across."""
         self.client.post(self.URL, {**self.VALID, "may_publish": "on"}, HTTP_REFERER="/")
         self.assertNotContains(self.client.get("/"), "shipped on time")
+
+
+def load_live_site_check():
+    """scripts/check_live_site.py, imported by path: scripts/ is not a package."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("check_live_site", settings.BASE_DIR / "scripts" / "check_live_site.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+class LiveSiteCheckTests(TestCase):
+    """scripts/check_live_site.py, run by .github/workflows/live-site.yml against the deployed site."""
+
+    SITE = "https://zencraftsolution.com"
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.live = load_live_site_check()
+
+    def site(self, home_url=SITE + "/", sitemap=SITE + "/sitemap.xml", health=(200,), home_status=200):
+        """A fake fetch for a site whose tags and sitemap use these addresses."""
+        health = list(health)
+        home = (f'<html><head><link rel="canonical" href="{home_url}">'
+                f'<meta property="og:url" content="{home_url}"></head><body></body></html>') if home_url else "<html></html>"
+        robots = "User-agent: *\nDisallow: /hq/\n" + (f"Sitemap: {sitemap}\n" if sitemap else "")
+
+        def fetch(url):
+            if url.endswith("/healthz/"):
+                return (health.pop(0) if len(health) > 1 else health[0]), '{"status": "ok"}'
+            if url.endswith("/robots.txt"):
+                return 200, robots
+            return home_status, home
+        return fetch
+
+    def run_check(self, fetch):
+        return self.live.check(self.SITE, fetch=fetch, sleep=lambda seconds: None)
+
+    def test_a_correctly_configured_site_passes(self):
+        self.assertEqual(self.run_check(self.site()), [])
+
+    def test_a_site_still_on_its_development_address_fails_on_all_three(self):
+        problems = self.run_check(self.site(home_url="http://127.0.0.1:8000/", sitemap="http://127.0.0.1:8000/sitemap.xml"))
+        self.assertEqual(problems, [
+            "the home page canonical link points at a local address: http://127.0.0.1:8000/",
+            "the home page og:url points at a local address: http://127.0.0.1:8000/",
+            "robots.txt Sitemap points at a local address: http://127.0.0.1:8000/sitemap.xml",
+        ])
+
+    def test_localhost_is_caught_too(self):
+        problems = self.run_check(self.site(sitemap="http://localhost:8000/sitemap.xml"))
+        self.assertEqual(problems, ["robots.txt Sitemap points at a local address: http://localhost:8000/sitemap.xml"])
+
+    def test_missing_tags_or_sitemap_fail(self):
+        problems = self.run_check(self.site(home_url=None, sitemap=None))
+        self.assertIn("the home page has no canonical link", problems)
+        self.assertIn("the home page has no og:url", problems)
+        self.assertIn("robots.txt has no Sitemap line", problems)
+
+    def test_health_is_retried_then_fails(self):
+        self.assertEqual(self.run_check(self.site(health=(503, 503, 200))), [])
+        problems = self.run_check(self.site(health=(503,)))
+        self.assertEqual(len(problems), 1)
+        self.assertTrue(problems[0].startswith(f"/healthz/ answered 503 after {self.live.HEALTH_ATTEMPTS} attempts"))
+
+    def test_a_home_page_that_does_not_load_fails(self):
+        self.assertIn("the home page answered 500, so its tags could not be checked",
+                      self.run_check(self.site(home_status=500)))
+
+    def test_only_web_addresses_are_fetched(self):
+        with self.assertRaises(ValueError):
+            self.live.fetch("file:///etc/passwd")
+        self.assertEqual(self.live.main(["not-a-url"]), 1)
+
+    def test_the_real_home_page_and_robots_pass_with_a_public_site_url(self):
+        """The site's own templates, rendered with a production SITE_URL, satisfy the check."""
+        with override_settings(SITE_URL=self.SITE):
+            pages = {"/": self.client.get("/"), "/robots.txt": self.client.get("/robots.txt")}
+
+        def fetch(url):
+            if url.endswith("/healthz/"):
+                return 200, "ok"
+            response = pages["/robots.txt" if url.endswith("/robots.txt") else "/"]
+            return response.status_code, response.content.decode()
+        self.assertEqual(self.live.check(self.SITE, fetch=fetch, sleep=lambda seconds: None), [])

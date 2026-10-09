@@ -443,7 +443,7 @@ def filtered_audit_log(request, params):
 def audit_log(request):
     logs = filtered_audit_log(request, request.GET)
     q = request.GET.get("q", "").strip()
-    return render(request, "dashboard/audit_log.html", {"logs": logs[:400], "total": logs.count(), "q": q})
+    return render(request, "dashboard/audit_log.html", {"logs": logs[:400], "q": q})
 
 
 @staff_required

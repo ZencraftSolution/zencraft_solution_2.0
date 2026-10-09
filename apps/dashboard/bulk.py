@@ -13,12 +13,14 @@ Deleting is one record at a time, for three reasons:
   private storage after its application or lead is deleted would be personal data nobody can
   find, which is the opposite of what deleting it was for.
 
-Every bulk delete is written to the audit log, after the deletion, so even clearing the audit log
-itself leaves an entry saying who did it and how much was removed.
+Every bulk delete is written to the audit log, after the deletion. The audit log itself is not a
+section here and cannot be deleted from the dashboard: a record of who deleted what is only worth
+anything if the people it records cannot remove it. Store orders are payment records, so only a
+superuser may bulk delete them.
 """
 
 from django.contrib import messages
-from django.db import models, transaction
+from django.core.exceptions import PermissionDenied
 from django.http import Http404, QueryDict
 from django.shortcuts import redirect, render
 from django.urls import reverse
@@ -26,26 +28,26 @@ from django.views.decorators.http import require_POST
 
 from apps.careers.models import JobApplication
 from apps.commerce.models import Order
-from apps.core.models import AuditLog
 from apps.core.utils import log_action
 from apps.estimator.models import ProjectInquiry
 
 from . import crud, views
+from .deletion import delete_with_files, file_fields
 from .mixins import staff_required
 
 # Examples shown on the confirmation page; the count is always exact.
 SAMPLE_SIZE = 20
 
 # The dashboard's own sections. The registry-driven lists (crud.REGISTRY) are added below.
+# superuser_only: other staff can see the list but get 403 from bulk delete. The audit log is
+# deliberately absent; see the module docstring.
 SECTIONS = {
     "leads": dict(model=ProjectInquiry, title="Leads", list_url="dashboard:leads",
                   queryset=views.filtered_leads, files=["document"]),
     "applications": dict(model=JobApplication, title="Job applications", list_url="dashboard:applications_list",
                          queryset=lambda request, params: views._filtered_applications(request, params), files=["cv"]),
     "orders": dict(model=Order, title="Store orders", list_url="dashboard:orders",
-                   queryset=views.filtered_orders, files=[]),
-    "audit": dict(model=AuditLog, title="Audit log", list_url="dashboard:audit",
-                  queryset=views.filtered_audit_log, files=[]),
+                   queryset=views.filtered_orders, files=[], superuser_only=True),
 }
 
 
@@ -59,7 +61,7 @@ def _section(name):
         model=cfg["model"], title=cfg["title"], list_url="dashboard:crud_list", list_args=[name],
         queryset=lambda request, params, cfg=cfg: crud.filtered_queryset(cfg, params),
         # Whatever FileFields the model has; deleting the record deletes what it uploaded.
-        files=[f.name for f in cfg["model"]._meta.get_fields() if isinstance(f, models.FileField)],
+        files=file_fields(cfg["model"]),
     )
 
 
@@ -77,23 +79,12 @@ def _selection(request, section):
     return section["model"].objects.filter(pk__in=ids), filters
 
 
-def _delete_one(obj, file_fields):
-    """Deletes the record, then its files. Returns False if other records still depend on it."""
-    files = [getattr(obj, name) for name in file_fields if getattr(obj, name, None)]
-    try:
-        with transaction.atomic():
-            obj.delete()
-    except (models.ProtectedError, models.RestrictedError):
-        return False
-    for stored in files:
-        stored.delete(save=False)
-    return True
-
-
 @staff_required
 @require_POST
 def bulk_delete(request, section_name):
     section = _section(section_name)
+    if section.get("superuser_only") and not request.user.is_superuser:
+        raise PermissionDenied
     selection, filters = _selection(request, section)
     count = selection.count()
     back = _list_url(section, filters)
@@ -115,7 +106,7 @@ def bulk_delete(request, section_name):
 
     deleted = kept = 0
     for obj in selection.iterator():
-        if _delete_one(obj, section["files"]):
+        if delete_with_files(obj, section["files"]):
             deleted += 1
         else:
             kept += 1

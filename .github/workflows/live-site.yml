@@ -1,0 +1,48 @@
+name: Live site check
+
+# Checks the deployed site, not the code: the home page canonical and og:url and the robots.txt
+# Sitemap line must not point at localhost or 127.0.0.1, and /healthz/ must answer 200. A
+# SITE_URL left at its development default breaks all three while the site otherwise works.
+#
+# Runs on demand (Actions > Live site check > Run workflow) and after every successful
+# deployment that the host reports to GitHub (the deployment_status event). The address comes
+# from the LIVE_SITE_URL repository variable: Settings > Secrets and variables > Actions >
+# Variables, e.g. https://zencraftsolution.com
+on:
+  workflow_dispatch:
+  deployment_status:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: live-site-check
+  cancel-in-progress: true
+
+jobs:
+  live-site:
+    name: Canonical, og:url, sitemap and health on the live site
+    # A deployment_status event also fires for "pending", "in_progress" and failures; only a
+    # finished, successful deploy is worth checking.
+    if: github.event_name == 'workflow_dispatch' || github.event.deployment_status.state == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      LIVE_SITE_URL: ${{ vars.LIVE_SITE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: LIVE_SITE_URL is set
+        run: |
+          if [ -z "$LIVE_SITE_URL" ]; then
+            echo "::error::Set the LIVE_SITE_URL repository variable (Settings > Secrets and variables > Actions > Variables) to the live site, e.g. https://zencraftsolution.com"
+            exit 1
+          fi
+
+      # Standard library only, so nothing to install.
+      - name: Check the live site
+        run: python scripts/check_live_site.py "$LIVE_SITE_URL"

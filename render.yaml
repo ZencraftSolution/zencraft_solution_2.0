@@ -18,6 +18,9 @@
 #                       live there, so skipping this makes every sign-in error.
 #   ensure_superuser  - creates the first admin account from DJANGO_SUPERUSER_*, and does nothing
 #                       on later deploys.
+#   check --deploy    - last, so a misconfigured deploy fails here and the running version stays
+#                       up. ERROR level only: a SITE_URL on localhost (zencraft.E002), no real email
+#                       backend, or media that a redeploy would wipe stops it; warnings do not.
 
 databases:
   - name: zencraft-db            # must match your existing database; see NAMES MATTER above
@@ -40,6 +43,7 @@ services:
       python manage.py migrate --noinput
       python manage.py createcachetable
       python manage.py ensure_superuser
+      python manage.py check --deploy --fail-level ERROR
     # 2 workers x 4 threads suits a starter instance: the work is database and network bound, not
     # CPU bound. The timeout is above the 10s EMAIL_TIMEOUT so a slow mail server loses the send,
     # not the whole request.

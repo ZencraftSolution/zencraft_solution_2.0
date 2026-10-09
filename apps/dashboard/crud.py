@@ -16,6 +16,7 @@ from apps.estimator.models import FeatureOption, ProjectType
 from apps.portfolio.models import CaseStudy, CaseStudyImage, GalleryImage, TeamMember, Testimonial
 from apps.services.models import FAQ, Industry, ProcessStep, Service, ServiceCategory, Technology
 
+from .deletion import delete_with_files
 from .mixins import staff_required
 
 # A list page shows at most this many rows; "select all matching" reaches the rest.
@@ -146,9 +147,8 @@ def crud_delete(request, slug, pk):
     obj = get_object_or_404(cfg["model"], pk=pk)
     if request.method == "POST":
         label = str(obj)
-        try:
-            obj.delete()
-        except models.ProtectedError:
+        # Removes its uploaded files too, exactly as bulk delete does.
+        if not delete_with_files(obj):
             messages.error(request, f"{label} is still referenced by other records and cannot be deleted.")
             return redirect("dashboard:crud_list", slug=slug)
         log_action(request, "deleted", None, detail=f"{cfg['title']}: {label}")
